@@ -1,4 +1,6 @@
 # study-buddy-app
+- Senior Project @ California State University of Long Beach
+
 # Description
 - Study Buddy is an application to help expand CSULB students' options on where to study on campus. 
 
