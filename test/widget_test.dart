@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:study_buddy/forgotpassword.dart';
+import 'package:study_buddy/pages/forgotpassword.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
