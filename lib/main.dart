@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/forgotpassword.dart';
+import 'pages/dashboard.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
