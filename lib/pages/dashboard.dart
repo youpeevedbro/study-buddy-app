@@ -1,8 +1,6 @@
 import 'package:study_buddy/components/square_button.dart';
 import 'package:flutter/material.dart';
 import 'profile.dart'; 
-import 'dart:ui' as ui;
-import 'dart:math' as math;
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});

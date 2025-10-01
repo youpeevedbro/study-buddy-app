@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'pages/forgotpassword.dart';
-import 'pages/dashboard.dart';
+//import 'pages/forgotpassword.dart';
+//import 'pages/dashboard.dart';
 import 'pages/login.dart';
 
 void main() {
