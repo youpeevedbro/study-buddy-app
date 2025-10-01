@@ -30,7 +30,7 @@ class SquareButton extends StatelessWidget {
           elevation: 20,
           shadowColor: Colors.orangeAccent,
         ),
-        child: Text(text, textAlign: TextAlign.left, style: const TextStyle(fontFamily: "SuperLobster", fontSize: 30),),
+        child: Text(text, textAlign: TextAlign.left, style: const TextStyle(fontFamily: "SuperLobster", fontSize: 25),),
       ),
     );
   }
