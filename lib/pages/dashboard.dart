@@ -1,5 +1,8 @@
 import 'package:study_buddy/components/square_button.dart';
 import 'package:flutter/material.dart';
+import 'profile.dart'; 
+import 'dart:ui' as ui;
+import 'dart:math' as math;
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -24,11 +27,13 @@ class _DashboardState extends State<Dashboard> {
                 style: TextStyle(fontFamily: "BrittanySignature", fontSize: 65),
               ),
               SizedBox(height: 30),
-              Divider(
-                thickness: 10,
-                indent: 0,
-                endIndent: 0,
-                color: Color(0xFFfcbf49),
+              SizedBox(
+                height: 60,
+                width: double.infinity,
+                child: CursiveDivider(
+                  color: const Color(0xFFfcbf49),
+                  strokeWidth: 10,
+                ),
               ),
               SizedBox(height: 30),
               // top row
@@ -37,7 +42,10 @@ class _DashboardState extends State<Dashboard> {
                   SquareButton(
                     text: "Account\nSettings",
                     onPressed: () {
-                      print("OK pressed!");
+                        Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const UserProfilePage()),
+                      );
                     },
                     backgroundColor: Color(0xFFf79f79),
                   ),
@@ -79,3 +87,66 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 }
+
+
+
+// ---------------------Cursive / wavy divider painter--------------------------
+class CursiveDivider extends StatelessWidget {
+  final Color color;
+  final double strokeWidth;
+
+  const CursiveDivider({
+    super.key,
+    this.color = Colors.black,
+    this.strokeWidth = 6.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _CursiveDividerPainter(color: color, strokeWidth: strokeWidth),
+      size: Size.infinite,
+    );
+  }
+}
+
+class _CursiveDividerPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+
+  _CursiveDividerPainter({required this.color, required this.strokeWidth});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
+
+    final path = Path();
+    final w = size.width;
+    final h = size.height;
+
+    // Draw a flowing bezier curve across the width
+    path.moveTo(0, h * 0.6);
+    path.cubicTo(w * 0.15, h * 0.1, w * 0.35, h * 0.9, w * 0.5, h * 0.5);
+    path.cubicTo(w * 0.65, h * 0.1, w * 0.85, h * 0.9, w, h * 0.6);
+
+    // Optional secondary thinner stroke for calligraphic feel
+    final shadowPaint = Paint()
+      ..color = color.withAlpha(64)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth * 1.6
+      ..strokeCap = StrokeCap.round
+      ..isAntiAlias = true;
+
+    canvas.drawPath(path, shadowPaint);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

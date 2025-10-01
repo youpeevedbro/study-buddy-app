@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'profile.dart'; // your profile page
 import '../components/grad_button.dart'; // your gradient button
 import 'forgotpassword.dart';
+import 'dashboard.dart';
 
 void main() {
   runApp(const MyApp());
@@ -51,7 +52,7 @@ class _LoginPageState extends State<LoginPage> {
     // Navigate to UserProfilePage after "login", for testing purposes, please delete later
     Navigator.pushReplacement(
     context,
-    MaterialPageRoute(builder: (context) => const UserProfilePage()),
+    MaterialPageRoute(builder: (context) => const Dashboard()),
   );
   }
 

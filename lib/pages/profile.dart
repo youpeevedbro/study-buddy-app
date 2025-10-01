@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart'; // your gradient button
-
-
+import 'dashboard.dart';
+import 'login.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -52,7 +52,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   void _logout() {
-    print("User logged out");
+      Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginPage()),
+      (route) => false,
+    );
   }
 
   void _disableAccount(BuildContext context) {
@@ -110,8 +113,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       child: Icon(Icons.arrow_back_ios, color: Colors.black),
                     ),
           onPressed: () {
-            // Handle back navigation
-            print("Back button pressed");
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const Dashboard()),
+            );
           },
         ),
         title: const Text("Study Buddy"),
@@ -280,7 +284,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         leading: IconButton(
           icon: Transform.translate(
                       offset: const Offset(3.0, 0.0), 
-                      child: Icon(Icons.arrow_back_ios, color: Colors.white),
+                      child: Icon(Icons.arrow_back_ios, color: Colors.black),
                     ),
           onPressed: () {
             // Handle back navigation
@@ -294,8 +298,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
         titleTextStyle: TextStyle(
           fontFamily: 'BrittanySignature',
           fontSize: 25,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          color: Colors.black,
         ),
       ),
       body: Padding(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'login.dart';
+import '../components/grad_button.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({Key? key}) : super(key: key);
@@ -109,30 +110,21 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     const SizedBox(height: 32),
 
                     // Send Link Button
-                    SizedBox(
+                    GradientButton(
                       width: double.infinity,
                       height: 56,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            // Handle password reset logic
-                            _handlePasswordReset();
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF9500), // Orange color
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Send Reset Link',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
+                      borderRadius: BorderRadius.circular(12),
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          _handlePasswordReset();
+                        }
+                      },
+                      child: const Text(
+                        'Send Reset Link',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -152,7 +144,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   'Back to Sign In',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Color(0xFFFF9500),
+                    color: Color(0xFFE7C144),
                     fontWeight: FontWeight.w500,
                   ),
                 ),

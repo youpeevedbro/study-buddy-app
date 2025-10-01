@@ -18,9 +18,7 @@ class SquareButton extends StatelessWidget {
       width: 150,
       height: 150,
       child: ElevatedButton(
-        onPressed: () {
-          print("Square button pressed!");
-        },
+        onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20.0), // removes roundness
