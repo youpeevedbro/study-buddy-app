@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart'; // Make sure this path is correct
+import 'login.dart';
 
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
@@ -19,6 +20,17 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: Transform.translate(
+                      offset: const Offset(3.0, 0.0), 
+                      child: Icon(Icons.arrow_back_ios, color: Colors.black),
+                    ),
+          onPressed: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            );
+          },
+        ),
         centerTitle: false,
         title: ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
