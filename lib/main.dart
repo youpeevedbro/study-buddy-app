@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/forgotpassword.dart';
 import 'pages/dashboard.dart';
+import 'pages/login.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,13 +15,12 @@ class StudyBuddyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Study Buddy',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFFF9500)),
+        primaryColor: const Color(0xFFE7C144),
+        hintColor: const Color(0xFFF0D689),
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: const ForgotPasswordPage(),
+      home: const LoginPage(),
     );
   }
 }

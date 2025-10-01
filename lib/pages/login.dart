@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'profile.dart'; // your profile page
 import '../components/grad_button.dart'; // your gradient button
+import 'forgotpassword.dart';
 
 void main() {
   runApp(const MyApp());
@@ -152,8 +153,9 @@ class _LoginPageState extends State<LoginPage> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        print('Forgot password pressed');
-                        // Navigate to forgot password screen
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+                        );
                       },
                       child: Text(
                         'Forgot your password?',

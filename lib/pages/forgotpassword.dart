@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'login.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({Key? key}) : super(key: key);
@@ -20,7 +21,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+          ),
         ),
       ),
       body: SafeArea(
@@ -140,7 +144,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
               // Back to Sign In Button
               TextButton(
-                onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                ),
                 child: const Text(
                   'Back to Sign In',
                   style: TextStyle(
@@ -182,8 +189,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
-                Navigator.pop(context); // Go back to login
+                // Navigator.pop(context); // Close dialog
+                // Navigator.pop(context); // Go back to login
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                  (route) => false,
+                );
               },
               child: const Text(
                 'OK',
