@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:study_buddy/components/grad_button.dart';
+import 'login.dart';
 
 class HomePage extends StatelessWidget{
   const HomePage({super.key});
