@@ -59,7 +59,7 @@ flutter:
   fonts:
     - family: BrittanySignature
       fonts:
-        - asset: assets/fonts/BrittanySignature.ttf
+        - asset: fonts/MyFont-BrittanySignature.ttf
     - family: SuperLobster
       fonts:
         - asset: fonts/MyFont-SuperLobster.ttf

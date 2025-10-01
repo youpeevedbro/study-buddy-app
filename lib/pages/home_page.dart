@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:study_buddy/components/grad_button.dart';
 import 'login.dart';
+import 'createaccount.dart';
 
 class HomePage extends StatelessWidget{
   const HomePage({super.key});
@@ -16,13 +17,13 @@ class HomePage extends StatelessWidget{
               SizedBox(
                 height: 225,
                 child: Image.asset(
-                  'assets/elbee.png', 
+                  'assets/elbee.png',
                   fit: BoxFit.contain
                 )
               ),
               SizedBox(height: 80),
               Text(
-                "Studdy Buddy", 
+                "Study Buddy",
                 style: Theme.of(context).textTheme.displayLarge,
                 textAlign: TextAlign.center,
               ),
@@ -30,7 +31,12 @@ class HomePage extends StatelessWidget{
               GradientButton(
                 width: double.infinity,
                 height: 50,
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                  );
+                },
                 borderRadius: BorderRadius.circular(15),
                 child: Text(
                   'Login',
@@ -38,8 +44,13 @@ class HomePage extends StatelessWidget{
                 ),
               ),
               SizedBox(height: 15),
-              OutlinedButton( 
-                onPressed: (){},
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CreateAccountPage()),
+                  );
+                },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.black,
                   minimumSize: Size.fromHeight(50),

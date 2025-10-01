@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart'; // your gradient button
 import 'dashboard.dart';
-import 'login.dart';
+import 'home_page.dart';
 void main() {
   runApp(const MyApp());
 }
@@ -53,7 +53,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   void _logout() {
       Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginPage()),
+      MaterialPageRoute(builder: (_) => const HomePage()),
       (route) => false,
     );
   }

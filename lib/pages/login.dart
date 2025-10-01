@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../components/grad_button.dart'; // your gradient button
 import 'forgotpassword.dart';
 import 'dashboard.dart';
+import 'home_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -82,8 +83,7 @@ class _LoginPageState extends State<LoginPage> {
                       child: Icon(Icons.arrow_back_ios, color: Colors.grey[700]),
                     ),
                     onPressed: () {
-                      // Implement navigation back or other action
-                      print('Back button pressed');
+                      Navigator.of(context).pop();
                     },
                   ),
                   const SizedBox(height: 100.0), // Spacing after back arrow
