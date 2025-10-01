@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'profile.dart'; // your profile page
+//import 'profile.dart'; // your profile page
 import '../components/grad_button.dart'; // your gradient button
 import 'forgotpassword.dart';
 import 'dashboard.dart';
