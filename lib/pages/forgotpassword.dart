@@ -22,10 +22,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const LoginPage()),
-            (route) => false,
-          ),
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
       body: SafeArea(
@@ -136,10 +133,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
               // Back to Sign In Button
               TextButton(
-              onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                  (route) => false,
-                ),
+              onPressed: () => Navigator.of(context).pop(), 
                 child: const Text(
                   'Back to Sign In',
                   style: TextStyle(
@@ -181,12 +175,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
           actions: [
             TextButton(
               onPressed: () {
-                // Navigator.pop(context); // Close dialog
-                // Navigator.pop(context); // Go back to login
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                  (route) => false,
-                );
+                Navigator.pop(context); // Close dialog
+                Navigator.pop(context); // Go back to login
               },
               child: const Text(
                 'OK',

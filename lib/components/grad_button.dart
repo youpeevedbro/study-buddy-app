@@ -14,7 +14,7 @@ class GradientButton extends StatelessWidget {
     required this.child,
     this.borderRadius,
     this.width,
-    this.height = 44.0,
+    this.height = 42.0,
     this.gradient = const LinearGradient(colors: [Color(0xFFFFDE59), Color(0xFFFF914D)]),
   });
 
