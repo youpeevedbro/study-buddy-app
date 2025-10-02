@@ -16,10 +16,10 @@ class HomePage extends StatelessWidget{
               SizedBox(height: 140),
               SizedBox(
                 height: 225,
-                // child: Image.asset(
-                //   'assets/elbee.png',
-                //   fit: BoxFit.contain
-                // )
+                child: Image.asset(
+                  'assets/images/elbee.png',
+                  fit: BoxFit.contain
+                )
               ),
               SizedBox(height: 80),
               Text(

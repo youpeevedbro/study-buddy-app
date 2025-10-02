@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart'; // Make sure this path is correct
-import 'login.dart';
+import 'home_page.dart';
 
 class CreateAccountPage extends StatefulWidget {
   const CreateAccountPage({super.key});
@@ -27,7 +27,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     ),
           onPressed: () {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const LoginPage()),
+              MaterialPageRoute(builder: (_) => const HomePage()),
             );
           },
         ),
