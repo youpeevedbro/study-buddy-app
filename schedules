@@ -1,0 +1,6 @@
+CREATE TABLE schedules (
+    id SERIAL PRIMARY KEY,
+    classroom_id INT REFERENCES classrooms(id) ON DELETE CASCADE,
+    start_time TIMESTAMP NOT NULL,
+    end_time TIMESTAMP NOT NULL
+);
