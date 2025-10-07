@@ -1,7 +1,7 @@
 # run the code below to activate the virtual enviroment to activate the dependencies
 # source .venv/bin/activate
 
-import requests
+import requests, json
 from bs4 import BeautifulSoup
 
 base_url = "https://www.csulb.edu/"
@@ -35,3 +35,13 @@ for row in body:
         
 # create a dictonary, using the building acronyms and names
 building_acronyms_and_names = dict(zip(building_acronyms, building_names))
+
+# Write the dictonary to a json file
+with open("building_codes.json", "w") as f:
+    json.dump(
+        building_acronyms_and_names,
+        f,
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+    )
