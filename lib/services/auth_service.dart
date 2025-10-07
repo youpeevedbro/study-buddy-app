@@ -1,13 +1,20 @@
+// lib/services/auth_service.dart
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 const auth0Domain      = 'dev-qcz5hdonm0stlozz.us.auth0.com';
 const auth0ClientId    = 'yE6ebH53vppjcmhAfqaEOMRsCKivuylT';
+
+// IMPORTANT: this is your *custom URL scheme*, shared by iOS & Android.
+// Do NOT put the bundle id here.
 const callbackScheme   = 'com.studybuddy';
+
 const dbConnectionName = 'Username-Password-Authentication';
-const apiAudience      = null;
+const apiAudience      = null; // e.g. 'https://api.myapi.com' if you have one
 
 const allowedDomain = '@student.csulb.edu';
 
@@ -37,18 +44,24 @@ class AuthService {
   }
 
   Future<void> logout() async {
-    final returnTo =
-        '$callbackScheme://$auth0Domain/android/com.example.study_buddy/callback';
+    // Build the platform-accurate returnTo using the *installed* app id.
+    final returnTo = await _buildReturnTo();
 
     await _secure.deleteAll();
     _accessToken = _idToken = _refreshToken = null;
 
     try {
       await _auth0.webAuthentication(scheme: callbackScheme).logout(returnTo: returnTo);
-    } catch (_) {}
+    } catch (_) {/* ignore */}
   }
 
-
+  /// com.studybuddy://<domain>/<ios|android>/<bundleOrAppId>/callback
+  Future<String> _buildReturnTo() async {
+    final info = await PackageInfo.fromPlatform();
+    final id   = info.packageName; // iOS: bundle id, Android: applicationId
+    final path = Platform.isIOS ? '/ios/$id/callback' : '/android/$id/callback';
+    return '$callbackScheme://$auth0Domain$path';
+  }
 
   Future<void> sendPasswordResetEmail(String email) async {
     final lower = email.trim().toLowerCase();
@@ -82,14 +95,11 @@ class AuthService {
   }
 
   Future<bool> isLoggedIn() async {
-    // refresh cached tokens from storage
     if (_idToken == null) {
       _idToken = await _secure.read(key: 'id_token');
     }
-
     final claims = _decodeJwt(_idToken);
     if (claims == null) return false;
-
     final exp = claims['exp'];
     if (exp is int) {
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
