@@ -79,7 +79,7 @@ class _LandingPageState extends State<LandingPage> {
               ),
               Expanded(
                 child: Align(
-                  alignment: const Alignment(0, -0.4),
+                  alignment: const Alignment(0, -0.3),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -106,7 +106,7 @@ class _LandingPageState extends State<LandingPage> {
                             ),
                           )
                               : const Text(
-                            'Log In',
+                            'Lock In',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -116,38 +116,6 @@ class _LandingPageState extends State<LandingPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Sign Up
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _busy ? null : _doSignup,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: brand,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _busy
-                              ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                              : const Text(
-                            'Sign Up',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
