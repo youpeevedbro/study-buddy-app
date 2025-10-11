@@ -1,19 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
@@ -31,8 +18,16 @@
 
   <title>study_buddy</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- 🔥 Speed up first connection to Auth0 (and your custom domain if used) -->
+  <link rel="dns-prefetch" href="https://dev-qcz5hdonm0stlozz.us.auth0.com">
+  <link rel="preconnect" href="https://dev-qcz5hdonm0stlozz.us.auth0.com" crossorigin>
+  <!-- If you later use a custom domain, add it too:
+  <link rel="dns-prefetch" href="https://login.yourdomain.com">
+  <link rel="preconnect" href="https://login.yourdomain.com" crossorigin>
+  -->
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
