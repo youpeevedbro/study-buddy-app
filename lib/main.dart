@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/landing.dart';
 import 'screens/dashboard.dart';
 import 'screens/profile.dart';
+import 'screens/activities.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,7 @@ class StudyBuddyApp extends StatelessWidget {
         '/landing'   : (_) => const LandingPage(),
         '/dashboard' : (_) => const Dashboard(),
         '/profile'   : (_) => const UserProfilePage(),
+        '/activities' : (_) => const MyActivitiesPage(),
       },
     );
   }
