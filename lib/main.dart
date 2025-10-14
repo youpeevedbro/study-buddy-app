@@ -3,6 +3,7 @@ import 'screens/landing.dart';
 import 'screens/dashboard.dart';
 import 'screens/profile.dart';
 import 'screens/activities.dart';
+import 'screens/my_studygroups.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,7 @@ class StudyBuddyApp extends StatelessWidget {
         '/dashboard' : (_) => const Dashboard(),
         '/profile'   : (_) => const UserProfilePage(),
         '/activities' : (_) => const MyActivitiesPage(),
+        '/mystudygroups' : (_) => const MyStudyGroupsPage(),
       },
     );
   }

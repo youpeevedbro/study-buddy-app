@@ -13,7 +13,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   void _checkOutRoom() {
     setState(() {
       _userCheckedIn = false;
-      //check user out of room
+      //Remove User from Room
     });
   }
   
@@ -61,7 +61,9 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               ),
               SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.pushNamed(context, '/mystudygroups'); // <-- go to My Study Groups
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: theme.colorScheme.primaryContainer,
                   foregroundColor: theme.colorScheme.onPrimaryContainer,
