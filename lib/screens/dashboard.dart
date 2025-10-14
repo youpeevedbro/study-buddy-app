@@ -97,9 +97,8 @@ class _DashboardState extends State<Dashboard> {
             ),
           ),
 
-          // checkout button at bottom
           Positioned(
-            bottom: 30, // distance from bottom edge
+            bottom: 30,
             left: 0,
             right: 0,
             child: Center(
@@ -108,15 +107,22 @@ class _DashboardState extends State<Dashboard> {
                 height: 55,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFfcbf49), // yellow
-                    foregroundColor: Colors.black, // text color
+                    backgroundColor: const Color(0xFFfcbf49),
+                    foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     elevation: 3,
                   ),
                   onPressed: () {
-                    // handle checkout logic
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("You have checked out"),
+                        duration: Duration(seconds: 1),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                   },
                   child: const Text(
                     "Checkout",
