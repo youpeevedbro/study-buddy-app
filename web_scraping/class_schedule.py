@@ -62,9 +62,13 @@ for link in class_links:
                     classes.append([class_names[index], session_title, days, time, location])
     index = index + 1
 
-# for i in classes:
-#     print(i)
 
-with open("output.txt", "w") as f:
-    for item in classes:
-        f.write(f"{item}\n")
+# Write the list of classes to a json file
+with open("classes.json", "w") as f:
+    json.dump(
+        classes,
+        f,
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+    )
