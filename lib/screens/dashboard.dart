@@ -29,115 +29,68 @@ class _DashboardState extends State<Dashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // main content
-          Container(
-            margin: const EdgeInsets.only(top: 100.0),
-            child: Padding(
-              padding: const EdgeInsets.all(30.0),
-              child: Column(
+      body: Container(
+        margin: const EdgeInsets.only(top: 100.0),
+        child: Padding(
+          padding: const EdgeInsets.all(30.0),
+          child: Column(
+            children: [
+              const Text(
+                "Hello, Student",
+                style: TextStyle(fontFamily: "BrittanySignature", fontSize: 65),
+              ),
+              const SizedBox(height: 30),
+              const SizedBox(
+                height: 60,
+                width: double.infinity,
+                child: CursiveDivider(
+                  color: Color(0xFFfcbf49),
+                  strokeWidth: 10,
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // top row
+              Row(
                 children: [
-                  const Text(
-                    "Hello, Student",
-                    style: TextStyle(
-                      fontFamily: "BrittanySignature",
-                      fontSize: 65,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  const SizedBox(
-                    height: 60,
-                    width: double.infinity,
-                    child: CursiveDivider(
-                      color: Color(0xFFfcbf49),
-                      strokeWidth: 10,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // top row
-                  Row(
-                    children: [
-                      SquareButton(
-                        text: "Account\nSettings",
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/profile');
-                        },
-                        backgroundColor: const Color(0xFFf79f79),
-                      ),
-                      const SizedBox(width: 30),
-                      SquareButton(
-                        text: "Find Study\nGroup",
-                        onPressed: () {},
-                        backgroundColor: const Color(0xFFf7d08a),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-
-                  // bottom row
-                  Row(
-                    children: [
-                      SquareButton(
-                        text: "Find\nRoom",
-                        onPressed: () {},
-                        backgroundColor: const Color(0xFFbfd7b5),
-                      ),
-                      const SizedBox(width: 30),
-                      SquareButton(
-                        text: "My\nActivities",
-                        onPressed: () {
-                      Navigator.pushNamed(context, '/activities'); // <-- go to My Activities
+                  SquareButton(
+                    text: "Account\nSettings",
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/profile'); // <-- go to profile
                     },
-                        backgroundColor: const Color(0xFFffd6af),
-                      ),
-                    ],
+                    backgroundColor: const Color(0xFFf79f79),
+                  ),
+                  const SizedBox(width: 30),
+                  SquareButton(
+                    text: "Find Study\nGroup",
+                    onPressed: () {},
+                    backgroundColor: const Color(0xFFf7d08a),
                   ),
                 ],
               ),
-            ),
-          ),
+              const SizedBox(height: 30),
 
-          Positioned(
-            bottom: 30,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.9,
-                height: 55,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFfcbf49),
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 3,
+              // bottom row
+              Row(
+                children: [
+                  SquareButton(
+                    text: "Find\nRoom",
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/rooms'); 
+                    },
+                    backgroundColor: const Color(0xFFbfd7b5),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("You have checked out"),
-                        duration: Duration(seconds: 1),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    "Checkout",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const SizedBox(width: 30),
+                  SquareButton(
+                    text: "My\nActivities",
+                    onPressed: () {},
+                    backgroundColor: const Color(0xFFffd6af),
                   ),
-                ),
+                ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
