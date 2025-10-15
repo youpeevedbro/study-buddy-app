@@ -32,8 +32,8 @@ class StudyBuddyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: brand),
         scaffoldBackgroundColor: Colors.white,
       ),
-      // initialRoute: '/landing',
-      initialRoute: '/firebase-check',
+      initialRoute: '/landing',
+      // initialRoute: '/firebase-check',
       routes: {
         '/landing'        : (_) => const LandingPage(),
         '/dashboard'      : (_) => const Dashboard(),
