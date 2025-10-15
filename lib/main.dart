@@ -5,6 +5,7 @@ import 'firebase_options.dart'; // <-- add this
 import 'screens/landing.dart';
 import 'screens/dashboard.dart';
 import 'screens/profile.dart';
+import 'screens/findroom.dart';
 import 'screens/firebasecheckpage.dart';
 import 'screens/activities.dart';
 import 'screens/my_studygroups.dart';
@@ -41,6 +42,7 @@ class StudyBuddyApp extends StatelessWidget {
         '/firebase-check' : (_) => const FirebaseCheckPage(),
         '/activities' : (_) => const MyActivitiesPage(),
         '/mystudygroups' : (_) => const MyStudyGroupsPage(),
+        '/rooms'     : (_) => const FindRoomPage(),
       },
     );
   }

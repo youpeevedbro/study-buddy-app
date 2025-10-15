@@ -1,7 +1,7 @@
 # run the code below to activate the virtual enviroment to activate the dependencies
 # source .venv/bin/activate
 
-import requests, json
+import requests, json, os
 from bs4 import BeautifulSoup
 
 base_url = "https://www.csulb.edu/"
@@ -36,8 +36,15 @@ for row in body:
 # create a dictonary, using the building acronyms and names
 building_acronyms_and_names = dict(zip(building_acronyms, building_names))
 
-# Write the dictonary to a json file
-with open("building_codes.json", "w") as f:
+# Save the json file to the Flutter assets folder
+# Get the project root 
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Path to Flutter assets folder
+output_path = os.path.join(root_dir, 'assets', 'building_codes.json')
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+with open(output_path, 'w', encoding='utf-8') as f:
     json.dump(
         building_acronyms_and_names,
         f,

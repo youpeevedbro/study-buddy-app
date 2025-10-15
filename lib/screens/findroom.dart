@@ -1,7 +1,8 @@
-// Find Room screen, logic can be implemented later, should be connect to dashboard
+// Find Room screen 
 import 'package:flutter/material.dart';
 import 'dashboard.dart';
 import 'filter.dart'; // Import the filter page
+import '../components/grad_button.dart';  
 
 class FindRoomPage extends StatefulWidget {
   const FindRoomPage({super.key});
@@ -11,35 +12,50 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
-  // Dummy room list (replace with Firestore or backend data)
-  final List<String> _rooms = [
-    "Room 1",
-    "Room 2",
-    "Room 3",
-    "Room 4",
-    "Room 5"
+  final List<Map<String, dynamic>> _rooms = [
+    {"name": "Room 1", "location": "EN2 - 312", "lockedReports": 3},
+    {"name": "Room 2", "location": "Library - 408", "lockedReports": 0},
+    {"name": "Room 3", "location": "Science Hall 105", "lockedReports": 1},
+    {"name": "Room 4", "location": "HC - 120", "lockedReports": 0},
   ];
 
-  String? _selectedRoom;
+  int _expandedIndex = -1;
+  FilterCriteria? _currentFilter;
 
+  // Filter modal
   void _openFilterPopup() async {
-  // Opens the Filter page as a modern bottom sheet
-  await showModalBottomSheet(
-    context: context,
-    isScrollControlled: true, // allows full height scroll
-    backgroundColor: Colors.white,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-    ),
-    builder: (context) => const FilterPage(), // call filter.dart widget
-  );
-}
+    final result = await showModalBottomSheet<FilterCriteria>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (context) => FilterPage(initialFilters: _currentFilter),
+    );
 
-  void _selectRoom(String room) {
+    if (result != null) {
+      setState(() => _currentFilter = result);
+      print('Applied Filters: ${result.toJson()}');
+      // TODO: Apply backend filtering logic here later
+    }
+  }
+
+  void _reportLocked(int index) {
     setState(() {
-      _selectedRoom = room;
+      _rooms[index]["lockedReports"]++;
     });
-    print("Selected: $room");
+    // TODO: Update Firestore or backend
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("${_rooms[index]["name"]} reported as locked")),
+    );
+  }
+
+  void _checkIn(int index) {
+    // TODO: Implement backend check-in logic
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("You checked into ${_rooms[index]["name"]}")),
+    );
   }
 
   @override
@@ -54,13 +70,13 @@ class _FindRoomPageState extends State<FindRoomPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // App Title (Study Buddy)
+                // App title
                 Padding(
                   padding: const EdgeInsets.only(top: 20.0),
                   child: Text(
                     'Study Buddy',
                     style: const TextStyle(
-                      fontFamily: 'BrittanySignature', 
+                      fontFamily: 'BrittanySignature',
                       fontSize: 36,
                       fontWeight: FontWeight.w400,
                     ),
@@ -69,13 +85,13 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
                 const SizedBox(height: 20),
 
-                // Find Room Header + Filter Button
+                // Header row
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 25.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         "Find Room",
                         style: TextStyle(
                           fontSize: 25,
@@ -91,68 +107,146 @@ class _FindRoomPageState extends State<FindRoomPage> {
                   ),
                 ),
 
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 25.0),
+                  child: const Divider(
+                    color: Colors.black,
+                    thickness: 2,
+                  ),
+                ),
+
                 const SizedBox(height: 10),
 
-                // Scrollable List of Rooms
+                // Expandable room list
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 25.0),
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Color(0xFFFADA7A),
+                        color: const Color(0xFFFADA7A),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      padding: const EdgeInsets.all(15),
-                      child: ListView.builder(
-                        itemCount: _rooms.length,
-                        itemBuilder: (context, index) {
-                          final room = _rooms[index];
-                          final isSelected = _selectedRoom == room;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: GestureDetector(
-                              onTap: () => _selectRoom(room),
-                              child: Container(
-                                height: 45,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: Color(0xFFFCF6DB),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: isSelected
-                                      ? Border.all(
-                                          color: theme.primaryColor,
-                                          width: 2,
-                                        )
-                                      : null,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(20),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 3),
+                      padding: const EdgeInsets.all(10),
+                      child: SingleChildScrollView(
+                        child: ExpansionPanelList(
+                          elevation: 0,
+                          expandedHeaderPadding: EdgeInsets.zero,
+                          expansionCallback: (panelIndex, isExpanded) {
+                            setState(() {
+                              _expandedIndex =
+                                  _expandedIndex == panelIndex ? -1 : panelIndex;
+                            });
+                          },
+                          children: _rooms.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final room = entry.value;
+                            final isExpanded = _expandedIndex == index;
+
+                            return ExpansionPanel(
+                              canTapOnHeader: true,
+                              backgroundColor: const Color(0xFFFCF6DB),
+                              headerBuilder: (context, isExpanded) {
+                                return ListTile(
+                                  title: Center(
+                                    child: Text(
+                                      room["name"],
+                                      style: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: isExpanded
+                                            ? theme.primaryColor
+                                            : Colors.black,
+                                      ),
                                     ),
-                                  ],
-                                ),
-                                child: Text(
-                                  room,
-                                  style: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected
-                                        ? theme.primaryColor
-                                        : Colors.black,
+                                  ),
+                                );
+                              },
+                              body: Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withAlpha(20),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "Location: ${room["location"]}",
+                                        style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if (room["lockedReports"] > 0)
+                                        Text(
+                                          "${room["lockedReports"]} student(s) reported this room as LOCKED",
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                            fontStyle: FontStyle.italic,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceEvenly,
+                                        children: [
+                                          // Report Locked
+                                          GradientButton(
+                                              height: 43,
+                                              borderRadius: BorderRadius.circular(12.0),
+                                              onPressed: () => _reportLocked(index),
+                                              child: const Text(
+                                                'Locked',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 19.0,
+                                                ),
+                                                ),
+                                            ),
+
+                                          // Check-in
+                                          GradientButton(
+                                              height: 43,
+                                              borderRadius: BorderRadius.circular(12.0),
+                                              onPressed: () => _checkIn(index),
+                                              child: const Text(
+                                                'Check-in',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 19.0,
+                                                ),
+                                                ),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                              isExpanded: isExpanded,
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ],
             ),
+
+            // Back button
             Positioned(
               top: 20,
               left: 25,
@@ -164,9 +258,9 @@ class _FindRoomPageState extends State<FindRoomPage> {
                   );
                 },
                 icon: Transform.translate(
-                      offset: const Offset(3.0, 0.0), 
-                      child: Icon(Icons.arrow_back_ios, color: Colors.black),
-                    ),
+                  offset: const Offset(3.0, 0.0),
+                  child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+                ),
               ),
             ),
           ],
