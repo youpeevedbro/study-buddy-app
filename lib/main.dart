@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';  
 import 'screens/landing.dart';
 import 'screens/dashboard.dart';
 import 'screens/profile.dart';
+import 'screens/firebasecheckpage.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();    
   runApp(const StudyBuddyApp());
 }
 
@@ -28,6 +31,8 @@ class StudyBuddyApp extends StatelessWidget {
         '/landing'   : (_) => const LandingPage(),
         '/dashboard' : (_) => const Dashboard(),
         '/profile'   : (_) => const UserProfilePage(),
+          //testing purposes
+        '/firebase-check' : (_) => const FirebaseCheckPage(),
       },
     );
   }
