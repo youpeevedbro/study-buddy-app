@@ -87,7 +87,9 @@ class _DashboardState extends State<Dashboard> {
                       const SizedBox(width: 30),
                       SquareButton(
                         text: "My\nActivities",
-                        onPressed: () {},
+                        onPressed: () {
+                      Navigator.pushNamed(context, '/activities'); // <-- go to My Activities
+                    },
                         backgroundColor: const Color(0xFFffd6af),
                       ),
                     ],
