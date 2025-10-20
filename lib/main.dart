@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // <-- add this
+import 'config/app_config.dart';
+import 'firebase_options.dart';
+
 
 import 'screens/landing.dart';
 import 'screens/dashboard.dart';
@@ -12,6 +15,11 @@ import 'screens/my_studygroups.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: ".env");
+
+  AppConfig.init();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // <-- use options
   );
