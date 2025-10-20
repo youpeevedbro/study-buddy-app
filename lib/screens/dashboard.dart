@@ -78,7 +78,9 @@ class _DashboardState extends State<Dashboard> {
                       const SizedBox(width: 30),
                       SquareButton(
                         text: "Find Study\nGroup",
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/studygroup');
+                        },
                         backgroundColor: const Color(0xFFf7d08a),
                       ),
                     ],

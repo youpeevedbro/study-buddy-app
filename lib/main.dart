@@ -52,7 +52,7 @@ class StudyBuddyApp extends StatelessWidget {
         '/activities' : (_) => const MyActivitiesPage(),
         '/mystudygroups' : (_) => const MyStudyGroupsPage(),
         '/rooms'     : (_) => const FindRoomPage(),
-        '/studygroup' : (_) => const StudyGroupPage(),
+        '/studygroup' : (_) => const StudyGroupsPage(),
       },
     );
   }
