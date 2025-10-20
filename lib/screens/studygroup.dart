@@ -198,7 +198,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                                         const SizedBox(height: 12),
                                         Center(
                                           child: GradientButton(
-                                            height: 45,
+                                            height: 35,
                                             borderRadius: BorderRadius.circular(12.0),
                                             onPressed: () => _sendJoinRequest(index),
                                             child: const Text(
