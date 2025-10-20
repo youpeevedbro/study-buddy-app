@@ -153,7 +153,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                       style: TextStyle(
                                         fontStyle: FontStyle.italic,
                                         fontSize: 16,
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.w500,
                                         color: isExpanded
                                             ? theme.primaryColor
                                             : Colors.black,
@@ -204,28 +204,28 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                         children: [
                                           // Report Locked
                                           GradientButton(
-                                              height: 43,
+                                              height: 35,
                                               borderRadius: BorderRadius.circular(12.0),
                                               onPressed: () => _reportLocked(index),
                                               child: const Text(
                                                 'Locked',
                                                 style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 19.0,
+                                                  fontSize: 16.0,
                                                 ),
                                                 ),
                                             ),
 
                                           // Check-in
                                           GradientButton(
-                                              height: 43,
+                                              height: 35,
                                               borderRadius: BorderRadius.circular(12.0),
                                               onPressed: () => _checkIn(index),
                                               child: const Text(
                                                 'Check-in',
                                                 style: TextStyle(
                                                   color: Colors.white,
-                                                  fontSize: 19.0,
+                                                  fontSize: 16.0,
                                                 ),
                                                 ),
                                             ),
