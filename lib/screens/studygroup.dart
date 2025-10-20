@@ -23,7 +23,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
       "name": "Algorithms Review Session",
       "time": "Wed, 6:00 PM - 8:00 PM",
       "location": "EN2 - 310",
-      "status": "Full"
+      "status": "By Invitation Only" // Should be full or by invitation only??
     },
     {
       "name": "Machine Learning Study Group",
@@ -34,7 +34,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
     {
       "name": "CSULB Finals Prep Group",
       "time": "Sat, 1:00 PM - 3:00 PM",
-      "location": "CBA - 205",
+      "location": "COB - 205",
       "status": "Open for new members"
     },
   ];
@@ -140,7 +140,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                                       style: TextStyle(
                                         fontStyle: FontStyle.italic,
                                         fontSize: 16,
-                                        fontWeight: FontWeight.w600,
+                                        fontWeight: FontWeight.w500,
                                         color: isExpanded
                                             ? theme.primaryColor
                                             : Colors.black,
@@ -152,6 +152,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                               body: Padding(
                                 padding: const EdgeInsets.all(12.0),
                                 child: Container(
+                                  width: double.infinity,
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(12),
@@ -187,31 +188,29 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: group["status"] == "Full"
+                                          color: group["status"] == "By Invitation Only"
                                               ? Colors.red
                                               : Colors.green,
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-                                      Center(
-                                        child: GradientButton(
-                                          height: 45,
-                                          borderRadius:
-                                              BorderRadius.circular(12.0),
-                                          onPressed: group["status"] == "Full"
-                                              ? null
-                                              : () => _sendJoinRequest(index),
-                                          child: Text(
-                                            group["status"] == "Full"
-                                                ? "Group Full"
-                                                : "Send Join Request",
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 18.0,
+                                      if (group["status"] != "By Invitation Only") ...[
+                                        const SizedBox(height: 12),
+                                        Center(
+                                          child: GradientButton(
+                                            height: 45,
+                                            borderRadius: BorderRadius.circular(12.0),
+                                            onPressed: () => _sendJoinRequest(index),
+                                            child: const Text(
+                                              "Send Join Request",
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 18.0,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
