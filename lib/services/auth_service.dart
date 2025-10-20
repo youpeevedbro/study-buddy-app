@@ -5,24 +5,13 @@ import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-
-const auth0Domain      = 'dev-qcz5hdonm0stlozz.us.auth0.com';
-const auth0ClientId    = 'yE6ebH53vppjcmhAfqaEOMRsCKivuylT';
-
-// IMPORTANT: this is your *custom URL scheme*, shared by iOS & Android.
-// Do NOT put the bundle id here.
-const callbackScheme   = 'com.studybuddy';
-
-const dbConnectionName = 'Username-Password-Authentication';
-const apiAudience      = null; // e.g. 'https://api.myapi.com' if you have one
-
-const allowedDomain = '@student.csulb.edu';
+import '../config/app_config.dart';
 
 class AuthService {
   AuthService._();
   static final instance = AuthService._();
 
-  final _auth0  = Auth0(auth0Domain, auth0ClientId);
+  final _auth0  = Auth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
   final _secure = const FlutterSecureStorage();
 
   String? _accessToken;
@@ -31,51 +20,47 @@ class AuthService {
 
   Future<void> login() async {
     final creds = await _auth0
-        .webAuthentication(scheme: callbackScheme)
-        .login(audience: apiAudience);
+        .webAuthentication(scheme: AppConfig.callbackScheme)
+        .login(audience: AppConfig.apiAudience);
     await _store(creds);
   }
 
   Future<void> signup() async {
     final creds = await _auth0
-        .webAuthentication(scheme: callbackScheme)
-        .login(audience: apiAudience, parameters: const {'screen_hint': 'signup'});
+        .webAuthentication(scheme: AppConfig.callbackScheme)
+        .login(audience: AppConfig.apiAudience, parameters: const {'screen_hint': 'signup'});
     await _store(creds);
   }
 
   Future<void> logout() async {
-    // Build the platform-accurate returnTo using the *installed* app id.
     final returnTo = await _buildReturnTo();
-
     await _secure.deleteAll();
     _accessToken = _idToken = _refreshToken = null;
-
     try {
-      await _auth0.webAuthentication(scheme: callbackScheme).logout(returnTo: returnTo);
+      await _auth0.webAuthentication(scheme: AppConfig.callbackScheme).logout(returnTo: returnTo);
     } catch (_) {/* ignore */}
   }
 
-  /// com.studybuddy://<domain>/<ios|android>/<bundleOrAppId>/callback
   Future<String> _buildReturnTo() async {
     final info = await PackageInfo.fromPlatform();
-    final id   = info.packageName; // iOS: bundle id, Android: applicationId
+    final id   = info.packageName;
     final path = Platform.isIOS ? '/ios/$id/callback' : '/android/$id/callback';
-    return '$callbackScheme://$auth0Domain$path';
+    return '${AppConfig.callbackScheme}://${AppConfig.auth0Domain}$path';
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
     final lower = email.trim().toLowerCase();
-    if (!lower.endsWith(allowedDomain)) {
-      throw Exception('Please use your $allowedDomain email.');
+    if (!lower.endsWith(AppConfig.allowedDomain)) {
+      throw Exception('Please use your ${AppConfig.allowedDomain} email.');
     }
-    final uri = Uri.https(auth0Domain, '/dbconnections/change_password');
+    final uri = Uri.https(AppConfig.auth0Domain, '/dbconnections/change_password');
     final res = await http.post(
       uri,
       headers: {'content-type': 'application/json'},
       body: jsonEncode({
-        'client_id': auth0ClientId,
+        'client_id': AppConfig.auth0ClientId,
         'email': lower,
-        'connection': dbConnectionName,
+        'connection': AppConfig.dbConnectionName,
       }),
     );
     if (res.statusCode >= 400) {

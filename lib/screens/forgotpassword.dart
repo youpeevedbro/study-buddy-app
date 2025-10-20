@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../config/app_config.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -18,8 +19,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final email = v.trim().toLowerCase();
     final validFormat = RegExp(r'^[\w.\-+]+@([\w\-]+\.)+[A-Za-z]{2,}$').hasMatch(email);
     if (!validFormat) return 'Enter a valid email';
-    if (!email.endsWith(allowedDomain)) {
-      return 'Use your $allowedDomain email';
+    if (!email.endsWith(AppConfig.allowedDomain)) {
+      return 'Use your ${AppConfig.allowedDomain} email';
     }
     return null;
   }
@@ -77,8 +78,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final lower = raw.toLowerCase();
     if (lower.contains('invalid_email_domain') ||
         lower.contains('forbidden_domain') ||
-        lower.contains(allowedDomain.toLowerCase()) == false) {
-      return 'Please use your $allowedDomain email.';
+        lower.contains(AppConfig.allowedDomain.toLowerCase()) == false) {
+      return 'Please use your ${AppConfig.allowedDomain} email.';
     }
     if (lower.contains('too_many_requests')) {
       return 'Too many attempts. Please try again in a few minutes.';
@@ -142,10 +143,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        const Text(
-                          'Enter your $allowedDomain email and we’ll send a link.',
+                        Text(
+                          'Enter your ${AppConfig.allowedDomain} email and we’ll send a link.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                         const SizedBox(height: 40),
 
