@@ -1,61 +1,53 @@
-// Find Room screen 
+// Study Groups screen
 import 'package:flutter/material.dart';
 import 'dashboard.dart';
-import 'filter.dart'; // Import the filter page
-import '../components/grad_button.dart';  
+import '../components/grad_button.dart';
 
-class FindRoomPage extends StatefulWidget {
-  const FindRoomPage({super.key});
+class StudyGroupsPage extends StatefulWidget {
+  const StudyGroupsPage({super.key});
 
   @override
-  State<FindRoomPage> createState() => _FindRoomPageState();
+  State<StudyGroupsPage> createState() => _StudyGroupsPageState();
 }
 
-class _FindRoomPageState extends State<FindRoomPage> {
-  final List<Map<String, dynamic>> _rooms = [
-    {"name": "Room 1", "location": "EN2 - 312", "lockedReports": 3},
-    {"name": "Room 2", "location": "Library - 408", "lockedReports": 0},
-    {"name": "Room 3", "location": "Science Hall 105", "lockedReports": 1},
-    {"name": "Room 4", "location": "HC - 120", "lockedReports": 0},
+class _StudyGroupsPageState extends State<StudyGroupsPage> {
+  // Dummy data for study groups
+  final List<Map<String, dynamic>> _groups = [
+    {
+      "name": "Data Structures Study Group",
+      "time": "Mon, 3:00 PM - 5:00 PM",
+      "location": "Library Room 204",
+      "status": "Open for new members"
+    },
+    {
+      "name": "Algorithms Review Session",
+      "time": "Wed, 6:00 PM - 8:00 PM",
+      "location": "EN2 - 310",
+      "status": "Full"
+    },
+    {
+      "name": "Machine Learning Study Group",
+      "time": "Fri, 2:00 PM - 4:00 PM",
+      "location": "VEC - 120",
+      "status": "Open for new members"
+    },
+    {
+      "name": "CSULB Finals Prep Group",
+      "time": "Sat, 1:00 PM - 3:00 PM",
+      "location": "CBA - 205",
+      "status": "Open for new members"
+    },
   ];
 
   int _expandedIndex = -1;
-  FilterCriteria? _currentFilter;
 
-  // Filter modal
-  void _openFilterPopup() async {
-    final result = await showModalBottomSheet<FilterCriteria>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+  void _sendJoinRequest(int index) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Join request sent to ${_groups[index]["name"]}"),
       ),
-      builder: (context) => FilterPage(initialFilters: _currentFilter),
     );
-
-    if (result != null) {
-      setState(() => _currentFilter = result);
-      print('Applied Filters: ${result.toJson()}');
-      // TODO: Apply backend filtering logic here later
-    }
-  }
-
-  void _reportLocked(int index) {
-    setState(() {
-      _rooms[index]["lockedReports"]++;
-    });
-    // TODO: Update Firestore or backend
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("${_rooms[index]["name"]} reported as locked")),
-    );
-  }
-
-  void _checkIn(int index) {
-    // TODO: Implement backend check-in logic
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("You checked into ${_rooms[index]["name"]}")),
-    );
+    // TODO: Implement backend join request logic
   }
 
   @override
@@ -85,25 +77,19 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
                 const SizedBox(height: 30),
 
-                // Header row
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Find Room",
-                        style: TextStyle(
-                          fontSize: 25,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                        ),
+                // Header
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 25.0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Study Groups",
+                      style: TextStyle(
+                        fontSize: 25,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
                       ),
-                      IconButton(
-                        onPressed: _openFilterPopup,
-                        icon: const Icon(Icons.filter_list, size: 28),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
 
@@ -117,7 +103,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
                 const SizedBox(height: 10),
 
-                // Expandable room list
+                // Expandable group list
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -137,9 +123,9 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                   _expandedIndex == panelIndex ? -1 : panelIndex;
                             });
                           },
-                          children: _rooms.asMap().entries.map((entry) {
+                          children: _groups.asMap().entries.map((entry) {
                             final index = entry.key;
-                            final room = entry.value;
+                            final group = entry.value;
                             final isExpanded = _expandedIndex == index;
 
                             return ExpansionPanel(
@@ -149,7 +135,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                 return ListTile(
                                   title: Center(
                                     child: Text(
-                                      room["name"],
+                                      group["name"],
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontStyle: FontStyle.italic,
                                         fontSize: 16,
@@ -182,54 +169,48 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        "Location: ${room["location"]}",
+                                        "Time: ${group["time"]}",
                                         style: const TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600),
                                       ),
                                       const SizedBox(height: 6),
-                                      if (room["lockedReports"] > 0)
-                                        Text(
-                                          "${room["lockedReports"]} student(s) reported this room as LOCKED",
-                                          style: const TextStyle(
-                                            color: Colors.red,
-                                            fontStyle: FontStyle.italic,
-                                            fontWeight: FontWeight.w500,
+                                      Text(
+                                        "Location: ${group["location"]}",
+                                        style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        "Status: ${group["status"]}",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: group["status"] == "Full"
+                                              ? Colors.red
+                                              : Colors.green,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Center(
+                                        child: GradientButton(
+                                          height: 45,
+                                          borderRadius:
+                                              BorderRadius.circular(12.0),
+                                          onPressed: group["status"] == "Full"
+                                              ? null
+                                              : () => _sendJoinRequest(index),
+                                          child: Text(
+                                            group["status"] == "Full"
+                                                ? "Group Full"
+                                                : "Send Join Request",
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18.0,
+                                            ),
                                           ),
                                         ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceEvenly,
-                                        children: [
-                                          // Report Locked
-                                          GradientButton(
-                                              height: 43,
-                                              borderRadius: BorderRadius.circular(12.0),
-                                              onPressed: () => _reportLocked(index),
-                                              child: const Text(
-                                                'Locked',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 19.0,
-                                                ),
-                                                ),
-                                            ),
-
-                                          // Check-in
-                                          GradientButton(
-                                              height: 43,
-                                              borderRadius: BorderRadius.circular(12.0),
-                                              onPressed: () => _checkIn(index),
-                                              child: const Text(
-                                                'Check-in',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 19.0,
-                                                ),
-                                                ),
-                                            ),
-                                        ],
                                       ),
                                     ],
                                   ),
@@ -254,7 +235,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                 onPressed: () {
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => Dashboard()),
+                    MaterialPageRoute(builder: (context) => const Dashboard()),
                   );
                 },
                 icon: Transform.translate(
