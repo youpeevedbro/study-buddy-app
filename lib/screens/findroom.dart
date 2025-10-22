@@ -1,6 +1,5 @@
 // Find Room screen 
 import 'package:flutter/material.dart';
-import 'dashboard.dart';
 import 'filter.dart'; // Import the filter page
 import '../components/grad_button.dart';  
 
@@ -252,10 +251,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
               left: 25,
               child: IconButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => Dashboard()),
-                  );
+                  Navigator.pop(context);
                 },
                 icon: Transform.translate(
                   offset: const Offset(3.0, 0.0),
