@@ -1,6 +1,5 @@
 // Study Groups screen
 import 'package:flutter/material.dart';
-import 'dashboard.dart';
 import '../components/grad_button.dart';
 
 class StudyGroupsPage extends StatefulWidget {
@@ -232,10 +231,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
               left: 25,
               child: IconButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const Dashboard()),
-                  );
+                  Navigator.pop(context);
                 },
                 icon: Transform.translate(
                   offset: const Offset(3.0, 0.0),
