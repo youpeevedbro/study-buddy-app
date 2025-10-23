@@ -3,7 +3,7 @@
 
 import requests
 from bs4 import BeautifulSoup
-import json
+import os, json
 
 base_url = "https://www.csulb.edu/"
 r_no_hash = 'https://web.csulb.edu/depts/enrollment/registration/class_schedule/Fall_2025/By_Subject/'
@@ -64,7 +64,13 @@ for link in class_links:
 
 
 # Write the list of classes to a json file
-with open("classes.json", "w") as f:
+import os, json
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+output_path = os.path.join(current_dir, 'classes.json')
+os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+with open(output_path, 'w', encoding='utf-8') as f:
     json.dump(
         classes,
         f,
@@ -72,3 +78,5 @@ with open("classes.json", "w") as f:
         indent=2,
         sort_keys=True,
     )
+
+print(f"Saved to {output_path}")
