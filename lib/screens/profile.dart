@@ -85,13 +85,33 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Transform.translate(
+            offset: const Offset(3.0, 0),
+            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          ),
+          onPressed: () => Navigator.pop(context), // back to Dashboard
+        ),
+        toolbarHeight: 100,
+        title: const Text("Study Buddy"),
+        centerTitle: true,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        foregroundColor: Colors.black,
+        titleTextStyle: const TextStyle(
+          fontFamily: 'BrittanySignature',
+          fontSize: 40,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
+      ),
       body: SafeArea(
         child: Stack(
           children: [
             // Main content column
             SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 110, 20, 20),
+                padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
                 child: Column(
                   children: [
                     const CircleAvatar(
@@ -191,38 +211,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 ),
               ),
             ),
-
-            // Centered "Study Buddy" title (similar style to findroom.dart)
-            Positioned(
-              top: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  'Study Buddy',
-                  style: const TextStyle(
-                    fontFamily: 'BrittanySignature',
-                    fontSize: 36,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-            ),
-
-            // Back button (top-left)
-            Positioned(
-              top: 15,
-              left: 8,
-              child: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Transform.translate(
-                  offset: const Offset(3.0, 0.0),
-                  child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-                ),
-                tooltip: 'Back',
-              ),
-            ),
           ],
         ),
       ),
@@ -263,38 +251,29 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Transform.translate(
+            offset: const Offset(3.0, 0),
+            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          ),
+          onPressed: () => Navigator.pop(context), // back to Dashboard
+        ),
+        toolbarHeight: 100,
+        title: const Text("Study Buddy"),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        titleTextStyle: const TextStyle(
+          fontFamily: 'BrittanySignature',
+          fontSize: 40,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
+      ),
       body: SafeArea(
         child: Stack(
           children: [
-            // Title
-            Positioned(
-              top: 20,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  'Study Buddy',
-                  style: const TextStyle(
-                    fontFamily: 'BrittanySignature',
-                    fontSize: 36,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.black,
-                  ),
-                ),
-              ),
-            ),
-            // Back button
-            Positioned(
-              top: 15,
-              left: 8,
-              child: IconButton(
-                onPressed: () => Navigator.pop(context),
-                icon: Transform.translate(
-                  offset: const Offset(3.0, 0.0),
-                  child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-                ),
-              ),
-            ),
             // Content
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 110, 20, 20),

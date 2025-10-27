@@ -63,28 +63,34 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: Transform.translate(
+            offset: const Offset(3.0, 0),
+            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          ),
+          onPressed: () => Navigator.pop(context), // back to Dashboard
+        ),
+        toolbarHeight: 100,
+        title: const Text("Study Buddy"),
+        centerTitle: true,
+        backgroundColor: theme.scaffoldBackgroundColor,
+        foregroundColor: Colors.black,
+        titleTextStyle: const TextStyle(
+          fontFamily: 'BrittanySignature',
+          fontSize: 40,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
+      ),
       body: SafeArea(
         child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // App title
-                Padding(
-                  padding: const EdgeInsets.only(top: 20.0),
-                  child: Text(
-                    'Study Buddy',
-                    style: const TextStyle(
-                      fontFamily: 'BrittanySignature',
-                      fontSize: 36,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
                 // Header row
+                const SizedBox(height: 20),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 25.0),
                   child: Row(
@@ -243,21 +249,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
                   ),
                 ),
               ],
-            ),
-
-            // Back button
-            Positioned(
-              top: 20,
-              left: 25,
-              child: IconButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                icon: Transform.translate(
-                  offset: const Offset(3.0, 0.0),
-                  child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-                ),
-              ),
             ),
           ],
         ),
