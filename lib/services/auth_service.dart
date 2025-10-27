@@ -80,9 +80,7 @@ class AuthService {
   }
 
   Future<bool> isLoggedIn() async {
-    if (_idToken == null) {
-      _idToken = await _secure.read(key: 'id_token');
-    }
+    _idToken ??= await _secure.read(key: 'id_token');
     final claims = _decodeJwt(_idToken);
     if (claims == null) return false;
     final exp = claims['exp'];

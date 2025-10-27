@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/timer_service.dart';
 
 class MyActivitiesPage extends StatefulWidget {
   const MyActivitiesPage({super.key});
@@ -15,6 +16,48 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       _userCheckedIn = false;
       //Remove User from Room
     });
+    TimerService.instance.stop();
+  }
+
+  Future<void> _showSetTimerDialog() async {
+    final controller = TextEditingController();
+    final minutes = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set timer (minutes)'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            hintText: 'Enter minutes, e.g. 60',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              final val = int.tryParse(controller.text.trim());
+              if (val == null || val <= 0) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a valid number of minutes.')),
+                );
+                return;
+              }
+              Navigator.pop(ctx, val);
+            },
+            child: const Text('Start'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (minutes != null && minutes > 0) {
+      TimerService.instance.start(Duration(minutes: minutes));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Timer started for $minutes minute(s).')),
+      );
+    }
   }
   
   @override
@@ -109,6 +152,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                     )
                   ), 
                   const Spacer(),
+                  //Check-out
                   ElevatedButton(
                     onPressed: _checkOutRoom, 
                     style: ElevatedButton.styleFrom(
@@ -131,7 +175,36 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                       )
                     )
                   )
-              )
+              ),
+              if (_userCheckedIn) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 50,
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _showSetTimerDialog,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.secondaryContainer,
+                      foregroundColor: theme.colorScheme.onSecondaryContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      textStyle: const TextStyle(
+                        fontSize: 18,
+                        fontFamily: "SuperLobster",
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.timer),
+                        SizedBox(width: 8),
+                        Text("Set timer"),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
           )
         )

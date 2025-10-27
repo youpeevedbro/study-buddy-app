@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:study_buddy/components/square_button.dart';
 import 'package:study_buddy/components/cursive_divider.dart';
 import '../services/auth_service.dart';
+import '../services/timer_service.dart';
 import 'dart:async';
 
 
@@ -14,22 +15,23 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   bool _userCheckedIn = true;
-  int _secondsRemaining = 36; // dummy 
-  Timer? _timer;
-  DateTime? _endsAt;
 
   @override
   void initState() {
     super.initState();
     _checkAuth();
-      if (_userCheckedIn) {
-      _startTimer();
-    }
+    TimerService.instance.addListener(_onTimerTick);
   }
+
+  void _onTimerTick() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
 
   @override
   void dispose() {
-    _timer?.cancel();
+    TimerService.instance.removeListener(_onTimerTick);
     super.dispose();
   }
 
@@ -41,31 +43,14 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
-  void _startTimer() {
-    _endsAt ??= DateTime.now().add(const Duration(minutes: 60)); // Dummy code
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_secondsRemaining > 0) {
-        setState(() {
-          _secondsRemaining--;
-        });
-      } else {
-        timer.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Time's up! Let's make room for the next class.")),
-        );
-      }
-    });
-  }
-
   void _checkOutRoom() {
     setState(() {
       _userCheckedIn = false;
-      _timer?.cancel();
     });
+     TimerService.instance.stop();
   }
 
-  String _formatTime(int totalSeconds) {
+ String _formatTime(int totalSeconds) {
     final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
     final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
     return "$minutes:$seconds";
@@ -174,7 +159,7 @@ class _DashboardState extends State<Dashboard> {
                         ),
                         const Spacer(),
                         Text(
-                          _formatTime(_secondsRemaining),
+                          _formatTime(TimerService.instance.secondsRemaining),
                           style: const TextStyle(
                             fontFamily: 'SuperLobster',
                             fontSize: 18,
