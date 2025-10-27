@@ -149,8 +149,30 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       ),
                     ),
 
+                    // Logout 
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: _logout,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.logout, color: theme.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Logout",
+                              style: TextStyle(fontSize: 18, color: theme.primaryColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 15),
 
+                    // Disable Account Button
                     GradientButton(
                       width: double.infinity,
                       height: 50,
@@ -199,17 +221,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   child: const Icon(Icons.arrow_back_ios, color: Colors.black),
                 ),
                 tooltip: 'Back',
-              ),
-            ),
-
-            // Logout button (top-right)
-            Positioned(
-              top: 15,
-              right: 8,
-              child: IconButton(
-                tooltip: 'Logout',
-                onPressed: _logout,
-                icon: const Icon(Icons.logout, color: Colors.black),
               ),
             ),
           ],
