@@ -45,3 +45,9 @@ app.*.map.json
 /android/app/release
 
 .env
+
+# Fire Store Account Service Key
+service-account.json
+
+# Ignore generated files created by web scraping scripts
+*.jsonl

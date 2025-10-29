@@ -12,6 +12,7 @@ import 'screens/findroom.dart';
 import 'screens/firebasecheckpage.dart';
 import 'screens/activities.dart';
 import 'screens/my_studygroups.dart';
+import 'screens/studygroup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,6 +52,7 @@ class StudyBuddyApp extends StatelessWidget {
         '/activities' : (_) => const MyActivitiesPage(),
         '/mystudygroups' : (_) => const MyStudyGroupsPage(),
         '/rooms'     : (_) => const FindRoomPage(),
+        '/studygroup' : (_) => const StudyGroupsPage(),
       },
     );
   }

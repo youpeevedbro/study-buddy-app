@@ -1,0 +1,14 @@
+# --- Core Dependencies for Study Buddy Firestore Data Pipeline ---
+
+# Google Cloud Firestore client
+google-cloud-firestore==2.17.1
+
+# Web scraping & parsing
+beautifulsoup4==4.12.3
+requests==2.32.3
+lxml==5.2.1
+
+# Optional utilities (used in some scripts)
+google-api-core==2.19.1
+protobuf==4.25.3
+typing-extensions>=4.8.0
