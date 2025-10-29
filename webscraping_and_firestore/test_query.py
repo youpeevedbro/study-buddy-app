@@ -49,7 +49,7 @@ from collections import defaultdict
 from collections import Counter
 
 db = firestore.Client()
-today = "2025-10-28"
+today = "2025-10-29"
 
 start_date = "2025-10-27"
 end_date   = "2025-10-28"
@@ -57,36 +57,38 @@ end_date   = "2025-10-28"
 
 # QUERY 0: REAL TESTING FOR FUN
 
-# compute "now" in minutes after midnight (adjust if you want local tz math)
-now = datetime.now()
-nowMin = now.hour * 60 + now.minute
+# # compute "now" in minutes after midnight (adjust if you want local tz math)
+# now = datetime.now()
+# nowMin = now.hour * 60 + now.minute
 
-# server: one inequality on endMin, plus equalities
-q = (db.collection("availabilitySlots")
-       .where(filter=FieldFilter("date", "==", today))
-       .where(filter=FieldFilter("buildingCode", "==", "MLSC"))
-    #    .where(filter=FieldFilter("floor", "==", 3))
-       .where(filter=FieldFilter("endMin", ">=", nowMin))
-    )
+# # server: one inequality on endMin, plus equalities
+# q = (db.collection("availabilitySlots")
+#        .where(filter=FieldFilter("date", "==", today))
+#        .where(filter=FieldFilter("buildingCode", "==", "MLSC"))
+#     #    .where(filter=FieldFilter("floor", "==", 3))
+#        .where(filter=FieldFilter("endMin", ">=", nowMin))
+#     )
 
-# client refine: ensure the slot already started
-for doc in q.stream():
-    d = doc.to_dict()
-    if d["startMin"] <= nowMin:
-        # print(doc.id, d)
-        print(d["roomId"], d["start"], d["end"])
+# # client refine: ensure the slot already started
+# for doc in q.stream():
+#     d = doc.to_dict()
+#     if d["startMin"] <= nowMin:
+#         # print(doc.id, d)
+#         print(d["roomId"], d["start"], d["end"])
 
 
 
 # QUERY 1: COB building -> 2025-10-27 -> durationMin >= 60 minutes
 
-# q = (db.collection("availabilitySlots")
-#        .where(filter=FieldFilter("buildingCode", "==", "COB"))
-#        .where(filter=FieldFilter("date", "==", today))
-#        .where(filter=FieldFilter("durationMin", ">=", 60)))
+q = (db.collection("availabilitySlots")
+       .where(filter=FieldFilter("buildingCode", "==", "COB"))
+       .where(filter=FieldFilter("date", "==", today))
+       .where(filter=FieldFilter("durationMin", ">=", 60)))
 
-# for doc in q.stream():
-#     print(doc.id, doc.to_dict())
+for doc in q.stream():
+    d = doc.to_dict()
+    # print(doc.id, doc.to_dict())
+    print(d["roomId"], d["start"], d["end"])
 
 
 
