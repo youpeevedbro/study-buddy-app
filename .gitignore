@@ -48,3 +48,6 @@ app.*.map.json
 
 # Fire Store Account Service Key
 service-account.json
+
+# Ignore generated files created by web scraping scripts
+*.jsonl
