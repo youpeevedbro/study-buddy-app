@@ -45,6 +45,9 @@ app.*.map.json
 /android/app/release
 
 .env
+*.env
+secrets/
+*.json
 
 # Fire Store Account Service Key
 service-account.json
