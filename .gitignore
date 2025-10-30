@@ -1,53 +1,74 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# ============================================
+# 🔒 SECRETS & ENV FILES
+# ============================================
+.env
+*.env
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
+# Secret keys & credentials
+backend/secrets/
+*service-account*.json
+*firebase-key*.json
+*.pem
+*.p12
+*.pfx
+*.key
+
+# Ignore local-only credentials or configs
+secrets/
+credentials/
+config/local_*
+
+# ============================================
+# 🐍 PYTHON BACKEND
+# ============================================
+# Virtual environments
+backend/venv/
+venv/
+.env/
+.venv/
+
+# Caches / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs / debug
+*.log
+
+# IDE and tooling
+.vscode/
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ============================================
+# 🐦 FLUTTER / DART FRONTEND
+# ============================================
+# Build artifacts
+build/
 .dart_tool/
+.packages
 .flutter-plugins
 .flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
 
-# Symbolication related
+# Generated files
+**/doc/api/
+**/ios/Flutter/.last_build_id
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio build outputs
 /android/app/debug
 /android/app/profile
 /android/app/release
 
-.env
+# ============================================
+# ⚙️ MISCELLANEOUS
+# ============================================
+# OS / editor files
+.DS_Store
+Thumbs.db
+*.swp
 
-# Fire Store Account Service Key
-service-account.json
-
-# Ignore generated files created by web scraping scripts
-*.jsonl
+# Temporary or cache directories
+.cache/
+tmp/
+logs/
