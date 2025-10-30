@@ -1,4 +1,6 @@
-# Miscellaneous
+# ============================================
+# GENERAL / PYTHON / MISC
+# ============================================
 *.class
 *.log
 *.pyc
@@ -12,18 +14,16 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IDEs
 *.iml
 *.ipr
 *.iws
 .idea/
+.vscode/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
+# ============================================
+# FLUTTER / DART / ANDROID / IOS
+# ============================================
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -31,26 +31,40 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
-
-# Symbolication related
+build/
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
-
-# Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
 /android/app/release
 
+# ============================================
+# ENVIRONMENT / SECRETS
+# ============================================
 .env
 *.env
+
+# ✅ Specific secret folders and files
+backend/secrets/
 secrets/
-*.json
-
-# Fire Store Account Service Key
 service-account.json
+backend/firebase-key.json
 
-# Ignore generated files created by web scraping scripts
+# ✅ Common private key formats
+*.pem
+*.p12
+*.pfx
+*.key
+
+# Avoid ignoring all JSONs — only target secrets explicitly
+# (Keep google-services.json and firebase_options.dart tracked)
+
+# ============================================
+# PROJECT-SPECIFIC
+# ============================================
+# Ignore generated data dumps, scraped outputs, logs, etc.
 *.jsonl
+*.sqlite
+*.db
+tmp/
+.cache/
