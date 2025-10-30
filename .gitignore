@@ -1,70 +1,74 @@
 # ============================================
-# GENERAL / PYTHON / MISC
-# ============================================
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
-
-# IDEs
-*.iml
-*.ipr
-*.iws
-.idea/
-.vscode/
-
-# ============================================
-# FLUTTER / DART / ANDROID / IOS
-# ============================================
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-build/
-app.*.symbols
-app.*.map.json
-/android/app/debug
-/android/app/profile
-/android/app/release
-
-# ============================================
-# ENVIRONMENT / SECRETS
+# 🔒 SECRETS & ENV FILES
 # ============================================
 .env
 *.env
 
-# ✅ Specific secret folders and files
+# Secret keys & credentials
 backend/secrets/
-secrets/
-service-account.json
-backend/firebase-key.json
-
-# ✅ Common private key formats
+*service-account*.json
+*firebase-key*.json
 *.pem
 *.p12
 *.pfx
 *.key
 
-# Avoid ignoring all JSONs — only target secrets explicitly
-# (Keep google-services.json and firebase_options.dart tracked)
+# Ignore local-only credentials or configs
+secrets/
+credentials/
+config/local_*
 
 # ============================================
-# PROJECT-SPECIFIC
+# 🐍 PYTHON BACKEND
 # ============================================
-# Ignore generated data dumps, scraped outputs, logs, etc.
-*.jsonl
-*.sqlite
-*.db
-tmp/
+# Virtual environments
+backend/venv/
+venv/
+.env/
+.venv/
+
+# Caches / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs / debug
+*.log
+
+# IDE and tooling
+.vscode/
+.idea/
+
+# ============================================
+# 🐦 FLUTTER / DART FRONTEND
+# ============================================
+# Build artifacts
+build/
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Generated files
+**/doc/api/
+**/ios/Flutter/.last_build_id
+app.*.symbols
+app.*.map.json
+
+# Android Studio build outputs
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# ============================================
+# ⚙️ MISCELLANEOUS
+# ============================================
+# OS / editor files
+.DS_Store
+Thumbs.db
+*.swp
+
+# Temporary or cache directories
 .cache/
+tmp/
+logs/
