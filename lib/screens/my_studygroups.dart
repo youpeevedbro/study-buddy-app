@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:study_buddy/components/grad_button.dart';
+import 'addgroup.dart';
 
 //TEMPORARY: FOR DUMMY DATA
 class StudyGroup{
@@ -71,7 +72,12 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GradientButton(
-                    onPressed: () {}, 
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AddGroupPage()),
+                      );
+                    }, 
                     borderRadius: BorderRadius.circular(12),
                     child: const Text(
                       "Add",

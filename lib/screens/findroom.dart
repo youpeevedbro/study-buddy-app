@@ -13,7 +13,7 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
-  Future<List<Room>> _futureRooms = Api.listRooms(limit: 200);
+  final Future<List<Room>> _futureRooms = Api.listRooms(limit: 200);
   FilterCriteria? _currentFilter;
 
   void _openFilterPopup() async {
