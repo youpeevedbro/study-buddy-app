@@ -9,6 +9,7 @@ import re as _re_from_norm
 from datetime import datetime as _dt_from_norm
 from datetime import timedelta
 import json
+import os
 
 # --- student-definition campus zone helper ---
 UPPER_STUDENT = {
@@ -409,21 +410,27 @@ def main():
     if _bad_rows:
         raise RuntimeError(f"Found {len(_bad_rows)} invalid cleaned rows; first: {_bad_rows[0]}")
 
-    # Optional: debug dump
-    with open("final_output.txt", "w") as f:
+        # --- write debug dump next to this script ---
+    here = os.path.dirname(__file__)
+    final_out_path = os.path.join(here, "final_output.txt")
+    out_busy_path = os.path.join(here, "out_busy.jsonl")
+    out_avail_path = os.path.join(here, "out_availability.jsonl")
+
+    # Write cleaned classes summary
+    with open(final_out_path, "w", encoding="utf-8") as f:
         for item in cleaned_classes:
             f.write(f"{item}\n")
 
-    # Build per (roomId,date)
-    per_day = build_daily_busy_and_free(cleaned_classes, campus_open=("07:00","22:00"))
+    # Build per (roomId, date)
+    per_day = build_daily_busy_and_free(cleaned_classes, campus_open=("07:00", "22:00"))
 
-    # Write JSONL files
-    
-    with open("out_busy.jsonl", "w") as fb, open("out_availability.jsonl", "w") as fa:
+    # Write JSONL files relative to this script
+    with open(out_busy_path, "w", encoding="utf-8") as fb, open(out_avail_path, "w", encoding="utf-8") as fa:
         for (roomId, date), data in per_day.items():
             bcode, room_num = _split_room_id_for_floor(roomId)
             floor = _infer_floor(room_num)
             campusZone = _campus_zone_student(bcode)
+
             fb.write(json.dumps({
                 "roomId": roomId,
                 "date": date,
@@ -433,16 +440,22 @@ def main():
                 "floor": floor,
                 "campusZone": campusZone
             }) + "\n")
+
             fa.write(json.dumps({
                 "roomId": roomId,
                 "date": date,
-                "campusOpen": {"start":"07:00","end":"22:00"},
+                "campusOpen": {"start": "07:00", "end": "22:00"},
                 "free": data["free"],
                 "buildingCode": bcode,
                 "roomNumber": room_num,
                 "floor": floor,
                 "campusZone": campusZone
             }) + "\n")
-            
+
+    print(f"✅ Scrape complete!")
+    print(f"   - Wrote {len(cleaned_classes)} cleaned class entries to {final_out_path}")
+    print(f"   - Wrote busy slots to {out_busy_path}")
+    print(f"   - Wrote availability slots to {out_avail_path}")
+
 if __name__ == "__main__":
     main()

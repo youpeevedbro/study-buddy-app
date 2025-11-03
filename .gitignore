@@ -27,6 +27,11 @@ venv/
 .env/
 .venv/
 
+# scrapers/webscraping_and_firestore/
+backend/scrapers/webscraping_and_firestore/out_*.jsonl
+backend/scrapers/webscraping_and_firestore/availability_slots.jsonl
+backend/scrapers/webscraping_and_firestore/final_output.txt
+
 # Caches / bytecode
 __pycache__/
 *.py[cod]
