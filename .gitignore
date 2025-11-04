@@ -32,6 +32,11 @@ backend/scrapers/webscraping_and_firestore/out_*.jsonl
 backend/scrapers/webscraping_and_firestore/availability_slots.jsonl
 backend/scrapers/webscraping_and_firestore/final_output.txt
 
+# Firestore emulator data
+backend/scrapers/webscraping_and_firestore/firestore-data/
+firebase-export-*/
+firestore_export/
+
 # Caches / bytecode
 __pycache__/
 *.py[cod]
