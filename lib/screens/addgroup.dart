@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart';
+import 'package:flutter/cupertino.dart';
 
 class AddGroupPage extends StatefulWidget {
   const AddGroupPage({super.key});
@@ -14,8 +15,60 @@ class _AddGroupPageState extends State<AddGroupPage> {
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
-  final TextEditingController _endTimeController = TextEditingController();
   final TextEditingController _maxController = TextEditingController();
+
+  //Time picker
+  void _showCupertinoTimePicker() {
+    final now = DateTime.now();
+
+    showCupertinoModalPopup(
+      context: context,
+      builder: (_) => Container(
+        height: 300,
+        color: Colors.white,
+        child: Column(
+          children: [
+            // Action bar
+            SizedBox(
+              height: 44,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: const Text('Cancel'),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: const Text('Done'),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            // The wheel picker
+            Expanded(
+              child: CupertinoDatePicker(
+                mode: CupertinoDatePickerMode.time,
+                use24hFormat: false,
+                initialDateTime: now,
+                onDateTimeChanged: (dt) {
+                  final tod = TimeOfDay.fromDateTime(dt);
+                  final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
+                  final minute = dt.minute.toString().padLeft(2, '0');
+                  final period = tod.period == DayPeriod.am ? 'AM' : 'PM';
+                  setState(() {
+                    _startTimeController.text = '$hour:$minute $period';
+                  });
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   // Date picker
   Future<void> _selectDate(BuildContext context) async {
@@ -99,8 +152,12 @@ class _AddGroupPageState extends State<AddGroupPage> {
               // Start Time
               TextFormField(
                 controller: _startTimeController,
-                decoration:
-                    const InputDecoration(labelText: "Start Time (HH:MM)"),
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: "Start Time",
+                  suffixIcon: Icon(Icons.access_time),
+                ),
+                onTap: _showCupertinoTimePicker,
               ),
               const SizedBox(height: 15),
 
