@@ -64,16 +64,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
           key: _formKey,
           child: ListView(
             children: [
-              const Text(
-                "Create Study Group",
-                style: TextStyle(
-                  fontSize: 26.0,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const Divider(thickness: 1.5, color: Colors.black),
               const SizedBox(height: 20),
-
               // Group Name
               TextFormField(
                 controller: _groupNameController,
@@ -113,14 +104,6 @@ class _AddGroupPageState extends State<AddGroupPage> {
               ),
               const SizedBox(height: 15),
 
-              // End Time
-              TextFormField(
-                controller: _endTimeController,
-                decoration:
-                    const InputDecoration(labelText: "End Time (HH:MM)"),
-              ),
-              const SizedBox(height: 15),
-
               // Max
               TextFormField(
                 controller: _maxController,
@@ -138,7 +121,6 @@ class _AddGroupPageState extends State<AddGroupPage> {
                     print("Location: ${_locationController.text}");
                     print("Date: ${_dateController.text}");
                     print("Start Time: ${_startTimeController.text}");
-                    print("End Time: ${_endTimeController.text}");
                     print("Max: ${_maxController.text}");
 
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -149,12 +131,13 @@ class _AddGroupPageState extends State<AddGroupPage> {
                   }
                 },
                 borderRadius: BorderRadius.circular(12),
+                height: 50,
                 child: const Text(
                   "Create",
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 18,
+                    fontSize: 20,
                   ),
                 ),
               ),

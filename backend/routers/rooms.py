@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
-from services.firestore_client import get_db
-from models.room import Room, RoomsResponse
+from backend.services.firestore_client import get_db
+from backend.models.room import Room, RoomsResponse
 
 router = APIRouter()
 COLLECTION = "availabilitySlots"

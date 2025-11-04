@@ -1,12 +1,14 @@
 # backend/main.py
 from dotenv import load_dotenv
 import os
+
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import rooms  # our read-only router
+from backend.routers import rooms  # our read-only router
+from backend.routers import addgroup
 
 # --- Verify .env loaded (optional sanity log) ---
 if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS"):
@@ -27,6 +29,7 @@ app.add_middleware(
 
 # --- Routers ---
 app.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
+app.include_router(addgroup.router, prefix="/groups", tags=["groups"])
 
 # --- Health check ---
 @app.get("/health")
