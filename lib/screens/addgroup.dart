@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart';
 import 'package:flutter/cupertino.dart';
+import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:http/http.dart' as http;
 
 class AddGroupPage extends StatefulWidget {
   const AddGroupPage({super.key});
@@ -15,11 +19,88 @@ class _AddGroupPageState extends State<AddGroupPage> {
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
+  final TextEditingController _endTimeController = TextEditingController();
   final TextEditingController _maxController = TextEditingController();
 
-  //Time picker
-  void _showCupertinoTimePicker() {
+  bool _submitting = false;
+
+  String get _apiBaseUrl {
+    if (kIsWeb) return 'http://localhost:8000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000'; // Android emulator localhost
+    return 'http://localhost:8000'; // iOS simulator/desktop
+  }
+
+  Future<void> _createGroup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _submitting = true);
+    try {
+      final uri = Uri.parse('$_apiBaseUrl/groups/create');
+      final body = jsonEncode({
+        "name": _groupNameController.text.trim(),
+        "location": _locationController.text.trim(),
+        "date": _dateController.text.trim(),
+        "starttime": _startTimeController.text.trim(),
+        "endtime": _endTimeController.text.trim(),
+        "max_members": int.tryParse(_maxController.text.trim()) ?? 0,
+        "creator_id": "user_123",
+      });
+
+      final resp = await http.post(
+        uri,
+        headers: {"Content-Type": "application/json"},
+        body: body,
+      );
+      if (!mounted) return; // widget may have been popped while awaiting
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = jsonDecode(resp.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Yay! Your new group is created!")),
+        );
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Failed: ${resp.statusCode} ${resp.body}")),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  // Helpers to parse/format "hh:mm AM/PM"
+  DateTime? _parseTime(String value) {
+    final m = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$').firstMatch(value.trim());
+    if (m == null) return null;
+    int hour = int.parse(m.group(1)!);
+    final minute = int.parse(m.group(2)!);
+    final period = m.group(3)!;
+    if (period.toUpperCase() == 'PM' && hour != 12) hour += 12;
+    if (period.toUpperCase() == 'AM' && hour == 12) hour = 0;
     final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, hour, minute);
+  }
+
+  String _formatTime(DateTime dt) {
+    final tod = TimeOfDay.fromDateTime(dt);
+    final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = tod.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  // Controller-aware Cupertino time picker
+  void _showCupertinoTimePickerFor(TextEditingController controller) {
+    DateTime initial = _parseTime(controller.text) ?? DateTime.now();
+    DateTime temp = initial;
 
     showCupertinoModalPopup(
       context: context,
@@ -28,7 +109,6 @@ class _AddGroupPageState extends State<AddGroupPage> {
         color: Colors.white,
         child: Column(
           children: [
-            // Action bar
             SizedBox(
               height: 44,
               child: Row(
@@ -42,25 +122,23 @@ class _AddGroupPageState extends State<AddGroupPage> {
                   CupertinoButton(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: const Text('Done'),
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      setState(() {
+                        controller.text = _formatTime(temp);
+                      });
+                      Navigator.pop(context);
+                    },
                   ),
                 ],
               ),
             ),
-            // The wheel picker
             Expanded(
               child: CupertinoDatePicker(
                 mode: CupertinoDatePickerMode.time,
                 use24hFormat: false,
-                initialDateTime: now,
+                initialDateTime: initial,
                 onDateTimeChanged: (dt) {
-                  final tod = TimeOfDay.fromDateTime(dt);
-                  final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
-                  final minute = dt.minute.toString().padLeft(2, '0');
-                  final period = tod.period == DayPeriod.am ? 'AM' : 'PM';
-                  setState(() {
-                    _startTimeController.text = '$hour:$minute $period';
-                  });
+                  temp = dt; // commit on Done
                 },
               ),
             ),
@@ -157,7 +235,19 @@ class _AddGroupPageState extends State<AddGroupPage> {
                   labelText: "Start Time",
                   suffixIcon: Icon(Icons.access_time),
                 ),
-                onTap: _showCupertinoTimePicker,
+                onTap: () => _showCupertinoTimePickerFor(_startTimeController),
+              ),
+              const SizedBox(height: 15),
+
+              // End Time
+              TextFormField(
+                controller: _endTimeController,
+                readOnly: true,
+                decoration: const InputDecoration(
+                  labelText: "End Time",
+                  suffixIcon: Icon(Icons.access_time),
+                ),
+                onTap: () => _showCupertinoTimePickerFor(_endTimeController),
               ),
               const SizedBox(height: 15),
 
@@ -171,33 +261,21 @@ class _AddGroupPageState extends State<AddGroupPage> {
               const SizedBox(height: 30),
 
               GradientButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    // For now, just print data or later send to backend
-                    print("Group Name: ${_groupNameController.text}");
-                    print("Location: ${_locationController.text}");
-                    print("Date: ${_dateController.text}");
-                    print("Start Time: ${_startTimeController.text}");
-                    print("Max: ${_maxController.text}");
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Study Group Created!")),
-                    );
-
-                    Navigator.pop(context);
-                  }
-                },
+                onPressed: _submitting ? null : _createGroup,                
                 borderRadius: BorderRadius.circular(12),
                 height: 50,
-                child: const Text(
-                  "Create",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20,
+                child: _submitting
+                  ? const SizedBox(
+                      height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text(
+                      "Create",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                      ),
+                    ),
                   ),
-                ),
-              ),
             ],
           ),
         ),

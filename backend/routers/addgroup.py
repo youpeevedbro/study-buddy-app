@@ -7,7 +7,7 @@ from backend.services.firestore_client import get_db
 # The router is included in main with prefix "/groups"; keep local routes simple
 router = APIRouter()
 
-@router.post("/create")
+@router.post("/create", status_code=201)
 def create_group(group: Group):
     """Create a study group document in the `groups` collection.
 
@@ -15,17 +15,19 @@ def create_group(group: Group):
     """
     try:
         db = get_db()
-        doc_ref, write_result = db.collection("groups").add(
+        write_result, doc_ref = db.collection("groups").add(
             {
                 "name": group.name,
                 "date": group.date,
-                "time": group.time,
+                "starttime": group.starttime,
+                "endtime": group.endtime,
                 "location": group.location,
                 "max_members": group.max_members,
                 "creator_id": group.creator_id,
                 "created_at": firestore.SERVER_TIMESTAMP,
             }
         )
+        print(f"[groups] created {doc_ref.id} name='{group.name}'")
         return {"id": doc_ref.id, "message": "Group created successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Create group failed: {type(e).__name__}: {e}")

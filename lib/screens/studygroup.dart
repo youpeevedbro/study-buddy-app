@@ -22,7 +22,7 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
       "name": "Algorithms Review Session",
       "time": "Wed, 6:00 PM - 8:00 PM",
       "location": "EN2 - 310",
-      "status": "By Invitation Only" // Should be full or by invitation only??
+      "status": "Full" 
     },
     {
       "name": "Machine Learning Study Group",
@@ -193,13 +193,13 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                                         style: TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w600,
-                                          color: group["status"] == "By Invitation Only"
+                                          color: group["status"] == "Full"
                                               ? Colors.red
                                               : Colors.green,
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-                                      if (group["status"] != "By Invitation Only") ...[
+                                      if (group["status"] != "Full") ...[
                                         const SizedBox(height: 12),
                                         Center(
                                           child: GradientButton(
