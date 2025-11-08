@@ -1,0 +1,22 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "availabilitySlots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "roomId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "startMin", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "availabilitySlots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "buildingCode", "order": "ASCENDING" },
+        { "fieldPath": "startMin", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

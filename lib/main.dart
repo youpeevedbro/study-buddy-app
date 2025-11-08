@@ -21,6 +21,9 @@ Future<void> main() async {
 
   AppConfig.init();
 
+  print('🔐 Auth0 Audience: ${AppConfig.apiAudience}');
+  print('dotenv AUTH0_AUDIENCE: ${dotenv.env['AUTH0_AUDIENCE']}');
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // <-- use options
   );

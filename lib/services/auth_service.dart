@@ -18,11 +18,17 @@ class AuthService {
   String? _idToken;
   String? _refreshToken;
 
+  Future<String?> getAccessToken() async {
+    _accessToken ??= await _secure.read(key: 'access_token');
+    return _accessToken;
+  }
+
   Future<void> login() async {
     final creds = await _auth0
         .webAuthentication(scheme: AppConfig.callbackScheme)
         .login(audience: AppConfig.apiAudience);
     await _store(creds);
+    print('🔑 Access Token: ${creds.accessToken}');
   }
 
   Future<void> signup() async {

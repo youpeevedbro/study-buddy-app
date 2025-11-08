@@ -16,6 +16,27 @@ class _FindRoomPageState extends State<FindRoomPage> {
   Future<List<Room>> _futureRooms = Api.listRooms(limit: 200);
   FilterCriteria? _currentFilter;
 
+  @override
+  void initState() {
+    super.initState();
+    _futureRooms = Api.listRooms(limit: 200); // kicks off after mount
+  }
+
+  void _reload() {
+    final b     = _currentFilter?.buildingCode?.trim();
+    final start = _currentFilter?.startTime?.format24Hour();
+    final end   = _currentFilter?.endTime?.format24Hour();
+
+    setState(() {
+      _futureRooms = Api.listRooms(
+        limit: 200,
+        building: (b?.isNotEmpty ?? false) ? b : null,
+        start: start,   // "HH:mm" or null
+        end: end,       // "HH:mm" or null
+      );
+    });
+  }
+
   void _openFilterPopup() async {
     final result = await showModalBottomSheet<FilterCriteria>(
       context: context,
@@ -29,6 +50,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
     if (result != null) {
       setState(() => _currentFilter = result);
+      _reload(); // ← fetch again with filters
     }
   }
 
