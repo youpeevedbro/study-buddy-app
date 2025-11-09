@@ -10,6 +10,33 @@ class StudyGroupCreate(BaseModel):
     name: str
     availabilitySlotDocument: str #{BUILDING}-{ROOM#}_{YYYY}-{MM}-{DD}_{startMin}_{endMin}
 
+# Response model for getting a Study Group (where user is not a member)
+class StudyGroupPublicResponse(BaseModel):
+    id: str
+    building: str
+    roomNumber: int
+    date: str
+    startTime: str
+    endTime: str
+    name: str
+    quantity: int
+    # ADD owner fields
+    availabilitySlotDocument: str
+
+# Response model for getting a Study Group (where user is a member)
+class StudyGroupPrivateResponse(BaseModel):
+    id: str
+    building: str
+    roomNumber: int
+    date: str
+    startTime: str
+    endTime: str
+    name: str
+    quantity: int
+    # ADD owner fields
+    members: list[str]  #List of User IDs
+    availabilitySlotDocument: str
+
 
     
 

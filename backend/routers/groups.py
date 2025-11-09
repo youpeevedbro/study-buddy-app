@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from services.firestore_client import get_db, firestore
-from models.group import StudyGroupCreate
+from models.group import StudyGroupCreate, StudyGroupPublicResponse
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
@@ -8,14 +8,26 @@ router = APIRouter()
 COLLECTION = "studyGroups"
 
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
-    date_str = f"{date} {time}" 
-    format_str = "%Y-%m-%d %H:%M"
-    dt = datetime.strptime(date_str, format_str)
+    dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
     la_tz = ZoneInfo("America/Los_Angeles")
     dt_la = dt.replace(tzinfo=la_tz)
 
-    dt_utc = dt_la.astimezone(timezone.utc) #datetime object in UTC
-    return dt_utc
+    return dt_la.astimezone(timezone.utc) #datetime object in UTC
+
+def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse: 
+    d = doc.to_dict()
+    return StudyGroupPublicResponse(
+        id=d.get("id", ""),
+        building=d.get("buildingCode", ""),
+        roomNumber=d.get("roomNumber", ""),
+        date=d.get("date", ""),
+        startTime=d.get("startTime", ""),
+        endTime=d.get("endTime", ""),
+        name=d.get("name", ""),
+        quantity=d.get("quantity", ""),
+        # ADD owner fields
+        availabilitySlotDocument=d.get("availabilitySlotDocument", "")
+    )
 
 
 @firestore.transactional
@@ -57,10 +69,17 @@ def create_group(group: StudyGroupCreate):
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
 
-@router.get("/{group_id}")
-def get_group(group_id: int):
+# ADD dependency: get User
+@router.get("/{group_id}") 
+def get_group(group_id: str) -> StudyGroupPublicResponse:
     try:
-        return {"group_id": group_id}
+        db = get_db()
+        col = db.collection(COLLECTION)
+        doc = col.document(group_id).get()
+        if doc.exists:
+            return _doc_to_publicStudyGroup(doc)
+        else:
+            raise HTTPException(status_code=404, detail="Study Group not found")
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
