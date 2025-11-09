@@ -13,8 +13,51 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
-  Future<List<Room>> _futureRooms = Api.listRooms(limit: 200);
+  late Future<List<Room>> _futureRooms;
   FilterCriteria? _currentFilter;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureRooms = Api.listRooms(limit: 200);
+  }
+
+  // --- Helpers to read values from your FilterCriteria regardless of field names ---
+  String? _buildingFrom(FilterCriteria? f) {
+    if (f == null) return null;
+    try {
+      final v = (f as dynamic).building as String?;
+      if (v != null && v.isNotEmpty) return v;
+    } catch (_) {}
+    try {
+      final v = (f as dynamic).buildingCode as String?;
+      if (v != null && v.isNotEmpty) return v;
+    } catch (_) {}
+    return null;
+  }
+
+  String? _dateFrom(FilterCriteria? f) {
+    if (f == null) return null;
+    try {
+      final v = (f as dynamic).date;
+      if (v is String && v.isNotEmpty) return v;
+      if (v is DateTime) return v.toIso8601String().split('T').first;
+    } catch (_) {}
+    try {
+      final v = (f as dynamic).selectedDate;
+      if (v is String && v.isNotEmpty) return v;
+      if (v is DateTime) return v.toIso8601String().split('T').first;
+    } catch (_) {}
+    return null;
+  }
+
+  void _reload() {
+    final b = _buildingFrom(_currentFilter);
+    final d = _dateFrom(_currentFilter);
+    setState(() {
+      _futureRooms = Api.listRooms(limit: 200, building: b, date: d);
+    });
+  }
 
   void _openFilterPopup() async {
     final result = await showModalBottomSheet<FilterCriteria>(
@@ -28,7 +71,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
     );
 
     if (result != null) {
-      setState(() => _currentFilter = result);
+      _currentFilter = result;
+      _reload();
     }
   }
 
@@ -123,9 +167,16 @@ class _FindRoomPageState extends State<FindRoomPage> {
                         );
                       }
                       if (snap.hasError) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: Text('Error: ${snap.error}'),
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Error: ${snap.error}', style: const TextStyle(height: 1.3)),
+                            const SizedBox(height: 12),
+                            ElevatedButton(
+                              onPressed: _reload,
+                              child: const Text('Retry'),
+                            ),
+                          ],
                         );
                       }
                       final rooms = snap.data ?? [];

@@ -4,7 +4,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'config/app_config.dart';
 import 'firebase_options.dart';
 
-
 import 'screens/landing.dart';
 import 'screens/dashboard.dart';
 import 'screens/profile.dart';
@@ -18,11 +17,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await dotenv.load(fileName: ".env");
-
   AppConfig.init();
 
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // <-- use options
+    options: DefaultFirebaseOptions.currentPlatform,
   );
   runApp(const StudyBuddyApp());
 }
@@ -43,16 +41,15 @@ class StudyBuddyApp extends StatelessWidget {
         scaffoldBackgroundColor: Colors.white,
       ),
       initialRoute: '/landing',
-      // initialRoute: '/firebase-check',
       routes: {
         '/landing'        : (_) => const LandingPage(),
         '/dashboard'      : (_) => const Dashboard(),
         '/profile'        : (_) => const UserProfilePage(),
         '/firebase-check' : (_) => const FirebaseCheckPage(),
-        '/activities' : (_) => const MyActivitiesPage(),
-        '/mystudygroups' : (_) => const MyStudyGroupsPage(),
-        '/rooms'     : (_) => const FindRoomPage(),
-        '/studygroup' : (_) => const StudyGroupsPage(),
+        '/activities'     : (_) => const MyActivitiesPage(),
+        '/mystudygroups'  : (_) => const MyStudyGroupsPage(),
+        '/rooms'          : (_) => const FindRoomPage(),
+        '/studygroup'     : (_) => const StudyGroupsPage(),
       },
     );
   }

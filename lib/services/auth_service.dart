@@ -1,106 +1,108 @@
 // lib/services/auth_service.dart
-import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:auth0_flutter/auth0_flutter.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/app_config.dart';
 
 class AuthService {
   AuthService._();
   static final instance = AuthService._();
 
-  final _auth0  = Auth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
-  final _secure = const FlutterSecureStorage();
+  // ---- Streams & session helpers ----
+  Stream<User?> get onAuthStateChanged => FirebaseAuth.instance.authStateChanges();
+  Future<User?> currentUser() async => FirebaseAuth.instance.currentUser;
+  Future<String?> currentIdToken({bool forceRefresh = false}) async =>
+      FirebaseAuth.instance.currentUser?.getIdToken(forceRefresh);
+  Future<bool> isLoggedIn() async => FirebaseAuth.instance.currentUser != null;
 
-  String? _accessToken;
-  String? _idToken;
-  String? _refreshToken;
-
-  Future<void> login() async {
-    final creds = await _auth0
-        .webAuthentication(scheme: AppConfig.callbackScheme)
-        .login(audience: AppConfig.apiAudience);
-    await _store(creds);
+  // ---- Email / Password ----
+  Future<void> signInWithEmail(String rawEmail, String password) async {
+    final email = rawEmail.trim().toLowerCase();
+    if (!email.endsWith(AppConfig.allowedDomain)) {
+      throw FirebaseAuthException(
+        code: 'invalid-email-domain',
+        message: 'Please use your ${AppConfig.allowedDomain} email address.',
+      );
+    }
+    if (password.isEmpty) {
+      throw FirebaseAuthException(code: 'missing-password', message: 'Please enter your password.');
+    }
+    await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
   }
 
-  Future<void> signup() async {
-    final creds = await _auth0
-        .webAuthentication(scheme: AppConfig.callbackScheme)
-        .login(audience: AppConfig.apiAudience, parameters: const {'screen_hint': 'signup'});
-    await _store(creds);
+  Future<void> signUpWithEmail(String rawEmail, String password) async {
+    final email = rawEmail.trim().toLowerCase();
+    if (!email.endsWith(AppConfig.allowedDomain)) {
+      throw FirebaseAuthException(
+        code: 'invalid-email-domain',
+        message: 'Please use your ${AppConfig.allowedDomain} email address.',
+      );
+    }
+    if (password.length < 6) {
+      throw FirebaseAuthException(code: 'weak-password', message: 'Password must be 6+ characters.');
+    }
+    await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
   }
 
+  Future<void> sendPasswordResetEmail(String rawEmail) async {
+    final email = rawEmail.trim().toLowerCase();
+    if (!email.endsWith(AppConfig.allowedDomain)) {
+      throw FirebaseAuthException(
+        code: 'invalid-email-domain',
+        message: 'Please use your ${AppConfig.allowedDomain} email address.',
+      );
+    }
+    await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+  }
+
+  // ---- Microsoft (OIDC) via Firebase ----
+  // Must match the Provider ID you created in Firebase Auth → OpenID Connect
+  static const _oidcProviderId = 'oidc.microsoft-csulb';
+
+  bool _signingIn = false;
+
+  Future<void> signInWithMicrosoft() async {
+    if (_signingIn) return; // single-flight guard
+    _signingIn = true;
+    try {
+      // Clear any local session to avoid silent SSO.
+      await FirebaseAuth.instance.signOut();
+
+      final provider = OAuthProvider(_oidcProviderId);
+      // Ensure the user is prompted each time (no auto SSO)
+      provider.setCustomParameters({'prompt': 'login'});
+
+      await FirebaseAuth.instance.signInWithProvider(provider);
+    } finally {
+      _signingIn = false;
+    }
+  }
+
+  // ---- Logout (Firebase + optional AAD front-channel) ----
   Future<void> logout() async {
-    final returnTo = await _buildReturnTo();
-    await _secure.deleteAll();
-    _accessToken = _idToken = _refreshToken = null;
-    try {
-      await _auth0.webAuthentication(scheme: AppConfig.callbackScheme).logout(returnTo: returnTo);
-    } catch (_) {/* ignore */}
-  }
+    // Always clear Firebase session first.
+    await FirebaseAuth.instance.signOut();
 
-  Future<String> _buildReturnTo() async {
-    final info = await PackageInfo.fromPlatform();
-    final id   = info.packageName;
-    final path = Platform.isIOS ? '/ios/$id/callback' : '/android/$id/callback';
-    return '${AppConfig.callbackScheme}://${AppConfig.auth0Domain}$path';
-  }
+    // Optionally also log out of Microsoft to clear AAD cookie.
+    // AppConfig.microsoftTenantId and AppConfig.firebaseHandlerUrl
+    // should be set in AppConfig/.env. If unset, we just skip.
+    final tenant = AppConfig.microsoftTenantId;
+    final handler = AppConfig.firebaseHandlerUrl;
+    if (tenant.isEmpty || handler.isEmpty) return;
 
-  Future<void> sendPasswordResetEmail(String email) async {
-    final lower = email.trim().toLowerCase();
-    if (!lower.endsWith(AppConfig.allowedDomain)) {
-      throw Exception('Please use your ${AppConfig.allowedDomain} email.');
-    }
-    final uri = Uri.https(AppConfig.auth0Domain, '/dbconnections/change_password');
-    final res = await http.post(
-      uri,
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode({
-        'client_id': AppConfig.auth0ClientId,
-        'email': lower,
-        'connection': AppConfig.dbConnectionName,
-      }),
+    final aadLogout = Uri.parse(
+      'https://login.microsoftonline.com/$tenant/oauth2/v2.0/logout'
+          '?post_logout_redirect_uri=$handler',
     );
-    if (res.statusCode >= 400) {
-      throw Exception('Reset email failed: ${res.statusCode} ${res.body}');
-    }
-  }
 
-  Future<void> _store(Credentials c) async {
-    _accessToken  = c.accessToken;
-    _idToken      = c.idToken;
-    _refreshToken = c.refreshToken;
-    await _secure.write(key: 'access_token', value: _accessToken);
-    await _secure.write(key: 'id_token', value: _idToken);
-    if (_refreshToken != null) {
-      await _secure.write(key: 'refresh_token', value: _refreshToken);
-    }
-  }
-
-  Future<bool> isLoggedIn() async {
-    _idToken ??= await _secure.read(key: 'id_token');
-    final claims = _decodeJwt(_idToken);
-    if (claims == null) return false;
-    final exp = claims['exp'];
-    if (exp is int) {
-      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      return exp > now;
-    }
-    return false;
-  }
-
-  Map<String, dynamic>? _decodeJwt(String? token) {
-    if (token == null) return null;
     try {
-      final parts = token.split('.');
-      if (parts.length != 3) return null;
-      final payload = base64Url.normalize(parts[1]);
-      final decoded = utf8.decode(base64Url.decode(payload));
-      return jsonDecode(decoded) as Map<String, dynamic>;
+      // Fire-and-forget; if this can't open, we still signed out of Firebase.
+      await launchUrl(aadLogout, mode: LaunchMode.externalApplication);
     } catch (_) {
-      return null;
+      // swallow any launcher errors
     }
   }
+
+  // ---- Optional metadata helper ----
+  Future<String> appPackageName() async => (await PackageInfo.fromPlatform()).packageName;
 }
