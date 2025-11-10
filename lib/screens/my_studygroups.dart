@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart';
-import 'addgroup.dart';
+import 'addgroup2.dart';
 
 class StudyGroup {
   final String name;
