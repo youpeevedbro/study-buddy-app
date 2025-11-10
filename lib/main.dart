@@ -13,13 +13,13 @@ import 'screens/firebasecheckpage.dart';
 import 'screens/activities.dart';
 import 'screens/my_studygroups.dart';
 import 'screens/studygroup.dart';
+import 'dart:io';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: ".env");
-
-  AppConfig.init();
+  await AppConfig.init();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform, // <-- use options
