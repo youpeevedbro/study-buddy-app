@@ -17,7 +17,7 @@ def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse:
     d = doc.to_dict()
     return StudyGroupPublicResponse(
         id=d.get("id", ""),
-        building=d.get("buildingCode", ""),
+        buildingCode=d.get("buildingCode", ""),
         roomNumber=d.get("roomNumber", ""),
         date=d.get("date", ""),
         startTime=d.get("startTime", ""),
@@ -44,15 +44,10 @@ def _update_group_transaction(transaction, studyGroupRef, updates_data):
         date = updates_data["date"] if "date" in updates_data else doc_dict["date"]
         startTime = updates_data["startTime"] if "startTime" in updates_data else doc_dict["startTime"]
         endTime = updates_data["endTime"] if "endTime" in updates_data else doc_dict["endTime"]
-        
+        updates_data["expireAt"] = convert_to_utc_datetime(date, endTime) # update expireAt field in case date or endTime changes
         # READ User's joined study groups
         # Ensure no overlapping times
         # UPDATE all applicable User's joined study groups
-        transaction.update(studyGroupRef, {"date": date,
-                                            "startTime": startTime,
-                                            "endTime": endTime,
-                                            "expireAt": convert_to_utc_datetime(date, endTime)
-                                            })
         # UPDATE incoming_requests documents 'expireAt' field
     
     if "name" in updates_data:
@@ -65,11 +60,15 @@ def _update_group_transaction(transaction, studyGroupRef, updates_data):
         # INCREMENT quantity in new availabilitySlots?
         print("updating...")
     
-    for key in ["date", "startTime", "endTime"]:
-        updates_data.pop(key, None)
-    if len(updates_data) > 0:
-        transaction.update(studyGroupRef, updates_data)   # Updates remaining fields not related to time
-        
+    transaction.update(studyGroupRef, updates_data)   #Updates StudyGroup Doc
+
+@firestore.transactional
+def _delete_group_transaction(transaction, studyGroupRef):
+    # DELETE study group from applicable User documents (joinedStudyGroups)
+    # DELETE incoming_requests documents related to study group (collection group query)
+    # DECREMENT quantity in study group's related availabilitySlotDoc?
+    transaction.delete(studyGroupRef)
+
 
 #ADD dependendency: get User
 @router.post("/")
@@ -80,20 +79,10 @@ def create_group(group: StudyGroupCreate):
         transaction = db.transaction()
 
         newGroupRef = col.document() # creates studyGroup doc ref + auto-ID
-        group_dict = group.model_dump()
-        data = { 
-            'id': newGroupRef.id,
-            'buildingCode': group_dict["building"],
-            'roomNumber': group_dict["roomNumber"],
-            'date': group_dict["date"],
-            'startTime': group_dict["startTime"],
-            'endTime': group_dict["endTime"],
-            'name': group_dict["name"],
-            'quantity': 1,
-            # ADD owner fields + members
-            'availabilitySlotDocument': group_dict["availabilitySlotDocument"],
-            'expireAt': convert_to_utc_datetime(group_dict["date"], group_dict["endTime"])
-        }
+        data = group.model_dump()
+        data.update({"id": newGroupRef.id,  # ADD owner fields + members 
+                     "quantity": 1, 
+                     "expireAt":convert_to_utc_datetime(data["date"], data["endTime"]) })
         
         _create_group_transaction(transaction, newGroupRef, data)
         #INCREMENENT availabilityslots?
@@ -167,4 +156,17 @@ def delete_group_member(group_id: str, user_id: str):
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
-    
+
+# ADD dependency: get User + ensure User is owner of study group
+@router.delete("/{group_id}")
+def delete_group(group_id: str):
+    try:
+        db = get_db()
+        col = db.collection(COLLECTION)
+        transaction = db.transaction()
+        groupRef = col.document(group_id)
+        _delete_group_transaction(transaction, groupRef)
+
+    except Exception as e:
+        # Surface exact failure in response while we debug
+        raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
