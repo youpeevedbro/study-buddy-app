@@ -11,14 +11,18 @@ class AppConfig {
   static late final String firebaseAndroidAppId;
   static late final String firebaseIosAppId;
 
-  // URL Firebase uses to complete OAuth flows (used for AAD post-logout redirect)
+  /// URL Firebase uses to complete OAuth flows (keep for login callback)
   static late final String firebaseHandlerUrl;
 
+  /// Where AAD should redirect AFTER logout (hosted page you deployed)
+  /// Defaults to: https://<project>.web.app/signed-out/
+  static late final String aadPostLogoutUrl;
+
   // === Microsoft / Entra ===
-  static late final String microsoftTenantId; // e.g. d175679b-...-... (can be empty)
+  static late final String microsoftTenantId; // e.g. d175679b-... (can be empty)
 
   // === App settings ===
-  static late final String allowedEmailDomain; // single or comma separated (server enforces list)
+  static late final String allowedEmailDomain; // client-side hint; server enforces list
   static late final String apiBase;            // FastAPI backend base URL
 
   /// Initialize configuration from .env (with safe defaults)
@@ -29,10 +33,16 @@ class AppConfig {
     firebaseAndroidAppId   = _read('FIREBASE_ANDROID_APP_ID', def: '');
     firebaseIosAppId       = _read('FIREBASE_IOS_APP_ID', def: '');
 
-    // If you prefer a custom value, expose FIREBASE_HANDLER_URL in .env
+    // Login callback (from Firebase OIDC setup)
     firebaseHandlerUrl     = _read(
       'FIREBASE_HANDLER_URL',
       def: 'https://$firebaseProjectId.firebaseapp.com/__/auth/handler',
+    );
+
+    // Logout landing page you deployed
+    aadPostLogoutUrl       = _read(
+      'AAD_POST_LOGOUT_URL',
+      def: 'https://$firebaseProjectId.web.app/signed-out/',
     );
 
     microsoftTenantId      = _read('MICROSOFT_TENANT_ID', def: '');

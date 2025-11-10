@@ -69,7 +69,7 @@ class AuthService {
       await FirebaseAuth.instance.signOut();
 
       final provider = OAuthProvider(_oidcProviderId);
-      // Ensure the user is prompted each time (no auto SSO)
+      // Ensure the user is prompted each time (no auto SSO).
       provider.setCustomParameters({'prompt': 'login'});
 
       await FirebaseAuth.instance.signInWithProvider(provider);
@@ -78,31 +78,29 @@ class AuthService {
     }
   }
 
-  // ---- Logout (Firebase + optional AAD front-channel) ----
+  // ---- Logout (Firebase + AAD front-channel to your hosted page) ----
   Future<void> logout() async {
-    // Always clear Firebase session first.
+    // 1) Always clear Firebase session first.
     await FirebaseAuth.instance.signOut();
 
-    // Optionally also log out of Microsoft to clear AAD cookie.
-    // AppConfig.microsoftTenantId and AppConfig.firebaseHandlerUrl
-    // should be set in AppConfig/.env. If unset, we just skip.
+    // 2) Also clear Microsoft cookie to avoid auto SSO on next login.
     final tenant = AppConfig.microsoftTenantId;
-    final handler = AppConfig.firebaseHandlerUrl;
-    if (tenant.isEmpty || handler.isEmpty) return;
+    final after = AppConfig.aadPostLogoutUrl; // hosted /signed-out/ page
+    if (tenant.isEmpty || after.isEmpty) return;
 
     final aadLogout = Uri.parse(
       'https://login.microsoftonline.com/$tenant/oauth2/v2.0/logout'
-          '?post_logout_redirect_uri=$handler',
+          '?post_logout_redirect_uri=${Uri.encodeComponent(after)}',
     );
 
     try {
-      // Fire-and-forget; if this can't open, we still signed out of Firebase.
       await launchUrl(aadLogout, mode: LaunchMode.externalApplication);
     } catch (_) {
-      // swallow any launcher errors
+      // Even if this fails, Firebase is signed out, and sign-in uses prompt=login.
     }
   }
 
   // ---- Optional metadata helper ----
-  Future<String> appPackageName() async => (await PackageInfo.fromPlatform()).packageName;
+  Future<String> appPackageName() async =>
+      (await PackageInfo.fromPlatform()).packageName;
 }
