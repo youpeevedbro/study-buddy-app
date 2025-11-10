@@ -101,7 +101,24 @@ def create_group(group: StudyGroupCreate):
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
+
+# ADD dependency: User accepting request to join is Study Group Owner 
+#                    + ensure User being added is not already a member
+@router.post("/{group_id}/members/{user_id}")
+def add_group_member(group_id: str, user_id: str):
+    try:
+        db = get_db()
+        col = db.collection(COLLECTION)
+        groupRef = col.document(group_id)
+        # UPDATE availability slot document for quantity?
+        groupRef.update({"members": firestore.ArrayUnion([user_id])})
+        groupRef.update({"quantity": firestore.Increment(1)})
+        
+    except Exception as e:
+        # Surface exact failure in response while we debug
+        raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
+
 
 # ADD dependency: get User
 @router.get("/{group_id}") 
@@ -136,4 +153,18 @@ def update_group(group_id: str, group_update: StudyGroupUpdate):
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
 
+# ADD dependency: get User + ensure User is member of study group
+@router.delete("/{group_id}/members/{user_id}")
+def delete_group_member(group_id: str, user_id: str):
+    try:
+        db = get_db()
+        col = db.collection(COLLECTION)
+        groupRef = col.document(group_id)
+        # UPDATE availability slot document for quantity?
+        groupRef.update({"members": firestore.ArrayRemove([user_id])})
+        groupRef.update({"quantity": firestore.Increment(-1)})
+        
+    except Exception as e:
+        # Surface exact failure in response while we debug
+        raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
