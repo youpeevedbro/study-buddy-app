@@ -17,18 +17,16 @@ class _AddGroupPageState extends State<AddGroupPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _groupNameController = TextEditingController();
   final TextEditingController _buildingController = TextEditingController();
-  final TextEditingController _floorController = TextEditingController();
   final TextEditingController _roomNumberController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
-  final TextEditingController _maxController = TextEditingController();
 
   bool _submitting = false;
   final GroupService _service = const GroupService();
 
-  // Helpers to parse/format "hh:mm AM/PM"
-  DateTime? _parseTime(String value) {
+  // Helpers to parse/format "hh:mm AM/PM" to/from TimeOfDay
+  TimeOfDay? _parseTime(String value) {
     final match = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$').firstMatch(value.trim());
     if (match == null) return null;
     int hour = int.parse(match.group(1)!);
@@ -36,22 +34,27 @@ class _AddGroupPageState extends State<AddGroupPage> {
     final period = match.group(3)!;
     if (period.toUpperCase() == 'PM' && hour != 12) hour += 12;
     if (period.toUpperCase() == 'AM' && hour == 12) hour = 0;
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, hour, minute);
+    return TimeOfDay(hour: hour, minute: minute);
   }
 
-  String _formatTime(DateTime dt) {
-    final tod = TimeOfDay.fromDateTime(dt);
+  String _formatTime(TimeOfDay tod) {
     final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
+    final minute = tod.minute.toString().padLeft(2, '0');
     final period = tod.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour:$minute $period';
   }
 
+  DateTime _timeOfDayToToday(TimeOfDay tod) {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
+  }
+
   // Controller-aware Cupertino time picker
   void _showCupertinoTimePickerFor(TextEditingController controller) {
-    DateTime initial = _parseTime(controller.text) ?? DateTime.now();
-    DateTime temp = initial;
+    final now = DateTime.now();
+    final initialTod = _parseTime(controller.text) ?? TimeOfDay.now();
+    DateTime initial = DateTime(now.year, now.month, now.day, initialTod.hour, initialTod.minute);
+    TimeOfDay temp = initialTod;
 
     showCupertinoModalPopup(
       context: context,
@@ -89,7 +92,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
                 use24hFormat: false,
                 initialDateTime: initial,
                 onDateTimeChanged: (dt) {
-                  temp = dt; // commit on Done
+                  temp = TimeOfDay.fromDateTime(dt); // commit on Done
                 },
               ),
             ),
@@ -132,9 +135,9 @@ class _AddGroupPageState extends State<AddGroupPage> {
       int.parse(parts[1]),
     );
 
-    final start = _parseTime(_startTimeController.text);
-    final end = _parseTime(_endTimeController.text);
-    if (start == null || end == null) {
+    final startTod = _parseTime(_startTimeController.text);
+    final endTod = _parseTime(_endTimeController.text);
+    if (startTod == null || endTod == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please choose start and end time')),
       );
@@ -144,17 +147,11 @@ class _AddGroupPageState extends State<AddGroupPage> {
     final group = Group(
       name: _groupNameController.text.trim(),
       date: date,
-      startTime: start,
-      endTime: end,
-      maxMembers: int.tryParse(_maxController.text.trim()) ?? 0,
+      startTime: startTod,
+      endTime: endTod,
       creatorId: 'user_123',
-      room: Room(
-        building: _buildingController.text.trim(),
-        number: _roomNumberController.text.trim(),
-        floor: _floorController.text.trim().isEmpty
-            ? null
-            : _floorController.text.trim(),
-      ),
+      building: _buildingController.text.trim(),
+      room: _roomNumberController.text.trim(),
     );
 
     setState(() => _submitting = true);
@@ -238,15 +235,6 @@ class _AddGroupPageState extends State<AddGroupPage> {
               ),
               const SizedBox(height: 15),
 
-              // Floor (optional)
-              TextFormField(
-                controller: _floorController,
-                decoration: const InputDecoration(
-                  labelText: 'Floor (optional)',
-                ),
-              ),
-              const SizedBox(height: 15),
-
               // Room Number
               TextFormField(
                 controller: _roomNumberController,
@@ -289,15 +277,6 @@ class _AddGroupPageState extends State<AddGroupPage> {
                   suffixIcon: Icon(Icons.access_time),
                 ),
                 onTap: () => _showCupertinoTimePickerFor(_endTimeController),
-              ),
-              const SizedBox(height: 15),
-
-              // Max
-              TextFormField(
-                controller: _maxController,
-                keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Max Participants'),
               ),
               const SizedBox(height: 30),
 
