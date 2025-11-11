@@ -12,6 +12,8 @@ import 'screens/firebasecheckpage.dart';
 import 'screens/activities.dart';
 import 'screens/my_studygroups.dart';
 import 'screens/studygroup.dart';
+import 'dart:io';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

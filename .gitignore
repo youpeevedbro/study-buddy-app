@@ -27,6 +27,12 @@ venv/
 .env/
 .venv/
 
+
+# Firebase/Firestore emulator dumps & exports
+backend/scrapers/webscraping_and_firestore/firestore-data/
+backend/scrapers/webscraping_and_firestore/firebase-export-*/
+
+
 # scrapers/webscraping_and_firestore/
 backend/scrapers/webscraping_and_firestore/out_*.jsonl
 backend/scrapers/webscraping_and_firestore/availability_slots.jsonl
