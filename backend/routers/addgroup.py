@@ -25,7 +25,7 @@ def create_group(group: Group):
             "creator_id": group.creator_id,
             "created_at": firestore.SERVER_TIMESTAMP,
         }
-        doc_ref, write_result = db.collection("groups").add(data)
+        write_result, doc_ref = db.collection("groups").add(data)
         print(f"[groups] created {doc_ref.id} name='{group.name}'")
         return {"id": doc_ref.id, "message": "Group created successfully"}
     except Exception as e:
