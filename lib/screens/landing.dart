@@ -1,5 +1,6 @@
+// lib/screens/landing.dart
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../components/grad_button.dart';
 
 class LandingPage extends StatefulWidget {
@@ -12,32 +13,26 @@ class LandingPage extends StatefulWidget {
 class _LandingPageState extends State<LandingPage> {
   bool _busy = false;
 
-  Future<void> _doLogin() async {
-    setState(() => _busy = true);
-    try {
-      await AuthService.instance.login();
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard'); // <- HERE
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+  // If your Provider ID in Firebase Console is different, edit here:
+  static const String _oidcProviderId = 'oidc.microsoft-csulb';
 
-  Future<void> _doSignup() async {
+  Future<void> _doMicrosoftLogin() async {
     setState(() => _busy = true);
     try {
-      await AuthService.instance.signup();
+      final provider = OAuthProvider(_oidcProviderId);
+      await FirebaseAuth.instance.signInWithProvider(provider);
+
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard'); // <- HERE
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sign-in failed: ${e.code} — ${e.message ?? ''}')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign up failed: $e')),
+        SnackBar(content: Text('Sign-in failed: $e')),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -84,35 +79,33 @@ class _LandingPageState extends State<LandingPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Log In
                       SizedBox(
                         width: double.infinity,
                         height: 56,
                         child: GradientButton(
-                            width: double.infinity,
-                            height: 56,
-                            borderRadius: BorderRadius.circular(12),
-                            onPressed: _busy ? null : _doLogin,
-                            child: _busy
-                                ? const SizedBox(
-                                    height: 22,
-                                    width: 22,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text(
-                                    'Lock In',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                          width: double.infinity,
+                          height: 56,
+                          borderRadius: BorderRadius.circular(12),
+                          onPressed: _busy ? null : _doMicrosoftLogin,
+                          child: _busy
+                              ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : const Text(
+                            'Sign in with Microsoft (CSULB)',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
                           ),
+                        ),
                       ),
-                      const SizedBox(height: 16),
                     ],
                   ),
                 ),

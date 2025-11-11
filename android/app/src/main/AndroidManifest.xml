@@ -1,4 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
     <application
         android:label="study_buddy"
         android:name="${applicationName}"
@@ -19,45 +21,48 @@
                 android:resource="@style/NormalTheme" />
 
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
 
-            <!-- handle logout Auth0 deep link -->
+        <!-- REMOVE any former Auth0 activities/filters -->
+
+        <!-- Firebase Auth OIDC redirect handler -->
+        <activity
+            android:name="com.google.firebase.auth.internal.GenericIdpActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            tools:node="merge">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
+                <!-- Scheme MUST equal your Android package name -->
                 <data
-                    android:scheme="${auth0Scheme}"
-                    android:host="${auth0Domain}"
-                    android:pathPrefix="/logout" />
-            </intent-filter>
-        </activity>
-
-        <!-- auth0 redirect login callback -->
-        <activity
-            android:name="com.auth0.android.provider.RedirectActivity"
-            android:exported="true"
-            android:launchMode="singleTask">
-            <intent-filter android:label="auth0">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="${auth0Scheme}"
-                    android:host="${auth0Domain}"
-                    android:pathPrefix="/android/com.example.study_buddy/callback" />
+                    android:scheme="com.example.study_buddy"
+                    android:host="firebase.auth" />
             </intent-filter>
         </activity>
 
         <meta-data android:name="flutterEmbedding" android:value="2" />
     </application>
 
+    <!-- Package visibility so url_launcher can open external browsers on Android 11+ -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+
+        <!-- keep any other queries you already had, e.g. PROCESS_TEXT -->
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
     </queries>
 </manifest>

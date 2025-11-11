@@ -1,106 +1,81 @@
-// lib/services/auth_service.dart
-import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:auth0_flutter/auth0_flutter.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../config/app_config.dart';
 
 class AuthService {
   AuthService._();
-  static final instance = AuthService._();
+  static final AuthService instance = AuthService._();
 
-  final _auth0  = Auth0(AppConfig.auth0Domain, AppConfig.auth0ClientId);
-  final _secure = const FlutterSecureStorage();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? _accessToken;
-  String? _idToken;
-  String? _refreshToken;
+  /// Returns true if a Firebase user is currently signed in.
+  Future<bool> isLoggedIn() async => _auth.currentUser != null;
 
-  Future<void> login() async {
-    final creds = await _auth0
-        .webAuthentication(scheme: AppConfig.callbackScheme)
-        .login(audience: AppConfig.apiAudience);
-    await _store(creds);
+  /// Sign in with CSULB SSO (OIDC via Firebase) with a forced fresh prompt.
+  /// Provider ID must match Firebase Auth → OpenID Connect config.
+  Future<UserCredential> signInWithCsulb() async {
+    final provider = OAuthProvider('oidc.microsoft-csulb')
+      ..setCustomParameters(<String, String>{
+        'prompt': 'select_account', // force account chooser
+        'max_age': '0',             // require fresh auth
+        // 'domain_hint': 'csulb.edu', // optional UX hint
+      });
+    return _auth.signInWithProvider(provider);
   }
 
-  Future<void> signup() async {
-    final creds = await _auth0
-        .webAuthentication(scheme: AppConfig.callbackScheme)
-        .login(audience: AppConfig.apiAudience, parameters: const {'screen_hint': 'signup'});
-    await _store(creds);
+  /// Optional alias if other code calls this name.
+  Future<void> signInWithMicrosoft() async {
+    await signInWithCsulb();
   }
 
+  /// Logout from Firebase and Microsoft (tenant-specific).
+  /// Uses your configured post-logout URL (prefer AAD_POST_LOGOUT_URL, fallback to Firebase handler).
   Future<void> logout() async {
-    final returnTo = await _buildReturnTo();
-    await _secure.deleteAll();
-    _accessToken = _idToken = _refreshToken = null;
-    try {
-      await _auth0.webAuthentication(scheme: AppConfig.callbackScheme).logout(returnTo: returnTo);
-    } catch (_) {/* ignore */}
-  }
+    final tenantId = AppConfig.microsoftTenantId.trim();
+    final postLogout = (AppConfig.aadPostLogoutUrl.isNotEmpty
+            ? AppConfig.aadPostLogoutUrl
+            : AppConfig.firebaseHandlerUrl)
+        .trim();
 
-  Future<String> _buildReturnTo() async {
-    final info = await PackageInfo.fromPlatform();
-    final id   = info.packageName;
-    final path = Platform.isIOS ? '/ios/$id/callback' : '/android/$id/callback';
-    return '${AppConfig.callbackScheme}://${AppConfig.auth0Domain}$path';
-  }
+    // Capture email BEFORE Firebase signOut(), for logout_hint (optional).
+    final email = _auth.currentUser?.email ?? '';
 
-  Future<void> sendPasswordResetEmail(String email) async {
-    final lower = email.trim().toLowerCase();
-    if (!lower.endsWith(AppConfig.allowedDomain)) {
-      throw Exception('Please use your ${AppConfig.allowedDomain} email.');
-    }
-    final uri = Uri.https(AppConfig.auth0Domain, '/dbconnections/change_password');
-    final res = await http.post(
-      uri,
-      headers: {'content-type': 'application/json'},
-      body: jsonEncode({
-        'client_id': AppConfig.auth0ClientId,
-        'email': lower,
-        'connection': AppConfig.dbConnectionName,
-      }),
+    // 1) Firebase sign out (local)
+    await _auth.signOut();
+
+    // 2) AAD logout to clear Microsoft cookies (skip if tenant unknown)
+    if (tenantId.isEmpty) return;
+
+    final url = Uri.parse(
+      'https://login.microsoftonline.com/$tenantId/oauth2/v2.0/logout'
+      '?post_logout_redirect_uri=${Uri.encodeComponent(postLogout)}'
+      '${email.isNotEmpty ? '&logout_hint=${Uri.encodeComponent(email)}' : ''}',
     );
-    if (res.statusCode >= 400) {
-      throw Exception('Reset email failed: ${res.statusCode} ${res.body}');
-    }
-  }
 
-  Future<void> _store(Credentials c) async {
-    _accessToken  = c.accessToken;
-    _idToken      = c.idToken;
-    _refreshToken = c.refreshToken;
-    await _secure.write(key: 'access_token', value: _accessToken);
-    await _secure.write(key: 'id_token', value: _idToken);
-    if (_refreshToken != null) {
-      await _secure.write(key: 'refresh_token', value: _refreshToken);
-    }
-  }
-
-  Future<bool> isLoggedIn() async {
-    _idToken ??= await _secure.read(key: 'id_token');
-    final claims = _decodeJwt(_idToken);
-    if (claims == null) return false;
-    final exp = claims['exp'];
-    if (exp is int) {
-      final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      return exp > now;
-    }
-    return false;
-  }
-
-  Map<String, dynamic>? _decodeJwt(String? token) {
-    if (token == null) return null;
+    // External browser works on both iOS & Android.
     try {
-      final parts = token.split('.');
-      if (parts.length != 3) return null;
-      final payload = base64Url.normalize(parts[1]);
-      final decoded = utf8.decode(base64Url.decode(payload));
-      return jsonDecode(decoded) as Map<String, dynamic>;
+      await launchUrl(url, mode: LaunchMode.externalApplication);
     } catch (_) {
-      return null;
+      // Even if this fails, Firebase is signed out; next sign-in still forces prompt.
     }
   }
+
+  /// Forgot-password helper (only for Email/Password accounts).
+  Future<void> sendPasswordResetEmail(String email) async {
+    final e = email.trim().toLowerCase();
+    if (AppConfig.allowedDomain.isNotEmpty && !e.endsWith(AppConfig.allowedDomain)) {
+      throw FirebaseAuthException(
+        code: 'invalid-email-domain',
+        message: 'Use your ${AppConfig.allowedDomain} email address.',
+      );
+    }
+    await _auth.sendPasswordResetEmail(email: e);
+  }
+
+  User? get currentUser => _auth.currentUser;
+
+  // Optional metadata helper
+  Future<String> appPackageName() async =>
+      (await PackageInfo.fromPlatform()).packageName;
 }
