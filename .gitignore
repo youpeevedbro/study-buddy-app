@@ -22,6 +22,7 @@ config/local_*
 # 🐍 PYTHON BACKEND
 # ============================================
 # Virtual environments
+backend/.venv/
 backend/venv/
 venv/
 .env/
