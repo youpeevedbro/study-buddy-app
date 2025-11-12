@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 from typing import List
 
-from fastapi import FastAPI, Depends, HTTPException, Header, status
+from fastapi import FastAPI, Depends, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import firebase_admin
@@ -11,10 +11,13 @@ from firebase_admin import auth, credentials
 from routers import rooms  # our read-only router
 from routers import addgroup
 
-# Load .env from project root (adjust path if needed)
+# --- Auth dependency (import the single source of truth from auth.py) ---
+from auth import verify_firebase_token  # noqa: E402
+
+# Load .env from project root
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
 
-# --- Firebase Admin init ---
+# --- Firebase Admin init (for token verification) ---
 sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 if not sa_path or not os.path.exists(sa_path):
     raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS not set or file not found.")
@@ -22,18 +25,16 @@ cred = credentials.Certificate(sa_path)
 firebase_admin.initialize_app(cred)
 print(f"Firebase Admin initialized with {sa_path}")
 
-# --- Allowed domains (comma-separated) ---
-# Example in .env: ALLOWED_EMAIL_DOMAIN=@csulb.edu,@student.csulb.edu
-allowed_domains: List[str] = [
-    d.strip().lower() for d in os.getenv("ALLOWED_EMAIL_DOMAIN", "@csulb.edu").split(",") if d.strip()
-]
+# --- Allowed domains (plural preferred; fallback to singular) ---
+_domains_raw = os.getenv("ALLOWED_EMAIL_DOMAINS") or os.getenv("ALLOWED_EMAIL_DOMAIN", "@csulb.edu")
+allowed_domains: List[str] = [d.strip().lower() for d in _domains_raw.split(",") if d.strip()]
 print(f"Allowed domains: {allowed_domains}")
 
+# --- FastAPI app & CORS ---
 app = FastAPI(title="StudyBuddy API", version="1.0")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten in prod
+    allow_origins=["*"],   # tighten for production
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
