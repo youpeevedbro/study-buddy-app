@@ -4,6 +4,7 @@ import 'package:study_buddy/components/square_button.dart';
 import 'package:study_buddy/components/cursive_divider.dart';
 import '../services/auth_service.dart';
 import '../services/timer_service.dart';
+import '../services/checkin_service.dart';
 import 'dart:async';
 
 class Dashboard extends StatefulWidget {
@@ -14,23 +15,24 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
-  bool _userCheckedIn = true;
-
   @override
   void initState() {
     super.initState();
     _checkAuth();
-    TimerService.instance.addListener(_onTimerTick);
+    // Rebuild when timer or check-in state changes
+    TimerService.instance.addListener(_onExternalChange);
+    CheckInService.instance.addListener(_onExternalChange);
   }
 
-  void _onTimerTick() {
+  void _onExternalChange() {
     if (!mounted) return;
     setState(() {});
   }
 
   @override
   void dispose() {
-    TimerService.instance.removeListener(_onTimerTick);
+    TimerService.instance.removeListener(_onExternalChange);
+    CheckInService.instance.removeListener(_onExternalChange);
     super.dispose();
   }
 
@@ -43,10 +45,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void _checkOutRoom() {
-    setState(() {
-      _userCheckedIn = false;
-    });
-    TimerService.instance.stop();
+    CheckInService.instance.checkOut(); // flips to false + stops timer
   }
 
   String _formatTime(int totalSeconds) {
@@ -58,6 +57,13 @@ class _DashboardState extends State<Dashboard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final checkedIn = CheckInService.instance.checkedIn;
+    final currentRoom = CheckInService.instance.currentRoom;
+
+    // Show building + room (e.g., ECS-228B) when checked in
+    final roomLabel = currentRoom != null
+        ? "${currentRoom.buildingCode}-${currentRoom.roomNumber}"
+        : "Room Number";
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -134,8 +140,8 @@ class _DashboardState extends State<Dashboard> {
 
                 const SizedBox(height: 50),
 
-                // === Timer widget ===
-                if (_userCheckedIn)
+                // === Timer widget (visible only when checked in) ===
+                if (checkedIn)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
@@ -173,7 +179,7 @@ class _DashboardState extends State<Dashboard> {
 
                 const SizedBox(height: 10),
 
-                // === Check-out section ===
+                // === Check-out / info section ===
                 Container(
                   height: 60,
                   width: double.infinity,
@@ -181,13 +187,13 @@ class _DashboardState extends State<Dashboard> {
                     color: theme.colorScheme.secondaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: _userCheckedIn
+                  child: checkedIn
                       ? Row(
                     children: [
                       const SizedBox(width: 15),
-                      const Text(
-                        'Room Number',
-                        style: TextStyle(
+                      Text(
+                        roomLabel, // ECS-228B
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),

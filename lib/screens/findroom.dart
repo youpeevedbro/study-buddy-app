@@ -4,6 +4,7 @@ import 'filter.dart';
 import '../components/grad_button.dart';
 import '../services/api.dart';
 import '../models/room.dart';
+import '../services/checkin_service.dart';
 import 'dart:collection';
 
 class FindRoomPage extends StatefulWidget {
@@ -29,6 +30,19 @@ class _FindRoomPageState extends State<FindRoomPage> {
   void initState() {
     super.initState();
     _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
+    // Rebuild if check-in state changes elsewhere (e.g., Dashboard)
+    CheckInService.instance.addListener(_onCheckinChange);
+  }
+
+  void _onCheckinChange() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    CheckInService.instance.removeListener(_onCheckinChange);
+    super.dispose();
   }
 
   // -------- Helpers to read values from FilterCriteria safely --------
@@ -104,7 +118,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
     }
   }
 
-  // Demo actions
+  // Actions
   void _reportLocked(Room r) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${r.buildingCode} - ${r.roomNumber} ${r.start}-${r.end} reported as locked')),
@@ -112,9 +126,21 @@ class _FindRoomPageState extends State<FindRoomPage> {
   }
 
   void _checkIn(Room r) {
+    CheckInService.instance.checkIn(room: r);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You checked into ${r.buildingCode} - ${r.roomNumber} (${r.start}-${r.end})')),
+      SnackBar(content: Text('You checked into ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})')),
     );
+    setState(() {}); // refresh current page so buttons update
+  }
+
+  void _checkOut(Room r) {
+    if (CheckInService.instance.isCurrentRoom(r)) {
+      CheckInService.instance.checkOut();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('You checked out of ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})')),
+      );
+      setState(() {});
+    }
   }
 
   // Pagination controls
@@ -244,6 +270,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
                         grouped.putIfAbsent(key, () => []).add(r);
                       }
 
+                      final checkedIn = CheckInService.instance.checkedIn;
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -304,6 +332,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                   children: [
                                     // List all time ranges for the day
                                     ...slots.map((r) {
+                                      final isCurrent = CheckInService.instance.isCurrentRoom(r);
                                       return Container(
                                         margin: const EdgeInsets.only(bottom: 10),
                                         padding: const EdgeInsets.all(12),
@@ -356,18 +385,32 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                     ),
                                                   ),
                                                 ),
-                                                GradientButton(
-                                                  height: 35,
-                                                  borderRadius: BorderRadius.circular(12.0),
-                                                  onPressed: () => _checkIn(r),
-                                                  child: const Text(
-                                                    'Check-in',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16.0,
+                                                if (checkedIn && isCurrent)
+                                                  GradientButton(
+                                                    height: 35,
+                                                    borderRadius: BorderRadius.circular(12.0),
+                                                    onPressed: () => _checkOut(r),
+                                                    child: const Text(
+                                                      'Check-out',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 16.0,
+                                                      ),
+                                                    ),
+                                                  )
+                                                else
+                                                  GradientButton(
+                                                    height: 35,
+                                                    borderRadius: BorderRadius.circular(12.0),
+                                                    onPressed: () => _checkIn(r),
+                                                    child: const Text(
+                                                      'Check-in',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 16.0,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
                                               ],
                                             ),
                                           ],
