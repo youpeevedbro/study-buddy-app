@@ -70,8 +70,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                 ),
                 child: const Text('My Study Groups'),
               ),
-
-              // Checkout/timer UI intentionally removed to keep a single source of truth.
             ],
           ),
         ),

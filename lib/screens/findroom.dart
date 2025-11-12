@@ -26,6 +26,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
   // --- Future for the current page ---
   Future<RoomsPage>? _futurePage;
 
+  // --- Local "reported once" state (no backend yet) ---
+  // Tracks which specific time slots the user has reported as locked.
+  final Set<String> _reportedSlots = <String>{};
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +78,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
     return null;
   }
 
+  // Unique key for a specific time slot (room + date + time)
+  String _slotKey(Room r) =>
+      '${r.buildingCode}-${r.roomNumber}|${r.date}|${r.start}-${r.end}';
+
   // Core fetch with current filters
   Future<RoomsPage> _fetchPage({
     required int limit,
@@ -120,8 +128,15 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
   // Actions
   void _reportLocked(Room r) {
+    final key = _slotKey(r);
+    if (_reportedSlots.contains(key)) return; // already reported once
+
+    setState(() {
+      _reportedSlots.add(key);
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${r.buildingCode} - ${r.roomNumber} ${r.start}-${r.end} reported as locked')),
+      SnackBar(content: Text('${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end}) reported as locked')),
     );
   }
 
@@ -333,6 +348,29 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                     // List all time ranges for the day
                                     ...slots.map((r) {
                                       final isCurrent = CheckInService.instance.isCurrentRoom(r);
+                                      final key = _slotKey(r);
+                                      final isReported = _reportedSlots.contains(key);
+
+                                      // Build the "Locked" button with one-click disable behavior.
+                                      final lockedButton = IgnorePointer(
+                                        ignoring: isReported,
+                                        child: Opacity(
+                                          opacity: isReported ? 0.5 : 1.0,
+                                          child: GradientButton(
+                                            height: 35,
+                                            borderRadius: BorderRadius.circular(12.0),
+                                            onPressed: () => _reportLocked(r),
+                                            child: const Text(
+                                              'Locked',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16.0,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+
                                       return Container(
                                         margin: const EdgeInsets.only(bottom: 10),
                                         padding: const EdgeInsets.all(12),
@@ -358,6 +396,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                               ),
                                             ),
                                             const SizedBox(height: 8),
+
+                                            // (Optional) still show existing lockedReports from backend if present
                                             if (r.lockedReports > 0)
                                               Padding(
                                                 padding: const EdgeInsets.only(bottom: 8),
@@ -370,21 +410,30 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                   ),
                                                 ),
                                               ),
+
+                                            // Buttons row: Locked (with stacked "1 Report") + Check-in/out
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                GradientButton(
-                                                  height: 35,
-                                                  borderRadius: BorderRadius.circular(12.0),
-                                                  onPressed: () => _reportLocked(r),
-                                                  child: const Text(
-                                                    'Locked',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16.0,
-                                                    ),
-                                                  ),
+                                                // Locked + "1 Report" stacked vertically and centered under Locked
+                                                Column(
+                                                  children: [
+                                                    lockedButton,
+                                                    if (isReported)
+                                                      const Padding(
+                                                        padding: EdgeInsets.only(top: 4.0),
+                                                        child: Text(
+                                                          '1 Report',
+                                                          style: TextStyle(
+                                                            color: Colors.red,
+                                                            fontWeight: FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
                                                 ),
+
                                                 if (checkedIn && isCurrent)
                                                   GradientButton(
                                                     height: 35,
