@@ -8,6 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import firebase_admin
 from firebase_admin import auth, credentials
+from routers import rooms  # our read-only router
+from routers import addgroup
 
 # Load .env from project root (adjust path if needed)
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"), override=True)
@@ -58,8 +60,8 @@ def verify_firebase_token(authorization: str | None = Header(default=None)):
     return decoded  # can return claims for downstream use
 
 # --- Routers ---
-from routers import rooms  # noqa: E402
 app.include_router(rooms.router, prefix="/rooms", tags=["rooms"], dependencies=[Depends(verify_firebase_token)])
+app.include_router(addgroup.router, prefix="/groups", tags=["groups"])
 
 # --- Health check ---
 @app.get("/health")
