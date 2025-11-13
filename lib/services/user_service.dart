@@ -77,4 +77,98 @@ class UserService {
       'disableAccount': false,
     });
   }
+
+  /// Update the current user's handle (username) with uniqueness check.
+  Future<void> updateCurrentUserHandle(String newHandle) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('No Firebase user is logged in.');
+    }
+
+    newHandle = newHandle.trim();
+
+    // basic format check (same as create profile)
+    final valid = RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(newHandle);
+    if (!valid) {
+      throw Exception(
+          'Handle must be 3–20 characters: letters, numbers, underscores only.');
+    }
+
+    // If handle unchanged, nothing to do
+    final currentDoc = await _usersCol.doc(user.uid).get();
+    final currentData = currentDoc.data();
+    if (currentData != null && currentData['handle'] == newHandle) {
+      return;
+    }
+
+    // uniqueness check
+    final available = await isHandleAvailable(newHandle);
+    if (!available) {
+      throw Exception('Handle already taken. Try another.');
+    }
+
+    // update Firestore
+    await _usersCol.doc(user.uid).update({
+      'handle': newHandle,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+  /// Soft-disable or re-enable the current account.
+  Future<void> updateDisableAccount(bool disabled) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('No Firebase user is logged in.');
+    }
+
+    await _usersCol.doc(user.uid).update({
+      'disableAccount': disabled,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Update both displayName and handle for the current user.
+  Future<void> updateDisplayNameAndHandle({
+    required String newDisplayName,
+    required String newHandle,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('No Firebase user is logged in.');
+    }
+
+    newDisplayName = newDisplayName.trim();
+    newHandle = newHandle.trim();
+
+    if (newDisplayName.isEmpty) {
+      throw Exception('Display name cannot be empty.');
+    }
+
+    // Validate handle format
+    final valid = RegExp(r'^[a-zA-Z0-9_]{3,20}$').hasMatch(newHandle);
+    if (!valid) {
+      throw Exception(
+        'Handle must be 3–20 characters: letters, numbers, underscores only.',
+      );
+    }
+
+    final doc = await _usersCol.doc(user.uid).get();
+    final currentData = doc.data() ?? {};
+    final currentHandle = currentData['handle'] as String? ?? '';
+
+    // Only check uniqueness if the handle actually changed
+    if (currentHandle != newHandle) {
+      final available = await isHandleAvailable(newHandle);
+      if (!available) {
+        throw Exception('Handle already taken. Try another.');
+      }
+    }
+
+    await _usersCol.doc(user.uid).update({
+      'displayName': newDisplayName,
+      'handle': newHandle,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+
 }

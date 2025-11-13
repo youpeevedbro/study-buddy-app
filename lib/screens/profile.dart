@@ -1,6 +1,12 @@
+// lib/screens/profile.dart
+
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../components/grad_button.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
+import '../models/user_profile.dart';
 
 class UserProfilePage extends StatefulWidget {
   const UserProfilePage({super.key});
@@ -10,23 +16,51 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> {
-  String userName = "John_Doe";
-  String userEmail = "johndoe@student.csulb.edu";
-  late final TextEditingController _nameController;
+  UserProfile? _profile;
+  bool _loading = true;
+  String? _error;
+
+  late final TextEditingController _displayNameController;
+  late final TextEditingController _handleController;
   late final TextEditingController _emailController;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: userName);
-    _emailController = TextEditingController(text: userEmail);
+    _displayNameController = TextEditingController();
+    _handleController = TextEditingController();
+    _emailController = TextEditingController();
+    _loadProfile();
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _displayNameController.dispose();
+    _handleController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await UserService.instance.getCurrentUserProfile();
+      final fallbackEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+
+      if (!mounted) return;
+      setState(() {
+        _profile = profile;
+        _loading = false;
+        _displayNameController.text = profile?.displayName ?? '';
+        _handleController.text = profile?.handle ?? '';
+        _emailController.text = profile?.email ?? fallbackEmail;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load profile: $e';
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _logout() async {
@@ -40,40 +74,37 @@ class _UserProfilePageState extends State<UserProfilePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text("Confirm Disable"),
-        content: const Text("Are you sure you want to disable your account?"),
+        content: const Text(
+          "Are you sure you want to disable your account?",
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text("Cancel"),
           ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                // TODO: hook to your backend if you actually disable accounts
-                //Navigator.pop(ctx);
-                Navigator.pushNamed(context, '/landing'); 
-                showDialog(
-                  context: context,
-                  builder: (innerCtx) => AlertDialog(
-                    title: const Text("Account Disabled"),
-                    content: const Text("Your account is disabled"),
-                    actionsAlignment: MainAxisAlignment.center,
-                    actionsPadding: const EdgeInsets.only(bottom: 12),
-                    actions: [
-                      TextButton.icon(
-                        onPressed: () => Navigator.pop(innerCtx),
-                        icon: const Icon(Icons.waving_hand, color: Color(0xFFE7C144)),
-                        label: const Text("See you!"),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: const Text("Disable"),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
             ),
+            onPressed: () async {
+              try {
+                final user = FirebaseAuth.instance.currentUser;
+                if (user != null) {
+                  // Soft-disable account in Firestore
+                  await UserService.instance.updateDisableAccount(true);
+                }
+              } catch (_) {
+                // optional: show snackbar
+              }
+
+              if (!mounted) return;
+              Navigator.of(ctx).pop(); // close confirm dialog
+              Navigator.of(context)
+                  .pushNamedAndRemoveUntil('/landing', (_) => false);
+            },
+            child: const Text("Disable"),
+          ),
         ],
       ),
     );
@@ -82,6 +113,25 @@ class _UserProfilePageState extends State<UserProfilePage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Text(
+            _error!,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -106,112 +156,135 @@ class _UserProfilePageState extends State<UserProfilePage> {
         ),
       ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            // Main content column
-            SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
-                child: Column(
-                  children: [
-                    const CircleAvatar(
-                      radius: 50,
-                      child: Icon(Icons.person, size: 60),
-                    ),
-                    const SizedBox(height: 20),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+          child: Column(
+            children: [
+              const CircleAvatar(
+                radius: 50,
+                child: Icon(Icons.person, size: 60),
+              ),
+              const SizedBox(height: 20),
 
-                    TextField(
-                      enabled: false,
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: "Username",
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    TextField(
-                      controller: _emailController,
-                      enabled: false,
-                      decoration: const InputDecoration(labelText: "Email"),
-                    ),
-                    const SizedBox(height: 30),
-
-                    InkWell(
-                      onTap: () async {
-                        final newName = await Navigator.push<String>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditProfilePage(initialName: _nameController.text),
-                          ),
-                        );
-                        if (newName != null && newName.isNotEmpty) {
-                          setState(() {
-                            userName = newName;
-                            _nameController.text = newName;
-                          });
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.edit, color: theme.primaryColor),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Edit Account",
-                              style: TextStyle(fontSize: 18, color: theme.primaryColor),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Logout 
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: _logout,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.logout, color: theme.primaryColor),
-                            const SizedBox(width: 8),
-                            Text(
-                              "Logout",
-                              style: TextStyle(fontSize: 18, color: theme.primaryColor),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-
-                    // Disable Account Button
-                    GradientButton(
-                      width: double.infinity,
-                      height: 50,
-                      borderRadius: BorderRadius.circular(12.0),
-                      onPressed: () => _disableAccount(context),
-                      child: const Text(
-                        'Disable Account',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22.0,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
+              // Display Name
+              TextField(
+                enabled: false,
+                controller: _displayNameController,
+                decoration: const InputDecoration(
+                  labelText: "Display Name",
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+
+              // Handle
+              TextField(
+                enabled: false,
+                controller: _handleController,
+                decoration: const InputDecoration(
+                  labelText: "Handle",
+                  prefixText: '@ ',
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Email
+              TextField(
+                controller: _emailController,
+                enabled: false,
+                decoration: const InputDecoration(
+                  labelText: "Email",
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // Edit Account (display name + handle)
+              InkWell(
+                onTap: () async {
+                  final result = await Navigator.push<Map<String, String>>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditProfilePage(
+                        initialDisplayName: _displayNameController.text,
+                        initialHandle: _handleController.text,
+                      ),
+                    ),
+                  );
+
+                  if (result != null) {
+                    setState(() {
+                      _displayNameController.text =
+                          result['displayName'] ?? _displayNameController.text;
+                      _handleController.text =
+                          result['handle'] ?? _handleController.text;
+                    });
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.edit, color: theme.primaryColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Edit Account",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: theme.primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Logout
+              InkWell(
+                onTap: _logout,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout, color: theme.primaryColor),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Logout",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: theme.primaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              // Disable Account Button
+              GradientButton(
+                width: double.infinity,
+                height: 50,
+                borderRadius: BorderRadius.circular(12.0),
+                onPressed: () => _disableAccount(context),
+                child: const Text(
+                  'Disable Account',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -220,31 +293,70 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
 // ---------------- EDIT PAGE -----------------
 class EditProfilePage extends StatefulWidget {
-  final String initialName;
-  const EditProfilePage({super.key, required this.initialName});
+  final String initialDisplayName;
+  final String initialHandle;
+
+  const EditProfilePage({
+    super.key,
+    required this.initialDisplayName,
+    required this.initialHandle,
+  });
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
 }
 
 class _EditProfilePageState extends State<EditProfilePage> {
-  late final TextEditingController _nameController;
+  late final TextEditingController _displayNameController;
+  late final TextEditingController _handleController;
+  String? _error;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.initialName);
+    _displayNameController =
+        TextEditingController(text: widget.initialDisplayName);
+    _handleController = TextEditingController(text: widget.initialHandle);
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _displayNameController.dispose();
+    _handleController.dispose();
     super.dispose();
   }
 
-  void _saveChanges() {
-    // TODO: Add validation and backend update logic here
-    Navigator.pop(context, _nameController.text);
+  Future<void> _saveChanges() async {
+    final newDisplayName = _displayNameController.text.trim();
+    final newHandle = _handleController.text.trim();
+
+    setState(() {
+      _error = null;
+      _saving = true;
+    });
+
+    try {
+      await UserService.instance.updateDisplayNameAndHandle(
+        newDisplayName: newDisplayName,
+        newHandle: newHandle,
+      );
+      if (!mounted) return;
+
+      Navigator.pop<Map<String, String>>(context, {
+        'displayName': newDisplayName,
+        'handle': newHandle,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
   }
 
   @override
@@ -257,7 +369,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             offset: const Offset(3.0, 0),
             child: const Icon(Icons.arrow_back_ios, color: Colors.black),
           ),
-          onPressed: () => Navigator.pop(context), // back to Dashboard
+          onPressed: () => Navigator.pop(context),
         ),
         toolbarHeight: 100,
         title: const Text("Study Buddy"),
@@ -272,36 +384,51 @@ class _EditProfilePageState extends State<EditProfilePage> {
         ),
       ),
       body: SafeArea(
-        child: Stack(
-          children: [
-            // Content
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 110, 20, 20),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(labelText: "Username"),
-                  ),
-                  const SizedBox(height: 30),
-                  GradientButton(
-                    width: double.infinity,
-                    height: 50,
-                    borderRadius: BorderRadius.circular(12.0),
-                    onPressed: _saveChanges,
-                    child: const Text(
-                      'Save',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 110, 20, 20),
+          child: Column(
+            children: [
+              TextField(
+                controller: _displayNameController,
+                decoration: const InputDecoration(
+                  labelText: "Display Name",
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: _handleController,
+                decoration: InputDecoration(
+                  labelText: "Handle",
+                  prefixText: '@ ',
+                  errorText: _error,
+                ),
+              ),
+              const SizedBox(height: 30),
+              GradientButton(
+                width: double.infinity,
+                height: 50,
+                borderRadius: BorderRadius.circular(12.0),
+                onPressed: _saving ? null : _saveChanges,
+                child: _saving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Save',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
