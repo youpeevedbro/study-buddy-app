@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../components/grad_button.dart';
+import '../services/user_service.dart'; // 👈 NEW
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -16,6 +17,21 @@ class _LandingPageState extends State<LandingPage> {
   // If your Provider ID in Firebase Console is different, edit here:
   static const String _oidcProviderId = 'oidc.microsoft-csulb';
 
+  /// Decide where to go after a successful login:
+  /// - If profile exists in Firestore → /dashboard
+  /// - If not → /createProfile
+  Future<void> _routeAfterLogin() async {
+    final hasProfile = await UserService.instance.currentUserProfileExists();
+
+    if (!mounted) return;
+
+    if (hasProfile) {
+      Navigator.pushReplacementNamed(context, '/dashboard');
+    } else {
+      Navigator.pushReplacementNamed(context, '/createProfile');
+    }
+  }
+
   Future<void> _doMicrosoftLogin() async {
     setState(() => _busy = true);
     try {
@@ -23,11 +39,17 @@ class _LandingPageState extends State<LandingPage> {
       await FirebaseAuth.instance.signInWithProvider(provider);
 
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/dashboard');
+
+      // 👇 instead of going straight to /dashboard,
+      //    check whether the user has a profile doc
+      await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sign-in failed: ${e.code} — ${e.message ?? ''}')),
+        SnackBar(
+          content:
+              Text('Sign-in failed: ${e.code} — ${e.message ?? ''}'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -89,21 +111,35 @@ class _LandingPageState extends State<LandingPage> {
                           onPressed: _busy ? null : _doMicrosoftLogin,
                           child: _busy
                               ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
                               : const Text(
-                            'Sign in with Microsoft (CSULB)',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
+                                  'Sign in with Microsoft (CSULB)',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // 👇 TEMP: force logout button so you can test onboarding
+                      TextButton(
+                        onPressed: () async {
+                          await FirebaseAuth.instance.signOut();
+                          debugPrint('Forced logout complete');
+                        },
+                        child: const Text(
+                          'Temp: Force Logout',
+                          style: TextStyle(color: Colors.red),
                         ),
                       ),
                     ],

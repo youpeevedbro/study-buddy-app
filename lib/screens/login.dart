@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../services/auth_service.dart';
+import '../services/user_service.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
   @override
@@ -19,7 +22,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final dark = const Color(0xFF111827);
 
   @override
-  void dispose() { _email.dispose(); _password.dispose(); super.dispose(); }
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   InputDecoration _inputDecoration(String placeholder, {String? errorText}) {
     return InputDecoration(
@@ -49,17 +56,42 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _friendly(FirebaseAuthException e) {
     switch (e.code) {
-      case 'invalid-email': return 'Please enter a valid email.';
-      case 'user-disabled': return 'This account is disabled.';
-      case 'user-not-found': return 'No account found for this email.';
-      case 'wrong-password': return 'Incorrect password.';
-      case 'too-many-requests': return 'Too many attempts. Try again later.';
-      default: return e.message ?? 'Sign-in failed.';
+      case 'invalid-email':
+        return 'Please enter a valid email.';
+      case 'user-disabled':
+        return 'This account is disabled.';
+      case 'user-not-found':
+        return 'No account found for this email.';
+      case 'wrong-password':
+        return 'Incorrect password.';
+      case 'too-many-requests':
+        return 'Too many attempts. Try again later.';
+      default:
+        return e.message ?? 'Sign-in failed.';
+    }
+  }
+
+  /// After any successful login, decide where to send the user:
+  /// - if they have a profile → /dashboard
+  /// - if they don't → /createProfile
+  Future<void> _routeAfterLogin() async {
+    final hasProfile = await UserService.instance.currentUserProfileExists();
+
+    if (!mounted) return;
+
+    if (hasProfile) {
+      Navigator.of(context).pushReplacementNamed('/dashboard');
+    } else {
+      Navigator.of(context).pushReplacementNamed('/createProfile');
     }
   }
 
   Future<void> _signInEmail() async {
-    setState(() { _busy = true; _emailErr = _passErr = _globalErr = null; });
+    setState(() {
+      _busy = true;
+      _emailErr = _passErr = _globalErr = null;
+    });
+
     try {
       final email = _email.text.trim().toLowerCase();
       final pwd = _password.text;
@@ -73,13 +105,20 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: pwd);
-      if (mounted) Navigator.of(context).pushReplacementNamed('/dashboard');
+      await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: pwd);
+
+      // 🔥 Instead of going straight to /dashboard, check profile first
+      await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
-      if (code.contains('password')) _passErr = _friendly(e);
-      else if (code.contains('user') || code.contains('email')) _emailErr = _friendly(e);
-      else _globalErr = _friendly(e);
+      if (code.contains('password')) {
+        _passErr = _friendly(e);
+      } else if (code.contains('user') || code.contains('email')) {
+        _emailErr = _friendly(e);
+      } else {
+        _globalErr = _friendly(e);
+      }
       setState(() {});
     } catch (_) {
       setState(() => _globalErr = 'Something went wrong. Please try again.');
@@ -89,15 +128,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInWithMicrosoft() async {
-    setState(() { _busy = true; _globalErr = null; });
+    setState(() {
+      _busy = true;
+      _globalErr = null;
+    });
+
     try {
-      // Provider ID must match what you created in Firebase Auth → OIDC
-      final cred = await FirebaseAuth.instance.signInWithProvider(
-        OAuthProvider('oidc.microsoft-csulb'),
-      );
-      if (cred.user != null && mounted) {
-        Navigator.of(context).pushReplacementNamed('/dashboard');
-      }
+      // ✅ Use your AuthService wrapper (CSULB SSO via OIDC)
+      await AuthService.instance.signInWithCsulb();
+
+      // 🔥 After SSO succeeds, check Firestore profile
+      await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       setState(() => _globalErr = _friendly(e));
     } catch (_) {
@@ -129,12 +170,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Email/password (optional to keep)
+                  // Email/password (you can keep or remove later)
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    autofillHints: const [AutofillHints.username, AutofillHints.email],
-                    decoration: _inputDecoration('Email', errorText: _emailErr),
+                    autofillHints: const [
+                      AutofillHints.username,
+                      AutofillHints.email
+                    ],
+                    decoration:
+                        _inputDecoration('Email', errorText: _emailErr),
                     style: TextStyle(color: dark, fontSize: 15),
                   ),
                   const SizedBox(height: 12),
@@ -142,7 +187,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _password,
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
-                    decoration: _inputDecoration('Password', errorText: _passErr),
+                    decoration:
+                        _inputDecoration('Password', errorText: _passErr),
                     style: TextStyle(color: dark, fontSize: 15),
                   ),
                   const SizedBox(height: 12),
@@ -153,12 +199,17 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: yellow,
                         foregroundColor: dark,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         elevation: 0,
                       ),
                       child: _busy
                           ? const CircularProgressIndicator()
-                          : const Text('Sign in with Email', style: TextStyle(fontWeight: FontWeight.w600)),
+                          : const Text(
+                              'Sign in with Email',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
                     ),
                   ),
 
@@ -171,7 +222,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 48,
                     child: OutlinedButton(
                       onPressed: _busy ? null : _signInWithMicrosoft,
-                      child: const Text('Sign in with Microsoft (CSULB)'),
+                      child:
+                          const Text('Sign in with Microsoft (CSULB)'),
                     ),
                   ),
 

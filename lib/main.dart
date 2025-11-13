@@ -14,6 +14,8 @@ import 'screens/my_studygroups.dart';
 import 'screens/studygroup.dart';
 import 'dart:io';
 import 'screens/addgroup2.dart';
+import 'screens/onboarding/create_profile.dart';
+import 'screens/login.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,7 +47,7 @@ class StudyBuddyApp extends StatelessWidget {
       initialRoute: '/landing',
       routes: {
         '/landing'        : (_) => const LandingPage(),
-        '/dashboard'      : (_) => const Dashboard(),
+        '/dashboard'      : (context) => const Dashboard(),
         '/profile'        : (_) => const UserProfilePage(),
         '/firebase-check' : (_) => const FirebaseCheckPage(),
         '/activities'     : (_) => const MyActivitiesPage(),
@@ -53,6 +55,8 @@ class StudyBuddyApp extends StatelessWidget {
         '/rooms'          : (_) => const FindRoomPage(),
         '/studygroup'     : (_) => const StudyGroupsPage(),
         '/addgroup2'  : (_) => const AddGroupPage(),
+        '/login': (context) => const LoginScreen(),
+        '/createProfile': (context) => const CreateProfileScreen(),
       },
     );
   }
