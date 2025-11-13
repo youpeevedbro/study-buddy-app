@@ -1,12 +1,23 @@
 # backend/routers/rooms.py
-import base64, json
+import base64
+import json
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional, Dict, Any
 from services.firestore_client import get_db
 from models.room import Room, RoomsResponse
 
+# ---- Timezone (America/Los_Angeles). Falls back to UTC if zoneinfo missing.
+try:
+    from zoneinfo import ZoneInfo
+    TZ = ZoneInfo("America/Los_Angeles")
+except Exception:
+    TZ = None  # use UTC fallback below
+
 router = APIRouter()
 COLLECTION = "availabilitySlots"
+
 
 def _doc_to_room(doc) -> Room:
     d = doc.to_dict() or {}
@@ -14,47 +25,69 @@ def _doc_to_room(doc) -> Room:
         id=doc.id,
         buildingCode=d.get("buildingCode", ""),
         roomNumber=str(d.get("roomNumber", "")),
-        date=d.get("date", ""),                     # <-- now included
+        date=d.get("date", ""),
         start=d.get("start", ""),
         end=d.get("end", ""),
         lockedReports=int(d.get("locked_reports", 0)),
     )
 
+
 def _encode_token(cursor: Dict[str, Any]) -> str:
     raw = json.dumps(cursor).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("utf-8")
+
 
 def _decode_token(token: str) -> Dict[str, Any]:
     raw = base64.urlsafe_b64decode(token.encode("utf-8"))
     return json.loads(raw.decode("utf-8"))
 
+
 @router.get("/", response_model=RoomsResponse)
 def list_rooms(
-    limit: int = Query(50, ge=1, le=200),           # default 50
-    pageToken: Optional[str] = None
+    limit: int = Query(50, ge=1, le=200),
+    pageToken: Optional[str] = None,
+    building: Optional[str] = Query(None, description="buildingCode like AS, ECS, LA1"),
 ):
     """
-    List rooms with cursor pagination.
-    Order: roomId, date, startMin
-    pageToken is a urlsafe base64-encoded JSON: {"roomId": "...", "date": "...", "startMin": 420}
+    Returns ONLY today's available room slots (from `availabilitySlots`).
+    Optional filter: `?building=AS`
+
+    Stable sort: roomId, date, startMin
+    Cursor token: {"roomId": "...", "date": "yyyy-MM-dd", "startMin": int}
     """
     try:
         db = get_db()
         col = db.collection(COLLECTION)
 
-        # Order for deterministic pagination
-        query = (
-            col.order_by("roomId")
-               .order_by("date")
-               .order_by("startMin")
-               .limit(limit + 1)  # fetch one extra to detect "has more"
+        # Resolve 'today' in campus TZ (or UTC fallback)
+        now = datetime.now(TZ) if TZ else datetime.utcnow()
+        today = now.strftime("%Y-%m-%d")
+
+        # Base query: only today's docs
+        q = col.where("date", "==", today)
+
+        # Optional: filter by building code
+        if building:
+            q = q.where("buildingCode", "==", building)
+
+        # Deterministic order + fetch +1 to detect "has more"
+        q = (
+            q.order_by("roomId")
+             .order_by("date")
+             .order_by("startMin")
+             .limit(limit + 1)
         )
 
+        # Cursor pagination
         if pageToken:
             cursor = _decode_token(pageToken)
-            query = query.start_after([cursor.get("roomId", ""), cursor.get("date", ""), cursor.get("startMin", 0)])
+            q = q.start_after([
+                cursor.get("roomId", ""),
+                cursor.get("date", ""),
+                cursor.get("startMin", 0),
+            ])
 
-        docs = list(query.stream())
+        docs = list(q.stream())
         has_more = len(docs) > limit
         docs = docs[:limit]
 
@@ -72,5 +105,10 @@ def list_rooms(
         return RoomsResponse(items=items, nextPageToken=next_token)
 
     except Exception as e:
-        # If Firestore prompts for an index (composite index needed), follow the GCP link it prints.
-        raise HTTPException(status_code=500, detail=f"/rooms failed: {type(e).__name__}: {e}")
+        # Print full error (includes Firestore "create index" link) to terminal.
+        detail = f"/rooms failed: {type(e).__name__}: {e}"
+        print("\n" + "=" * 70)
+        print("🔥 Firestore query failed — likely needs a composite index.")
+        print(detail)
+        print("=" * 70 + "\n")
+        raise HTTPException(status_code=500, detail=detail)

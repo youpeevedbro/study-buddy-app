@@ -84,18 +84,17 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
   // Core fetch with current filters
   Future<RoomsPage> _fetchPage({
-    required int limit,
-    String? pageToken,
+  required int limit,
+  String? pageToken,
   }) {
-    final b = _buildingFrom(_currentFilter);
-    final d = _dateFrom(_currentFilter);
+    final b = _buildingFrom(_currentFilter); // 👈 use it
     return Api.listRoomsPage(
       limit: limit,
       pageToken: pageToken,
-      building: b,
-      date: d,
+      building: b,   // 👈 pass through (null = no filter)
     );
   }
+
 
   // Reload from first page (after setting/changing filters or on retry)
   void _reload() {
