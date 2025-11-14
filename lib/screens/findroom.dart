@@ -26,9 +26,14 @@ class _FindRoomPageState extends State<FindRoomPage> {
   // --- Future for the current page ---
   Future<RoomsPage>? _futurePage;
 
-  // --- Local "reported once" state (no backend yet) ---
-  // Tracks which specific time slots the user has reported as locked.
+  // --- Local "reported once per user session" state ---
+  // Tracks which specific time slots THIS user has reported as locked
+  // so they can't spam-click the button.
   final Set<String> _reportedSlots = <String>{};
+
+  // Latest counts fetched from the backend when user reports.
+  // Keyed by _slotKey(room).
+  final Map<String, int> _slotReportCounts = <String, int>{};
 
   @override
   void initState() {
@@ -86,16 +91,27 @@ class _FindRoomPageState extends State<FindRoomPage> {
   Future<RoomsPage> _fetchPage({
     required int limit,
     String? pageToken,
-  }) {
-    final b = _buildingFrom(_currentFilter);
-    final d = _dateFrom(_currentFilter);
-    return Api.listRoomsPage(
-      limit: limit,
-      pageToken: pageToken,
-      building: b,
-      date: d,
-    );
+  }) async {
+    try {
+      print(">>> Fetching rooms page...");
+      final b = _buildingFrom(_currentFilter);
+      final d = _dateFrom(_currentFilter);
+
+      final page = await Api.listRoomsPage(
+        limit: limit,
+        pageToken: pageToken,
+        building: b,
+        date: d,
+      );
+
+      print(">>> Received ${page.items.length} rooms.");
+      return page;
+    } catch (e) {
+      print(">>> API ERROR (listRoomsPage): $e");
+      rethrow;
+    }
   }
+
 
   // Reload from first page (after setting/changing filters or on retry)
   void _reload() {
@@ -127,17 +143,31 @@ class _FindRoomPageState extends State<FindRoomPage> {
   }
 
   // Actions
-  void _reportLocked(Room r) {
+  Future<void> _reportLocked(Room r) async {
     final key = _slotKey(r);
-    if (_reportedSlots.contains(key)) return; // already reported once
+    if (_reportedSlots.contains(key)) return; // already reported once this session
 
-    setState(() {
-      _reportedSlots.add(key);
-    });
+    try {
+      // Call backend to increment and get the new global count
+      final newCount = await Api.reportRoomLocked(r.id);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end}) reported as locked')),
-    );
+      setState(() {
+        _reportedSlots.add(key);        // disable further clicks for this user/session
+        _slotReportCounts[key] = newCount;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end}) reported as locked',
+          ),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to report room as locked: $e')),
+      );
+    }
   }
 
   void _checkIn(Room r) {
@@ -351,6 +381,14 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                       final key = _slotKey(r);
                                       final isReported = _reportedSlots.contains(key);
 
+                                      // Determine report count: use latest override if we have one,
+                                      // otherwise the value from backend.
+                                      final reportCount =
+                                          _slotReportCounts[key] ?? r.lockedReports;
+                                      final hasAnyReports = reportCount > 0;
+                                      final reportLabel =
+                                          '$reportCount Report${reportCount == 1 ? '' : 's'}';
+
                                       // Build the "Locked" button with one-click disable behavior.
                                       final lockedButton = IgnorePointer(
                                         ignoring: isReported,
@@ -397,12 +435,12 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                             ),
                                             const SizedBox(height: 8),
 
-                                            // (Optional) still show existing lockedReports from backend if present
-                                            if (r.lockedReports > 0)
+                                            // Show DB-backed total reports, if any
+                                            if (hasAnyReports)
                                               Padding(
                                                 padding: const EdgeInsets.only(bottom: 8),
                                                 child: Text(
-                                                  '${r.lockedReports} student(s) reported this room as LOCKED',
+                                                  '$reportLabel reported this room as LOCKED',
                                                   style: const TextStyle(
                                                     color: Colors.red,
                                                     fontStyle: FontStyle.italic,
@@ -411,21 +449,21 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                 ),
                                               ),
 
-                                            // Buttons row: Locked (with stacked "1 Report") + Check-in/out
+                                            // Buttons row: Locked (+ stacked label) + Check-in/out
                                             Row(
                                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                // Locked + "1 Report" stacked vertically and centered under Locked
+                                                // Locked + reportLabel stacked vertically and centered under Locked
                                                 Column(
                                                   children: [
                                                     lockedButton,
-                                                    if (isReported)
-                                                      const Padding(
-                                                        padding: EdgeInsets.only(top: 4.0),
+                                                    if (hasAnyReports)
+                                                      Padding(
+                                                        padding: const EdgeInsets.only(top: 4.0),
                                                         child: Text(
-                                                          '1 Report',
-                                                          style: TextStyle(
+                                                          reportLabel,
+                                                          style: const TextStyle(
                                                             color: Colors.red,
                                                             fontWeight: FontWeight.w600,
                                                           ),

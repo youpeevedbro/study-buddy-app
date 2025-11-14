@@ -1,3 +1,5 @@
+// lib/models/room.dart
+
 class Room {
   final String id;
   final String buildingCode;
