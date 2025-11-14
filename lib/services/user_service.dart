@@ -46,6 +46,7 @@ class UserService {
   }
 
   /// Create the profile for the current user (first-time login).
+    /// Create the profile for the current user (first-time login).
   Future<void> createCurrentUserProfile({
     required String handle,
     required String displayName,
@@ -61,22 +62,36 @@ class UserService {
       throw Exception('Handle already taken');
     }
 
+    // 2) Build UserProfile with all required fields
     final profile = UserProfile(
       uid: user.uid,
-      handle: handle,
       displayName: displayName,
+      handle: handle,
       email: user.email ?? '',
+
+      // new fields:
+      checkedIn: false,
+      checkedInRoomId: null,
+      checkedInRoomLabel: null,
+      checkedInEnd: null,
+      joinedStudyGroupIds: const [],
+      disableAccount: false,
     );
 
-    // 2) Write to Firestore
+    // 3) Write to Firestore
     await _usersCol.doc(user.uid).set({
       ...profile.toJson(),
+      'checkedIn': profile.checkedIn,
+      'checkedInRoomId': profile.checkedInRoomId,
+      'checkedInRoomLabel': profile.checkedInRoomLabel,
+      'checkedInEnd': profile.checkedInEnd,
+      'joinedStudyGroupIds': profile.joinedStudyGroupIds,
+      'disableAccount': profile.disableAccount,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-      'checkedIn': false,
-      'disableAccount': false,
     });
   }
+
 
   /// Update the current user's handle (username) with uniqueness check.
   Future<void> updateCurrentUserHandle(String newHandle) async {

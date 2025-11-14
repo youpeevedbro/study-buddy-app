@@ -1,32 +1,60 @@
+// lib/models/user_profile.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserProfile {
   final String uid;
-  final String handle;
   final String displayName;
+  final String handle;
   final String email;
+
+  final bool checkedIn;
+  final String? checkedInRoomId;
+  final String? checkedInRoomLabel;
+  final DateTime? checkedInEnd;
+
+  final List<String> joinedStudyGroupIds;
+
+  final bool disableAccount;
 
   UserProfile({
     required this.uid,
-    required this.handle,
     required this.displayName,
+    required this.handle,
     required this.email,
+    required this.checkedIn,
+    required this.checkedInRoomId,
+    required this.checkedInRoomLabel,
+    required this.checkedInEnd,
+    required this.joinedStudyGroupIds,
+    required this.disableAccount,
   });
 
-  // Used when creating/updating profile
-  Map<String, dynamic> toJson() {
-    return {
-      'handle': handle,
-      'displayName': displayName,
-      'email': email,
-    };
-  }
-
-  // Used when reading from Firestore
   factory UserProfile.fromFirestore(String uid, Map<String, dynamic> data) {
     return UserProfile(
       uid: uid,
-      handle: data['handle'] ?? '',
       displayName: data['displayName'] ?? '',
+      handle: data['handle'] ?? '',
       email: data['email'] ?? '',
+
+      checkedIn: data['checkedIn'] ?? false,
+      checkedInRoomId: data['checkedInRoomId'],
+      checkedInRoomLabel: data['checkedInRoomLabel'],
+      checkedInEnd: data['checkedInEnd'] != null
+          ? (data['checkedInEnd'] as Timestamp).toDate()
+          : null,
+
+      joinedStudyGroupIds:
+          List<String>.from(data['joinedStudyGroupIds'] ?? []),
+
+      disableAccount: data['disableAccount'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'displayName': displayName,
+      'handle': handle,
+      'email': email,
+    };
   }
 }
