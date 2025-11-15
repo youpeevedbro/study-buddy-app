@@ -23,6 +23,18 @@ class _FindRoomPageState extends State<FindRoomPage> {
   // --- Filters from FilterPage ---
   FilterCriteria? _currentFilter;
 
+  String _fmt(BuildContext context, String hhmm) {
+  final parts = hhmm.split(':');
+  if (parts.length != 2) return hhmm;
+
+  int hour = int.tryParse(parts[0]) ?? 0;
+  int minute = int.tryParse(parts[1]) ?? 0;
+
+  final dt = DateTime(2025, 1, 1, hour, minute);
+  return TimeOfDay.fromDateTime(dt).format(context);
+}
+
+
   // --- Future for the current page ---
   Future<RoomsPage>? _futurePage;
 
@@ -84,16 +96,26 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
   // Core fetch with current filters
   Future<RoomsPage> _fetchPage({
-  required int limit,
-  String? pageToken,
+    required int limit,
+    String? pageToken,
   }) {
-    final b = _buildingFrom(_currentFilter); // 👈 use it
+    final b = _buildingFrom(_currentFilter);
+
+    String? hhmm(TimeOfDay? t) =>
+        (t == null) ? null : t.format(context); // if you prefer 24h, use your format24Hour()
+
+    final s = _currentFilter?.startTime?.format24Hour(); // you had this helper earlier
+    final e = _currentFilter?.endTime?.format24Hour();
+
     return Api.listRoomsPage(
       limit: limit,
       pageToken: pageToken,
-      building: b,   // 👈 pass through (null = no filter)
+      building: b,
+      startTime: s,
+      endTime: e,
     );
   }
+
 
 
   // Reload from first page (after setting/changing filters or on retry)
@@ -388,7 +410,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              '${r.start} - ${r.end}',
+                                              '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
                                               style: const TextStyle(
                                                 fontSize: 14,
                                                 fontWeight: FontWeight.w600,
