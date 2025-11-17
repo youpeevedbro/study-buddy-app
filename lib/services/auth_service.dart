@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../config/app_config.dart';
 
@@ -17,54 +16,66 @@ class AuthService {
   Future<UserCredential> signInWithCsulb() async {
     final provider = OAuthProvider('oidc.microsoft-csulb')
       ..setCustomParameters(<String, String>{
-        'prompt': 'select_account', // force account chooser
-        'max_age': '0',             // require fresh auth
-        // 'domain_hint': 'csulb.edu', // optional UX hint
+        'prompt': 'select_account',
+        'max_age': '0',
       });
-    return _auth.signInWithProvider(provider);
+
+    // 🔥 Step 1 — Perform the actual sign-in
+    final cred = await _auth.signInWithProvider(provider);
+
+    // 🔥 Step 2 — Enforce required domain here
+    final email = cred.user?.email ?? '';
+    final lower = email.toLowerCase();
+
+    if (AppConfig.allowedDomain.isNotEmpty &&
+        !lower.endsWith(AppConfig.allowedDomain.trim().toLowerCase())) {
+
+      await _auth.signOut(); // sign back out (because this account is not allowed)
+
+      throw FirebaseAuthException(
+        code: 'invalid-email-domain',
+        message: 'Use your ${AppConfig.allowedDomain} email address.',
+      );
+    }
+
+    // 🔥 If domain is allowed → return success
+    return cred;
   }
+
 
   /// Optional alias if other code calls this name.
   Future<void> signInWithMicrosoft() async {
     await signInWithCsulb();
   }
 
-  /// Logout from Firebase and Microsoft (tenant-specific).
-  /// Uses your configured post-logout URL (prefer AAD_POST_LOGOUT_URL, fallback to Firebase handler).
-  Future<void> logout() async {
-    final tenantId = AppConfig.microsoftTenantId.trim();
-    final postLogout = (AppConfig.aadPostLogoutUrl.isNotEmpty
-            ? AppConfig.aadPostLogoutUrl
-            : AppConfig.firebaseHandlerUrl)
-        .trim();
-
-    // Capture email BEFORE Firebase signOut(), for logout_hint (optional).
-    final email = _auth.currentUser?.email ?? '';
-
-    // 1) Firebase sign out (local)
+  /// Logout from Firebase (app-level logout).
+  /// We rely on `prompt` / `max_age` on sign-in to avoid silent SSO reuse.
+  Future<void> signOut() async {
     await _auth.signOut();
-
-    // 2) AAD logout to clear Microsoft cookies (skip if tenant unknown)
-    if (tenantId.isEmpty) return;
-
-    final url = Uri.parse(
-      'https://login.microsoftonline.com/$tenantId/oauth2/v2.0/logout'
-      '?post_logout_redirect_uri=${Uri.encodeComponent(postLogout)}'
-      '${email.isNotEmpty ? '&logout_hint=${Uri.encodeComponent(email)}' : ''}',
-    );
-
-    // External browser works on both iOS & Android.
-    try {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      // Even if this fails, Firebase is signed out; next sign-in still forces prompt.
-    }
+    // Debug once on iOS to confirm it's really null:
+    // ignore: avoid_print
+    print('After Firebase signOut: ${_auth.currentUser}');
   }
+
+    /// Email/password sign-in wrapper.
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    return _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  /// If your older code calls `logout()`, keep this as a shim so nothing breaks.
+  Future<void> logout() => signOut();
 
   /// Forgot-password helper (only for Email/Password accounts).
   Future<void> sendPasswordResetEmail(String email) async {
     final e = email.trim().toLowerCase();
-    if (AppConfig.allowedDomain.isNotEmpty && !e.endsWith(AppConfig.allowedDomain)) {
+    if (AppConfig.allowedDomain.isNotEmpty &&
+        !e.endsWith(AppConfig.allowedDomain)) {
       throw FirebaseAuthException(
         code: 'invalid-email-domain',
         message: 'Use your ${AppConfig.allowedDomain} email address.',

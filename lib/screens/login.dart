@@ -92,23 +92,30 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailErr = _passErr = _globalErr = null;
     });
 
+    final email = _email.text.trim().toLowerCase();
+    final pwd = _password.text;
+
+    // Local validation first
+    if (!email.endsWith(allowedDomain)) {
+      setState(() {
+        _busy = false;
+        _emailErr = 'Please use your CSULB email address.';
+      });
+      return;
+    }
+    if (pwd.isEmpty) {
+      setState(() {
+        _busy = false;
+        _passErr = 'Please enter your password.';
+      });
+      return;
+    }
+
     try {
-      final email = _email.text.trim().toLowerCase();
-      final pwd = _password.text;
-
-      if (!email.endsWith(allowedDomain)) {
-        setState(() => _emailErr = 'Please use your CSULB email address.');
-        return;
-      }
-      if (pwd.isEmpty) {
-        setState(() => _passErr = 'Please enter your password.');
-        return;
-      }
-
-      await FirebaseAuth.instance
+      await AuthService.instance
           .signInWithEmailAndPassword(email: email, password: pwd);
 
-      // 🔥 Instead of going straight to /dashboard, check profile first
+      // After successful sign-in, route based on profile
       await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
@@ -119,13 +126,16 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         _globalErr = _friendly(e);
       }
-      setState(() {});
+      setState(() {}); // re-render with updated error
     } catch (_) {
       setState(() => _globalErr = 'Something went wrong. Please try again.');
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
+
 
   Future<void> _signInWithMicrosoft() async {
     setState(() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:study_buddy/services/auth_service.dart';
 import '../services/api_client.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -12,13 +13,13 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.instance.currentUser;
     return Scaffold(
       appBar: AppBar(
         title: const Text('StudyBuddy'),
         actions: [
           IconButton(
-            onPressed: () async { await FirebaseAuth.instance.signOut(); },
+            onPressed: () async { await AuthService.instance.signOut(); },
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
           )

@@ -44,7 +44,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Future<void> _loadProfile() async {
     try {
       final profile = await UserService.instance.getCurrentUserProfile();
-      final fallbackEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+      final fallbackEmail = AuthService.instance.currentUser?.email ?? '';
 
       if (!mounted) return;
       setState(() {
@@ -64,9 +64,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Future<void> _logout() async {
-    await AuthService.instance.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/landing', (_) => false);
+    await AuthService.instance.signOut();
   }
 
   void _disableAccount(BuildContext context) {
@@ -89,7 +87,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ),
             onPressed: () async {
               try {
-                final user = FirebaseAuth.instance.currentUser;
+                final user = AuthService.instance.currentUser;
                 if (user != null) {
                   // Soft-disable account in Firestore
                   await UserService.instance.updateDisableAccount(true);

@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:study_buddy/services/auth_service.dart';
 import '../config/app_config.dart';
 import '../models/room.dart';
 
@@ -17,12 +18,18 @@ class Api {
 
   /// Common headers, inject Firebase ID token if available.
   static Future<Map<String, String>> _headers() async {
-    final token = await FirebaseAuth.instance.currentUser?.getIdToken(true);
+    final user = AuthService.instance.currentUser;
+    String? token;
+    if (user != null) {
+      token = await user.getIdToken(true);
+    }
+
     return <String, String>{
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
+
 
   /// Simple one-shot list (non-paginated). Accepts optional filters.
   /// Handles either { "items": [...] } or a bare JSON array.

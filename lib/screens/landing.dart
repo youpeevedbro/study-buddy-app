@@ -1,6 +1,7 @@
 // lib/screens/landing.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:study_buddy/services/auth_service.dart';
 import '../components/grad_button.dart';
 import '../services/user_service.dart'; // 👈 NEW
 
@@ -35,20 +36,16 @@ class _LandingPageState extends State<LandingPage> {
   Future<void> _doMicrosoftLogin() async {
     setState(() => _busy = true);
     try {
-      final provider = OAuthProvider(_oidcProviderId);
-      await FirebaseAuth.instance.signInWithProvider(provider);
+      // Use the wrapper you defined in AuthService
+      await AuthService.instance.signInWithCsulb();
 
       if (!mounted) return;
-
-      // 👇 instead of going straight to /dashboard,
-      //    check whether the user has a profile doc
       await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content:
-              Text('Sign-in failed: ${e.code} — ${e.message ?? ''}'),
+          content: Text('Sign-in failed: ${e.code} — ${e.message ?? ''}'),
         ),
       );
     } catch (e) {
@@ -60,6 +57,7 @@ class _LandingPageState extends State<LandingPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

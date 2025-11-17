@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:study_buddy/services/auth_service.dart';
 
 import '../../services/user_service.dart';
 
@@ -22,7 +23,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final user = FirebaseAuth.instance.currentUser;
+    final user = AuthService.instance.currentUser;
 
     // Prefill display name with SSO default (optional)
     _displayNameController.text = user?.displayName ?? '';
