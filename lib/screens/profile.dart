@@ -1,7 +1,6 @@
 // lib/screens/profile.dart
 
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 import '../components/grad_button.dart';
 import '../services/auth_service.dart';
@@ -66,6 +65,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
   Future<void> _logout() async {
     await AuthService.instance.signOut();
     if (!mounted) return;
+
+    // Go back to the root (AuthGate as home); it will show Landing if user == null
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
@@ -100,6 +101,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
               if (!mounted) return;
               Navigator.of(ctx).pop(); // close confirm dialog
+
+              // Clear navigation stack and go to landing/auth gate
               Navigator.of(context)
                   .pushNamedAndRemoveUntil('/landing', (_) => false);
             },
@@ -411,21 +414,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 onPressed: _saving ? null : _saveChanges,
                 child: _saving
                     ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
                     : const Text(
-                        'Save',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22.0,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  'Save',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),

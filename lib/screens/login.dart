@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../config/app_config.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -16,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   String? _emailErr, _passErr, _globalErr;
 
-  static const allowedDomain = '@csulb.edu';
+  final String allowedDomain = AppConfig.allowedDomain;
 
   final yellow = const Color(0xFFFFC72A);
   final dark = const Color(0xFF111827);
@@ -66,6 +68,8 @@ class _LoginScreenState extends State<LoginScreen> {
         return 'Incorrect password.';
       case 'too-many-requests':
         return 'Too many attempts. Try again later.';
+      case 'invalid-email-domain':
+        return e.message ?? 'Use your CSULB email address.';
       default:
         return e.message ?? 'Sign-in failed.';
     }
@@ -92,30 +96,30 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailErr = _passErr = _globalErr = null;
     });
 
-    final email = _email.text.trim().toLowerCase();
-    final pwd = _password.text;
-
-    // Local validation first
-    if (!email.endsWith(allowedDomain)) {
-      setState(() {
-        _busy = false;
-        _emailErr = 'Please use your CSULB email address.';
-      });
-      return;
-    }
-    if (pwd.isEmpty) {
-      setState(() {
-        _busy = false;
-        _passErr = 'Please enter your password.';
-      });
-      return;
-    }
-
     try {
-      await AuthService.instance
-          .signInWithEmailAndPassword(email: email, password: pwd);
+      final email = _email.text.trim().toLowerCase();
+      final pwd = _password.text;
 
-      // After successful sign-in, route based on profile
+      if (!email.endsWith(allowedDomain.toLowerCase())) {
+        setState(() {
+          _busy = false;
+          _emailErr = 'Please use your CSULB email address.';
+        });
+        return;
+      }
+      if (pwd.isEmpty) {
+        setState(() {
+          _busy = false;
+          _passErr = 'Please enter your password.';
+        });
+        return;
+      }
+
+      await AuthService.instance.signInWithEmailAndPassword(
+        email: email,
+        password: pwd,
+      );
+
       await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       final code = e.code.toLowerCase();
@@ -126,16 +130,13 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         _globalErr = _friendly(e);
       }
-      setState(() {}); // re-render with updated error
+      setState(() {});
     } catch (_) {
       setState(() => _globalErr = 'Something went wrong. Please try again.');
     } finally {
-      if (mounted) {
-        setState(() => _busy = false);
-      }
+      if (mounted) setState(() => _busy = false);
     }
   }
-
 
   Future<void> _signInWithMicrosoft() async {
     setState(() {
@@ -144,10 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // ✅ Use your AuthService wrapper (CSULB SSO via OIDC)
       await AuthService.instance.signInWithCsulb();
-
-      // 🔥 After SSO succeeds, check Firestore profile
       await _routeAfterLogin();
     } on FirebaseAuthException catch (e) {
       setState(() => _globalErr = _friendly(e));
@@ -180,16 +178,16 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Email/password (you can keep or remove later)
+                  // Email/password
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     autofillHints: const [
                       AutofillHints.username,
-                      AutofillHints.email
+                      AutofillHints.email,
                     ],
                     decoration:
-                        _inputDecoration('Email', errorText: _emailErr),
+                    _inputDecoration('Email', errorText: _emailErr),
                     style: TextStyle(color: dark, fontSize: 15),
                   ),
                   const SizedBox(height: 12),
@@ -198,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: true,
                     autofillHints: const [AutofillHints.password],
                     decoration:
-                        _inputDecoration('Password', errorText: _passErr),
+                    _inputDecoration('Password', errorText: _passErr),
                     style: TextStyle(color: dark, fontSize: 15),
                   ),
                   const SizedBox(height: 12),
@@ -217,9 +215,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: _busy
                           ? const CircularProgressIndicator()
                           : const Text(
-                              'Sign in with Email',
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
+                        'Sign in with Email',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
 
@@ -232,8 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 48,
                     child: OutlinedButton(
                       onPressed: _busy ? null : _signInWithMicrosoft,
-                      child:
-                          const Text('Sign in with Microsoft (CSULB)'),
+                      child: const Text('Sign in with Microsoft (CSULB)'),
                     ),
                   ),
 

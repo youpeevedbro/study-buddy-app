@@ -50,7 +50,8 @@ class AppConfig {
     microsoftTenantId = _read('MICROSOFT_TENANT_ID', def: '');
 
     // ---- App ----
-    allowedEmailDomain = _read('ALLOWED_EMAIL_DOMAIN', def: '@scsulb.edu');
+    // Reads ALLOWED_EMAIL_DOMAIN from .env; fallback is mostly irrelevant now
+    allowedEmailDomain = _read('ALLOWED_EMAIL_DOMAIN', def: '@student.csulb.edu');
 
     // Prefer explicit .env overrides; otherwise pick per platform.
     final envBaseIOS     = dotenv.maybeGet('API_BASE_IOS')?.trim();

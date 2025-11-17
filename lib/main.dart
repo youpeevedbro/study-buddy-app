@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';      // 👈 ADD THIS
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'config/app_config.dart';
 import 'firebase_options.dart';
@@ -15,9 +15,8 @@ import 'screens/activities.dart';
 import 'screens/my_studygroups.dart';
 import 'screens/studygroup.dart';
 import 'screens/addgroup2.dart';
-import 'screens/onboarding/create_profile.dart';
 import 'screens/login.dart';
-// import 'dart:io';  // 👈 Not needed here, you can remove this import
+import 'screens/onboarding/create_profile.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +27,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(const StudyBuddyApp());
 }
 
@@ -39,7 +39,6 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // While waiting for Firebase to load
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -48,14 +47,12 @@ class AuthGate extends StatelessWidget {
 
         final user = snapshot.data;
 
-        // If not logged in → go to landing page
         if (user == null) {
           return const LandingPage();
         }
 
-        // Logged in → go to dashboard
-        // 👇 use whatever your dashboard widget is actually called
-        return const Dashboard(); 
+        // Logged in → go straight to dashboard (CreateProfile decides routing when needed)
+        return const Dashboard();
       },
     );
   }
@@ -76,13 +73,7 @@ class StudyBuddyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: brand),
         scaffoldBackgroundColor: Colors.white,
       ),
-
-      // 🔴 OLD:
-      // initialRoute: '/landing',
-
-      // ✅ NEW: start the app at AuthGate so it reacts to login/logout
       home: const AuthGate(),
-
       routes: {
         '/landing'        : (_) => const LandingPage(),
         '/dashboard'      : (_) => const Dashboard(),

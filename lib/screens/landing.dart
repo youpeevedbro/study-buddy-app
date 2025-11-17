@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:study_buddy/services/auth_service.dart';
 import '../components/grad_button.dart';
-import '../services/user_service.dart'; // 👈 NEW
+import '../services/user_service.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
@@ -14,9 +14,6 @@ class LandingPage extends StatefulWidget {
 
 class _LandingPageState extends State<LandingPage> {
   bool _busy = false;
-
-  // If your Provider ID in Firebase Console is different, edit here:
-  static const String _oidcProviderId = 'oidc.microsoft-csulb';
 
   /// Decide where to go after a successful login:
   /// - If profile exists in Firestore → /dashboard
@@ -36,7 +33,6 @@ class _LandingPageState extends State<LandingPage> {
   Future<void> _doMicrosoftLogin() async {
     setState(() => _busy = true);
     try {
-      // Use the wrapper you defined in AuthService
       await AuthService.instance.signInWithCsulb();
 
       if (!mounted) return;
@@ -57,7 +53,6 @@ class _LandingPageState extends State<LandingPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -107,24 +102,23 @@ class _LandingPageState extends State<LandingPage> {
                           onPressed: _busy ? null : _doMicrosoftLogin,
                           child: _busy
                               ? const SizedBox(
-                                  height: 22,
-                                  width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                               : const Text(
-                                  'Sign in with Microsoft (CSULB)',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                            'Sign in with Microsoft (CSULB)',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
