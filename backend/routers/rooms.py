@@ -1,5 +1,7 @@
+# backend/routers/rooms.py
 import base64
 import json
+import logging
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, HTTPException, Query
@@ -9,9 +11,11 @@ from services.firestore_client import get_db
 from models.room import Room, RoomsResponse
 
 router = APIRouter()
+log = logging.getLogger("uvicorn.error")
 
 # Each document in this collection is an availability slot for a room/time.
 COLLECTION = "availabilitySlots"
+
 
 def _doc_to_room(doc) -> Room:
     d = doc.to_dict() or {}
@@ -26,13 +30,16 @@ def _doc_to_room(doc) -> Room:
         lockedReports=int(d.get("locked_reports", 0)),
     )
 
+
 def _encode_token(cursor: Dict[str, Any]) -> str:
     raw = json.dumps(cursor).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("utf-8")
 
+
 def _decode_token(token: str) -> Dict[str, Any]:
     raw = base64.urlsafe_b64decode(token.encode("utf-8"))
     return json.loads(raw.decode("utf-8"))
+
 
 @router.get("/", response_model=RoomsResponse)
 def list_rooms(
@@ -102,13 +109,15 @@ def list_rooms(
         return RoomsResponse(items=items, nextPageToken=next_token)
 
     except Exception as e:
+        log.exception("list_rooms failed: %s", e)
         # If Firestore prompts for an index (composite index needed), follow the GCP link it prints.
         raise HTTPException(
             status_code=500,
             detail=f"/rooms failed: {type(e).__name__}: {e}",
         )
 
-@router.post("/rooms/{room_id}/report_locked")
+
+@router.post("/{room_id}/report_locked")
 def report_locked(room_id: str):
     """
     Increment the locked_reports counter for a specific availability slot.
@@ -129,14 +138,17 @@ def report_locked(room_id: str):
         data = new_snap.to_dict() or {}
         new_count = int(data.get("locked_reports", 0))
 
+        log.info("report_locked: room_id=%s new_count=%d", room_id, new_count)
         return {"lockedReports": new_count}
     except HTTPException:
         raise
     except Exception as e:
+        log.exception("report_locked failed for room_id=%s: %s", room_id, e)
         raise HTTPException(
             status_code=500,
             detail=f"report_locked failed: {type(e).__name__}: {e}",
         )
+
 
 @router.post("/admin/reset_locked_reports")
 def reset_locked_reports():
@@ -144,26 +156,48 @@ def reset_locked_reports():
     Reset locked_reports = 0 for all availabilitySlots documents.
 
     Intended to be called by a scheduled job once per day (around 00:00).
+
+    Uses list_documents() instead of query.stream() to avoid Firestore's
+    internal retry bug that caused:
+      AttributeError: '_UnaryStreamMultiCallable' object has no attribute '_retry'
     """
     try:
         db = get_db()
         col = db.collection(COLLECTION)
 
+        log.info("reset_locked_reports: starting full reset for collection '%s'", COLLECTION)
+
         batch = db.batch()
         updated = 0
+        BATCH_SIZE = 400
 
-        for i, doc in enumerate(col.stream(), start=1):
-            batch.update(doc.reference, {"locked_reports": 0})
+        # list_documents() yields DocumentReference objects (no query retry bug)
+        for i, doc_ref in enumerate(col.list_documents(page_size=BATCH_SIZE), start=1):
+            batch.update(doc_ref, {"locked_reports": 0})
             updated += 1
 
-            # Firestore batches limited to 500 writes; keep some margin.
-            if i % 400 == 0:
+            if i % BATCH_SIZE == 0:
+                log.info(
+                    "reset_locked_reports: committing intermediate batch of %d docs (total so far=%d)",
+                    BATCH_SIZE,
+                    updated,
+                )
                 batch.commit()
                 batch = db.batch()
 
-        batch.commit()
+        # Commit any remaining updates
+        if updated % BATCH_SIZE != 0:
+            log.info(
+                "reset_locked_reports: committing final batch, total docs=%d",
+                updated,
+            )
+            batch.commit()
+
+        log.info("reset_locked_reports: DONE, roomsReset=%d", updated)
         return {"status": "ok", "roomsReset": updated}
+
     except Exception as e:
+        log.exception("reset_locked_reports: FAILED: %s", e)
         raise HTTPException(
             status_code=500,
             detail=f"reset_locked_reports failed: {type(e).__name__}: {e}",

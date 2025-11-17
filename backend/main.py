@@ -3,14 +3,15 @@ from dotenv import load_dotenv
 import os
 from typing import List
 
-from fastapi import FastAPI, Depends, Header, HTTPException, status
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 import firebase_admin
-from firebase_admin import auth, credentials
+from firebase_admin import credentials
 
 from routers import rooms
 from routers import addgroup
+from auth import verify_firebase_token  # use shared auth helper
 
 # --------------------------------------------------------------------
 # Load .env for LOCAL development only.
@@ -34,13 +35,12 @@ else:
     print("✅ Firebase Admin initialized using Application Default Credentials (ADC)")
 
 # --------------------------------------------------------------------
-# Allowed email domains (backend enforcement)
+# Allowed email domains (for logging only; enforcement is in auth.py)
 # --------------------------------------------------------------------
-# Normalize: remove leading '@', split comma list
 _domains_raw = (
-    os.getenv("ALLOWED_EMAIL_DOMAINS")    # e.g. "csulb.edu,student.csulb.edu"
+    os.getenv("ALLOWED_EMAIL_DOMAINS")    # e.g. "student.csulb.edu"
     or os.getenv("ALLOWED_EMAIL_DOMAIN")  # fallback
-    or "csulb.edu"                        # final fallback
+    or "student.csulb.edu"                # final fallback
 )
 
 allowed_domains: List[str] = [
@@ -49,7 +49,7 @@ allowed_domains: List[str] = [
     if d.strip()
 ]
 
-print(f"✅ Allowed domains (base): {allowed_domains}")
+print(f"✅ Allowed domains (Firebase users): {allowed_domains}")
 
 # --------------------------------------------------------------------
 # FastAPI app + CORS
@@ -58,52 +58,11 @@ app = FastAPI(title="StudyBuddy API", version="1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],    # tighten later
+    allow_origins=["*"],    # you can tighten this later
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
 )
-
-# --------------------------------------------------------------------
-# Firebase token verification dependency
-# --------------------------------------------------------------------
-def verify_firebase_token(authorization: str | None = Header(default=None)):
-    """Verifies Firebase ID token + enforces email domain restrictions."""
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing bearer token"
-        )
-
-    token = authorization.split(" ", 1)[1]
-
-    try:
-        decoded = auth.verify_id_token(token, check_revoked=True)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {e}"
-        )
-
-    email = (decoded.get("email") or "").lower()
-    if not email:
-        raise HTTPException(status_code=401, detail="No email in token")
-
-    # Extract just the domain — everything after the last '@'
-    domain = email.split("@")[-1]
-
-    # Allow exact domain or any subdomain of it
-    def _allowed(d: str) -> bool:
-        # d is base, e.g. "csulb.edu"
-        return domain == d or domain.endswith("." + d)
-
-    if allowed_domains and not any(_allowed(d) for d in allowed_domains):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Email domain not allowed: {domain}"
-        )
-
-    return decoded  # claims available to downstream routes
 
 # --------------------------------------------------------------------
 # Routers
@@ -112,6 +71,7 @@ app.include_router(
     rooms.router,
     prefix="/rooms",
     tags=["rooms"],
+    # Students (Firebase) + Cloud Scheduler service account
     dependencies=[Depends(verify_firebase_token)],
 )
 
