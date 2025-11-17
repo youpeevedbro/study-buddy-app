@@ -1,21 +1,18 @@
 # backend/routers/rooms.py
 import base64
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from services.firestore_client import get_db
 from models.room import Room, RoomsResponse
-from google.cloud.firestore_v1 import FieldFilter
 
-# Try to respect local timezone (PST/PDT for CSULB)
 try:
     from zoneinfo import ZoneInfo
-
     TZ = ZoneInfo("America/Los_Angeles")
-except Exception:  # pragma: no cover - fallback for older Python
+except Exception:
     TZ = None
 
 router = APIRouter()
@@ -46,10 +43,6 @@ def _decode_token(token: str) -> Dict[str, Any]:
 
 
 def _parse_hhmm_to_min(hhmm: Optional[str]) -> Optional[int]:
-    """
-    Convert "HH:mm" -> minutes after midnight.
-    Returns None if the string is missing or malformed.
-    """
     if not hhmm:
         return None
     try:
@@ -63,114 +56,149 @@ def _parse_hhmm_to_min(hhmm: Optional[str]) -> Optional[int]:
 def list_rooms(
     limit: int = Query(50, ge=1, le=200),
     pageToken: Optional[str] = None,
-    building: Optional[str] = Query(
-        None, description="buildingCode like AS, ECS, LA1"
-    ),
-    startTime: Optional[str] = Query(
-        None, description="HH:mm (inclusive start of desired window)"
-    ),
-    endTime: Optional[str] = Query(
-        None, description="HH:mm (exclusive end of desired window)"
-    ),
+    building: Optional[str] = Query(None, description="buildingCode like AS, ECS, LA1"),
+    startTime: Optional[str] = Query(None, description="HH:mm (inclusive start of desired window)"),
+    endTime: Optional[str] = Query(None, description="HH:mm (exclusive end of desired window)"),
 ):
     """
-    List *today's* available room slots (from `availabilitySlots`).
+    Returns ONLY today's available room slots (from `availabilitySlots`).
 
-    Time filtering uses **overlap semantics**:
+    Time filter semantics (overlap mode):
 
-      - startTime only:
-            return slots where endMin > startMinParam
-              (room is free at/after that time)
+    - start only (T):  slot contains T
+                       => startMin <= T < endMin
 
-      - endTime only:
-            return slots where startMin < endMinParam
-              (room is free up until that time)
+    - end only (E):    slot starts before E
+                       => startMin < E
 
-      - both startTime & endTime:
-            return slots that overlap [startTime, endTime), i.e.
-                endMin   > startMinParam
-            AND startMin < endMinParam
+    - both S–E:        slot overlaps [S,E)
+                       => endMin > S AND startMin < E
 
-        We push part of this into Firestore:
-            where("startMin", "<", endMinParam)
-        and finish `endMin > startMinParam` in Python.
-
-    Results are ordered (and paginated) by:
-        roomId, date, startMin
-    and returned inside a RoomsResponse with nextPageToken.
+    Because Firestore only allows range filters on ONE field, we:
+    - push one side of the inequality into Firestore
+    - finish the other side(s) in Python.
     """
     try:
         db = get_db()
         col = db.collection(COLLECTION)
 
-        # --- Determine "today" in CSULB time ---
         now = datetime.now(TZ) if TZ else datetime.utcnow()
-        today = now.strftime("%Y-%m-%d")
+        today = (now + timedelta(days=1)).strftime("%Y-%m-%d") # THIS IS FOR TESTING
+        # today = now.strftime("%Y-%m-%d")
 
-        # --- Base query: today's slots only ---
+        # Base query: today only
         q = col.where("date", "==", today)
 
-        # Optional: building filter
+        # Optional: building
         if building:
-            q = q.where(filter=FieldFilter("buildingCode", "==", building))
+            q = q.where("buildingCode", "==", building)
 
-        # --- Parse time filters ---
+        # Parse time params
         start_min_param = _parse_hhmm_to_min(startTime)
         end_min_param = _parse_hhmm_to_min(endTime)
 
-        # --- Apply time filters (overlap semantics) ---
-        need_python_filter = False
+        # Flags for Python-side filtering
+        filter_contains_T = False   # start-only case
+        filter_overlap_SE = False   # both S–E case
 
+        # --- Apply Firestore-side filters (only one inequality field allowed) ---
         if start_min_param is not None and end_min_param is not None:
-            # Overlap:
-            #   endMin > start_min_param  AND  startMin < end_min_param
-            #
-            # Firestore side: limit startMin < end_min_param
-            q = q.where(filter=FieldFilter("startMin", "<", end_min_param))
-            # We'll enforce `endMin > start_min_param` in Python
-            need_python_filter = True
+            # Overlap S–E: endMin > S AND startMin < E
+            # Firestore: push startMin < E
+            q = q.where("startMin", "<", end_min_param)
+            filter_overlap_SE = True  # we'll enforce endMin > S in Python
 
-        elif start_min_param is not None:
-            # Free at/after this time -> slot must extend past start
-            q = q.where(filter=FieldFilter("endMin", ">", start_min_param))
+        elif start_min_param is not None and end_min_param is None:
+            # "Free AT T": startMin <= T < endMin
+            # Firestore: push endMin > T
+            q = q.where("endMin", ">", start_min_param)
+            filter_contains_T = True  # we'll enforce startMin <= T in Python
 
-        elif end_min_param is not None:
-            # Free until this time -> slot must start before end
-            q = q.where(filter=FieldFilter("startMin", "<", end_min_param))
+        elif start_min_param is None and end_min_param is not None:
+            # "Free UNTIL E": slot started before E
+            # Firestore: startMin < E (no extra Python filter needed)
+            q = q.where("startMin", "<", end_min_param)
 
-        # --- Deterministic ordering + overfetch (+1) for has_more ---
+        fetch_limit = 2000  # overfetch to account for post-filtering
+
+        # Stable ordering for pagination
         q = (
             q.order_by("roomId")
-            .order_by("date")
-            .order_by("startMin")
-            .limit(limit + 1)
+             .order_by("date")
+             .order_by("startMin")
+             .limit(fetch_limit)
         )
 
-        # --- Cursor pagination ---
+        # Cursor
         if pageToken:
             cursor = _decode_token(pageToken)
-            q = q.start_after(
-                [
-                    cursor.get("roomId", ""),
-                    cursor.get("date", ""),
-                    cursor.get("startMin", 0),
-                ]
-            )
+            q = q.start_after([
+                cursor.get("roomId", ""),
+                cursor.get("date", ""),
+                cursor.get("startMin", 0),
+            ])
 
-        # --- Fetch documents ---
+        print(
+            f"[rooms] date={today} "
+            f"building={building!r} "
+            f"startTimeParam={startTime!r} (min={start_min_param}) "
+            f"endTimeParam={endTime!r} (min={end_min_param}) "
+            f"limit={limit} fetch_limit={fetch_limit}"
+        )
+
+        # --- Fetch from Firestore ---
         docs = list(q.stream())
+        print(f"[rooms DEBUG] BEFORE post-filter: {len(docs)} docs")
+        preview_before = []
+        for d in docs[:15]:
+            data = d.to_dict() or {}
+            preview_before.append(
+                (
+                    data.get("buildingCode"),
+                    str(data.get("roomNumber")),
+                    data.get("startMin"),
+                    data.get("endMin"),
+                )
+            )
+        print("    first 15:", preview_before)
 
-        # Complete Python-side filter for overlap both-times case
-        if need_python_filter and start_min_param is not None:
-            filtered: List[Any] = []
+        # --- Python-side filtering for the parts Firestore can't express ---
+        if filter_contains_T and start_min_param is not None:
+            # Keep only slots with startMin <= T
+            tmp = []
             for d in docs:
                 data = d.to_dict() or {}
-                end_min = data.get("endMin", -1)
-                # Keep only slots whose end is after the window start
-                if end_min > start_min_param:
-                    filtered.append(d)
-            docs = filtered
+                start_min = int(data.get("startMin", 9999))
+                if start_min <= start_min_param:
+                    tmp.append(d)
+            docs = tmp
 
+        if filter_overlap_SE and start_min_param is not None:
+            # We already enforced startMin < E in Firestore,
+            # now enforce endMin > S here.
+            tmp = []
+            for d in docs:
+                data = d.to_dict() or {}
+                end_min = int(data.get("endMin", -1))
+                if end_min > start_min_param:
+                    tmp.append(d)
+            docs = tmp
+
+        print(f"[rooms DEBUG] AFTER post-filter: {len(docs)} docs")
+        preview_after = []
+        for d in docs[:15]:
+            data = d.to_dict() or {}
+            preview_after.append(
+                (
+                    data.get("buildingCode"),
+                    str(data.get("roomNumber")),
+                    data.get("startMin"),
+                    data.get("endMin"),
+                )
+            )
+        print("    first 15:", preview_after)
+
+        # --- Pagination bookkeeping (on the filtered docs) ---
         has_more = len(docs) > limit
         docs = docs[:limit]
 
@@ -190,10 +218,9 @@ def list_rooms(
         return RoomsResponse(items=items, nextPageToken=next_token)
 
     except Exception as e:
-        # Helpful logging if Firestore wants a composite index
         detail = f"/rooms failed: {type(e).__name__}: {e}"
         print("\n" + "=" * 70)
-        print("🔥 Firestore /rooms query failed — possibly needs a composite index.")
+        print("🔥 Firestore query failed or post-filter error.")
         print(detail)
         print("=" * 70 + "\n")
         raise HTTPException(status_code=500, detail=detail)

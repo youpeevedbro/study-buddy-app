@@ -6,6 +6,8 @@ import '../services/api.dart';
 import '../models/room.dart';
 import '../services/checkin_service.dart';
 import 'dart:collection';
+import 'package:intl/intl.dart';
+
 
 class FindRoomPage extends StatefulWidget {
   const FindRoomPage({super.key});
@@ -45,10 +47,20 @@ class _FindRoomPageState extends State<FindRoomPage> {
   @override
   void initState() {
     super.initState();
+
+    final now = TimeOfDay.now();
+    _currentFilter = FilterCriteria(
+      buildingCode: null,
+      startTime: now,
+      endTime: null,
+    );
+
+
     _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
-    // Rebuild if check-in state changes elsewhere (e.g., Dashboard)
     CheckInService.instance.addListener(_onCheckinChange);
   }
+
+
 
   void _onCheckinChange() {
     if (!mounted) return;
@@ -100,9 +112,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
     String? pageToken,
   }) {
     final b = _buildingFrom(_currentFilter);
-
-    String? hhmm(TimeOfDay? t) =>
-        (t == null) ? null : t.format(context); // if you prefer 24h, use your format24Hour()
 
     final s = _currentFilter?.startTime?.format24Hour(); // you had this helper earlier
     final e = _currentFilter?.endTime?.format24Hour();
@@ -197,6 +206,57 @@ class _FindRoomPageState extends State<FindRoomPage> {
     });
   }
 
+  String _currentFilterLabel() {
+    final f = _currentFilter;
+
+    // If filter object doesn't exist → Free Now
+    if (f == null) return "Free Now";
+
+    // If ALL filters are cleared → Availability Schedule
+    final noBuilding = (f.buildingCode == null || f.buildingCode!.isEmpty);
+    final noStart = (f.startTime == null);
+    final noEnd = (f.endTime == null);
+
+    if (noBuilding && noStart && noEnd) {
+      return "Availability Schedule";
+    }
+
+    // Default Start-Time = Free Now
+    final now = TimeOfDay.now();
+    final defaultStart = now.hour == f.startTime?.hour &&
+                        now.minute == f.startTime?.minute &&
+                        f.endTime == null;
+
+    if (defaultStart) {
+      final formatted = _formatAMPM(now);
+      return "Free Now ($formatted)";
+    }
+
+    // Only startTime → Free At
+    if (f.startTime != null && f.endTime == null) {
+      return "Free At ${_formatAMPM(f.startTime!)}";
+    }
+
+    // Only endTime → Free Until
+    if (f.startTime == null && f.endTime != null) {
+      return "Free Until ${_formatAMPM(f.endTime!)}";
+    }
+
+    // Both → Free Between
+    if (f.startTime != null && f.endTime != null) {
+      return "Free Between ${_formatAMPM(f.startTime!)} – ${_formatAMPM(f.endTime!)}";
+    }
+
+    return "Available Rooms";
+  }
+
+
+  String _formatAMPM(TimeOfDay t) {
+    final dt = DateTime(2024, 1, 1, t.hour, t.minute);
+    return DateFormat.jm().format(dt); // requires intl package
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -254,6 +314,17 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
                 const Divider(color: Colors.black, thickness: 2),
                 const SizedBox(height: 10),
+
+                // Filter summary label
+                Text(
+                  _currentFilterLabel(),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 8),
 
                 // GOLD BACKGROUND CONTAINER
                 Container(
