@@ -63,8 +63,6 @@ class _LandingPageState extends State<LandingPage> {
 
   @override
   Widget build(BuildContext context) {
-    const brand = Color(0xFFFFC72A);
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -128,20 +126,7 @@ class _LandingPageState extends State<LandingPage> {
                                 ),
                         ),
                       ),
-
                       const SizedBox(height: 16),
-
-                      // 👇 TEMP: force logout button so you can test onboarding
-                      TextButton(
-                        onPressed: () async {
-                          await FirebaseAuth.instance.signOut();
-                          debugPrint('Forced logout complete');
-                        },
-                        child: const Text(
-                          'Temp: Force Logout',
-                          style: TextStyle(color: Colors.red),
-                        ),
-                      ),
                     ],
                   ),
                 ),
