@@ -104,12 +104,41 @@ class _AddGroupPageState extends State<AddGroupPage> {
 
   // Date picker
   Future<void> _selectDate(BuildContext context) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 7));
+
+    // Try to keep a previously selected date if it's still in range
+    DateTime initial = start;
+    if (_dateController.text.isNotEmpty) {
+      final parts = _dateController.text.split('/');
+      if (parts.length == 3) {
+        final parsed = DateTime(
+          int.parse(parts[2]),
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
+        if (parsed.isBefore(start)) {
+          initial = start;
+        } else if (parsed.isAfter(end)) {
+          initial = end;
+        } else {
+          initial = parsed;
+        }
+      }
+    }
+
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2101),
+      initialDate: initial,
+      firstDate: start,
+      lastDate: end,
+      selectableDayPredicate: (day) {
+        final d = DateTime(day.year, day.month, day.day);
+        return !(d.isBefore(start) || d.isAfter(end));
+      },
     );
+
     if (picked != null) {
       setState(() {
         _dateController.text =
@@ -134,6 +163,17 @@ class _AddGroupPageState extends State<AddGroupPage> {
       int.parse(parts[0]),
       int.parse(parts[1]),
     );
+
+    // Enforce date within today..today+7
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 7));
+    if (date.isBefore(start) || date.isAfter(end)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Date must be within the next 7 days')),
+      );
+      return;
+    }
 
     final startTod = _parseTime(_startTimeController.text);
     final endTod = _parseTime(_endTimeController.text);
