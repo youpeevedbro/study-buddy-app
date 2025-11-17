@@ -83,8 +83,8 @@ def list_rooms(
         col = db.collection(COLLECTION)
 
         now = datetime.now(TZ) if TZ else datetime.utcnow()
-        today = (now + timedelta(days=1)).strftime("%Y-%m-%d") # THIS IS FOR TESTING
-        # today = now.strftime("%Y-%m-%d")
+        # today = (now + timedelta(days=1)).strftime("%Y-%m-%d") # THIS IS FOR TESTING
+        today = now.strftime("%Y-%m-%d")
 
         # Base query: today only
         q = col.where("date", "==", today)

@@ -193,7 +193,7 @@ class _FilterPageState extends State<FilterPage> {
                   ),
                   TextButton(
                     onPressed: _clearFilters,
-                    child: const Text("Clear All"),
+                    child: const Text("Reset"),
                   ),
                 ],
               ),
