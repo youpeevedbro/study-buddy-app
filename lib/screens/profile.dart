@@ -65,6 +65,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   Future<void> _logout() async {
     await AuthService.instance.signOut();
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   void _disableAccount(BuildContext context) {
