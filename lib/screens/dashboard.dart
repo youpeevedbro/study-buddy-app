@@ -5,7 +5,6 @@ import 'package:study_buddy/components/cursive_divider.dart';
 import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
-import 'dart:async';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -19,8 +18,8 @@ class _DashboardState extends State<Dashboard> {
   void initState() {
     super.initState();
     _checkAuth();
-    // Rebuild when timer or check-in state changes
-    TimerService.instance.addListener(_onExternalChange);
+
+    // Rebuild when check-in status changes
     CheckInService.instance.addListener(_onExternalChange);
   }
 
@@ -31,7 +30,6 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void dispose() {
-    TimerService.instance.removeListener(_onExternalChange);
     CheckInService.instance.removeListener(_onExternalChange);
     super.dispose();
   }
@@ -45,7 +43,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void _checkOutRoom() {
-    CheckInService.instance.checkOut(); // flips to false + stops timer
+    CheckInService.instance.checkOut(); // stops timer & flips state
   }
 
   String _formatTime(int totalSeconds) {
@@ -60,7 +58,6 @@ class _DashboardState extends State<Dashboard> {
     final checkedIn = CheckInService.instance.checkedIn;
     final currentRoom = CheckInService.instance.currentRoom;
 
-    // Show building + room (e.g., ECS-228B) when checked in
     final roomLabel = currentRoom != null
         ? "${currentRoom.buildingCode}-${currentRoom.roomNumber}"
         : "Room Number";
@@ -140,42 +137,48 @@ class _DashboardState extends State<Dashboard> {
 
                 const SizedBox(height: 50),
 
-                // === Timer widget (visible only when checked in) ===
-                if (checkedIn)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    margin: const EdgeInsets.only(bottom: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFDDD8),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.timer, color: Color(0xFFE57373)),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Timer',
-                          style: TextStyle(
-                            fontFamily: 'SuperLobster',
-                            fontSize: 16,
-                            color: Color(0xFFE57373),
-                            fontWeight: FontWeight.bold,
+                // === Timer widget (updates every second) ===
+                AnimatedBuilder(
+                  animation: TimerService.instance,
+                  builder: (context, _) {
+                    if (!checkedIn) return const SizedBox.shrink();
+
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                      margin: const EdgeInsets.only(bottom: 15),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFDDD8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.timer, color: Color(0xFFE57373)),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Timer',
+                            style: TextStyle(
+                              fontFamily: 'SuperLobster',
+                              fontSize: 16,
+                              color: Color(0xFFE57373),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _formatTime(TimerService.instance.secondsRemaining),
-                          style: const TextStyle(
-                            fontFamily: 'SuperLobster',
-                            fontSize: 18,
-                            color: Color(0xFFE57373),
-                            fontWeight: FontWeight.bold,
+                          const Spacer(),
+                          Text(
+                            _formatTime(TimerService.instance.secondsRemaining),
+                            style: const TextStyle(
+                              fontFamily: 'SuperLobster',
+                              fontSize: 18,
+                              color: Color(0xFFE57373),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
 
                 const SizedBox(height: 10),
 
@@ -189,40 +192,40 @@ class _DashboardState extends State<Dashboard> {
                   ),
                   child: checkedIn
                       ? Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Text(
-                        roomLabel, // ECS-228B
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton(
-                        onPressed: _checkOutRoom,
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(
-                            fontSize: 18,
-                            fontFamily: "SuperLobster",
+                          children: [
+                            const SizedBox(width: 15),
+                            Text(
+                              roomLabel, // ECS-228B
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Spacer(),
+                            ElevatedButton(
+                              onPressed: _checkOutRoom,
+                              style: ElevatedButton.styleFrom(
+                                textStyle: const TextStyle(
+                                  fontSize: 18,
+                                  fontFamily: "SuperLobster",
+                                ),
+                              ),
+                              child: const Text("Check-out"),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                        )
+                      : const Center(
+                          child: Text(
+                            "You are currently not checked into a room",
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontFamily: 'SuperLobster',
+                              color: Colors.black,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        child: const Text("Check-out"),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  )
-                      : const Center(
-                    child: Text(
-                      "You are currently not checked into a room",
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontFamily: 'SuperLobster',
-                        color: Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
                 ),
               ],
             ),
