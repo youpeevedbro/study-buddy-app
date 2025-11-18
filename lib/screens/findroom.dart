@@ -112,7 +112,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
     }
   }
 
-
   // Reload from first page (after setting/changing filters or on retry)
   void _reload() {
     _nextToken = null;
@@ -173,7 +172,11 @@ class _FindRoomPageState extends State<FindRoomPage> {
   void _checkIn(Room r) {
     CheckInService.instance.checkIn(room: r);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('You checked into ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})')),
+      SnackBar(
+        content: Text(
+          'You checked into ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})',
+        ),
+      ),
     );
     setState(() {}); // refresh current page so buttons update
   }
@@ -182,7 +185,11 @@ class _FindRoomPageState extends State<FindRoomPage> {
     if (CheckInService.instance.isCurrentRoom(r)) {
       CheckInService.instance.checkOut();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('You checked out of ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})')),
+        SnackBar(
+          content: Text(
+            'You checked out of ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})',
+          ),
+        ),
       );
       setState(() {});
     }
@@ -288,7 +295,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text('Error: ${snap.error}', style: const TextStyle(height: 1.3)),
+                            Text(
+                              'Error: ${snap.error}',
+                              style: const TextStyle(height: 1.3),
+                            ),
                             const SizedBox(height: 12),
                             ElevatedButton(
                               onPressed: _reload,
@@ -311,7 +321,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
                       // Group by "{buildingCode}-{roomNumber} | date"
                       final Map<String, List<Room>> grouped = SplayTreeMap();
                       for (final r in rooms) {
-                        final key = '${r.buildingCode}-${r.roomNumber} | ${r.date}';
+                        final key =
+                            '${r.buildingCode}-${r.roomNumber} | ${r.date}';
                         grouped.putIfAbsent(key, () => []).add(r);
                       }
 
@@ -327,15 +338,18 @@ class _FindRoomPageState extends State<FindRoomPage> {
                             itemCount: grouped.length,
                             itemBuilder: (context, i) {
                               final entry = grouped.entries.elementAt(i);
-                              final header = entry.key;   // "AS-233 | 2025-08-25"
-                              final slots = entry.value;  // all times that day for that room
+                              final header = entry.key; // "AS-233 | 2025-08-25"
+                              final slots =
+                                  entry.value; // all times that day for that room
 
                               final parts = header.split('|');
-                              final left = parts[0].trim();        // "AS-233"
-                              final right = (parts.length > 1) ? parts[1].trim() : '';
+                              final left = parts[0].trim(); // "AS-233"
+                              final right =
+                              (parts.length > 1) ? parts[1].trim() : '';
 
                               return Container(
-                                margin: const EdgeInsets.symmetric(vertical: 8),
+                                margin:
+                                const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFCF6DB),
                                   borderRadius: BorderRadius.circular(12),
@@ -348,8 +362,14 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                   ],
                                 ),
                                 child: ExpansionTile(
-                                  tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  childrenPadding: const EdgeInsets.only(left: 16, right: 16, bottom: 16, top: 8),
+                                  tilePadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  childrenPadding: const EdgeInsets.only(
+                                    left: 16,
+                                    right: 16,
+                                    bottom: 16,
+                                    top: 8,
+                                  ),
                                   title: Row(
                                     children: [
                                       Expanded(
@@ -377,14 +397,21 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                   children: [
                                     // List all time ranges for the day
                                     ...slots.map((r) {
-                                      final isCurrent = CheckInService.instance.isCurrentRoom(r);
+                                      final isCurrent =
+                                      CheckInService.instance
+                                          .isCurrentRoom(r);
                                       final key = _slotKey(r);
-                                      final isReported = _reportedSlots.contains(key);
+
+                                      // Combine server truth + local session
+                                      final isReported =
+                                          r.userHasReported ||
+                                              _reportedSlots.contains(key);
 
                                       // Determine report count: use latest override if we have one,
                                       // otherwise the value from backend.
                                       final reportCount =
-                                          _slotReportCounts[key] ?? r.lockedReports;
+                                          _slotReportCounts[key] ??
+                                              r.lockedReports;
                                       final hasAnyReports = reportCount > 0;
                                       final reportLabel =
                                           '$reportCount Report${reportCount == 1 ? '' : 's'}';
@@ -396,8 +423,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                           opacity: isReported ? 0.5 : 1.0,
                                           child: GradientButton(
                                             height: 35,
-                                            borderRadius: BorderRadius.circular(12.0),
-                                            onPressed: () => _reportLocked(r),
+                                            borderRadius:
+                                            BorderRadius.circular(12.0),
+                                            onPressed: () =>
+                                                _reportLocked(r),
                                             child: const Text(
                                               'Locked',
                                               style: TextStyle(
@@ -410,21 +439,25 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                       );
 
                                       return Container(
-                                        margin: const EdgeInsets.only(bottom: 10),
+                                        margin: const EdgeInsets.only(
+                                            bottom: 10),
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                          BorderRadius.circular(10),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withOpacity(0.05),
+                                              color: Colors.black
+                                                  .withOpacity(0.05),
                                               blurRadius: 3,
                                               offset: const Offset(0, 2),
                                             ),
                                           ],
                                         ),
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               '${r.start} - ${r.end}',
@@ -435,24 +468,13 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                             ),
                                             const SizedBox(height: 8),
 
-                                            // Show DB-backed total reports, if any
-                                            if (hasAnyReports)
-                                              Padding(
-                                                padding: const EdgeInsets.only(bottom: 8),
-                                                child: Text(
-                                                  '$reportLabel reported this room as LOCKED',
-                                                  style: const TextStyle(
-                                                    color: Colors.red,
-                                                    fontStyle: FontStyle.italic,
-                                                    fontWeight: FontWeight.w500,
-                                                  ),
-                                                ),
-                                              ),
-
                                             // Buttons row: Locked (+ stacked label) + Check-in/out
                                             Row(
-                                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisAlignment:
+                                              MainAxisAlignment
+                                                  .spaceEvenly,
+                                              crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                               children: [
                                                 // Locked + reportLabel stacked vertically and centered under Locked
                                                 Column(
@@ -460,12 +482,17 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                     lockedButton,
                                                     if (hasAnyReports)
                                                       Padding(
-                                                        padding: const EdgeInsets.only(top: 4.0),
+                                                        padding:
+                                                        const EdgeInsets
+                                                            .only(
+                                                            top: 4.0),
                                                         child: Text(
                                                           reportLabel,
-                                                          style: const TextStyle(
+                                                          style:
+                                                          const TextStyle(
                                                             color: Colors.red,
-                                                            fontWeight: FontWeight.w600,
+                                                            fontWeight:
+                                                            FontWeight.w600,
                                                           ),
                                                         ),
                                                       ),
@@ -475,8 +502,11 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                 if (checkedIn && isCurrent)
                                                   GradientButton(
                                                     height: 35,
-                                                    borderRadius: BorderRadius.circular(12.0),
-                                                    onPressed: () => _checkOut(r),
+                                                    borderRadius:
+                                                    BorderRadius.circular(
+                                                        12.0),
+                                                    onPressed: () =>
+                                                        _checkOut(r),
                                                     child: const Text(
                                                       'Check-out',
                                                       style: TextStyle(
@@ -488,8 +518,11 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                 else
                                                   GradientButton(
                                                     height: 35,
-                                                    borderRadius: BorderRadius.circular(12.0),
-                                                    onPressed: () => _checkIn(r),
+                                                    borderRadius:
+                                                    BorderRadius.circular(
+                                                        12.0),
+                                                    onPressed: () =>
+                                                        _checkIn(r),
                                                     child: const Text(
                                                       'Check-in',
                                                       style: TextStyle(
@@ -513,15 +546,18 @@ class _FindRoomPageState extends State<FindRoomPage> {
                           const SizedBox(height: 16),
                           // Pagination controls
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: (_prevTokens.length > 1) ? _goPrev : null,
+                                onPressed:
+                                (_prevTokens.length > 1) ? _goPrev : null,
                                 icon: const Icon(Icons.chevron_left),
                                 label: const Text('Previous'),
                               ),
                               OutlinedButton.icon(
-                                onPressed: (_nextToken != null) ? _goNext : null,
+                                onPressed:
+                                (_nextToken != null) ? _goNext : null,
                                 icon: const Icon(Icons.chevron_right),
                                 label: const Text('Next'),
                               ),
