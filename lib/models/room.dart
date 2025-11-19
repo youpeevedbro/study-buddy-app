@@ -1,3 +1,5 @@
+// lib/models/room.dart
+
 class Room {
   final String id;
   final String buildingCode;
@@ -6,6 +8,7 @@ class Room {
   final String start;     // can be "" if missing
   final String end;       // can be "" if missing
   final int lockedReports;
+  final bool userHasReported; // did THIS user already report this slot?
 
   Room({
     required this.id,
@@ -15,19 +18,38 @@ class Room {
     required this.start,
     required this.end,
     required this.lockedReports,
+    this.userHasReported = false,
   });
 
-  factory Room.fromJson(Map<String, dynamic> j) => Room(
-    id: (j['id'] ?? '').toString(),
-    buildingCode: (j['buildingCode'] ?? '').toString(),
-    roomNumber: (j['roomNumber'] ?? '').toString(),
-    date: (j['date'] ?? '').toString(),
-    start: (j['start'] ?? '').toString(),
-    end: (j['end'] ?? '').toString(),
-    lockedReports: (j['lockedReports'] is int)
-        ? j['lockedReports'] as int
-        : int.tryParse((j['lockedReports'] ?? '0').toString()) ?? 0,
-  );
+  factory Room.fromJson(Map<String, dynamic> j) {
+    final lockedRaw = j['lockedReports'];
+    final userReportedRaw = j['userHasReported'];
+
+    final lockedReports = (lockedRaw is int)
+        ? lockedRaw
+        : int.tryParse((lockedRaw ?? '0').toString()) ?? 0;
+
+    bool userHasReported;
+    if (userReportedRaw is bool) {
+      userHasReported = userReportedRaw;
+    } else if (userReportedRaw is int) {
+      userHasReported = userReportedRaw != 0;
+    } else {
+      userHasReported =
+      (userReportedRaw?.toString().toLowerCase() == 'true');
+    }
+
+    return Room(
+      id: (j['id'] ?? '').toString(),
+      buildingCode: (j['buildingCode'] ?? '').toString(),
+      roomNumber: (j['roomNumber'] ?? '').toString(),
+      date: (j['date'] ?? '').toString(),
+      start: (j['start'] ?? '').toString(),
+      end: (j['end'] ?? '').toString(),
+      lockedReports: lockedReports,
+      userHasReported: userHasReported,
+    );
+  }
 }
 
 class RoomsPage {

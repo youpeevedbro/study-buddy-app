@@ -9,6 +9,10 @@ class Api {
   /// Base URL for the backend — resolved by AppConfig.init()
   static String get base => AppConfig.apiBase;
 
+  /// Shared HTTP timeout for all backend calls.
+  /// Bump this if Cloud Run cold starts still hit the limit.
+  static const Duration _timeout = Duration(seconds: 30);
+
   /// Build a Uri for GET/POST with optional query parameters.
   static Uri _u(String path, [Map<String, String>? qp]) {
     final normalized = path.startsWith('/') ? path : '/$path';
@@ -38,7 +42,7 @@ class Api {
     final uri = _u('/rooms/', qp);
     final res = await http
         .get(uri, headers: await _headers())
-        .timeout(const Duration(seconds: 12));
+        .timeout(_timeout);
 
     if (res.statusCode != 200) {
       throw Exception('Failed to load rooms ${res.statusCode}: ${res.body}');
@@ -71,7 +75,7 @@ class Api {
     final uri = _u('/rooms/', qp);
     final resp = await http
         .get(uri, headers: await _headers())
-        .timeout(const Duration(seconds: 12));
+        .timeout(_timeout);
 
     if (resp.statusCode != 200) {
       throw Exception("Rooms request failed: ${resp.statusCode} ${resp.body}");
@@ -109,5 +113,24 @@ class Api {
       }
       token = page.nextPageToken;
     } while (token != null && token.isNotEmpty);
+  }
+
+  /// Increment lockedReports for a room slot and return the new count.
+  static Future<int> reportRoomLocked(String roomId) async {
+    final uri = _u('/rooms/$roomId/report_locked');
+    final resp = await http
+        .post(uri, headers: await _headers())
+        .timeout(_timeout);
+
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to report room locked (${resp.statusCode}): ${resp.body}',
+      );
+    }
+
+    final data = jsonDecode(resp.body) as Map<String, dynamic>;
+    final count = data['lockedReports'];
+    if (count is int) return count;
+    return int.tryParse(count?.toString() ?? '0') ?? 0;
   }
 }

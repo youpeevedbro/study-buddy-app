@@ -23,6 +23,8 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env");
   AppConfig.init();
 
+  print(">>> BACKEND = ${AppConfig.apiBase}");
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

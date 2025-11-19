@@ -1,5 +1,13 @@
 fastapi==0.115.4
 uvicorn[standard]==0.30.6
+
+# Firebase / Google
 firebase-admin==6.5.0
+google-cloud-firestore==2.16.0
+google-auth==2.35.0
+
+# Config
 python-dotenv==1.0.1
-pydantic
+
+# Pydantic v2 (FastAPI 0.115 uses v2)
+pydantic>=2.0.0,<3.0.0
