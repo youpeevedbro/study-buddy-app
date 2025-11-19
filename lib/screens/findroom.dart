@@ -1,13 +1,14 @@
 // lib/pages/findroom.dart
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import 'filter.dart';
 import '../components/grad_button.dart';
 import '../services/api.dart';
 import '../models/room.dart';
 import '../services/checkin_service.dart';
-import 'dart:collection';
-import 'package:intl/intl.dart';
-
 
 class FindRoomPage extends StatefulWidget {
   const FindRoomPage({super.key});
@@ -25,34 +26,18 @@ class _FindRoomPageState extends State<FindRoomPage> {
   // --- Filters from FilterPage ---
   FilterCriteria? _currentFilter;
 
-  String _fmt(BuildContext context, String hhmm) {
-  final parts = hhmm.split(':');
-  if (parts.length != 2) return hhmm;
-
-  int hour = int.tryParse(parts[0]) ?? 0;
-  int minute = int.tryParse(parts[1]) ?? 0;
-
-  final dt = DateTime(2025, 1, 1, hour, minute);
-  return TimeOfDay.fromDateTime(dt).format(context);
-}
-
-
   // --- Future for the current page ---
   Future<RoomsPage>? _futurePage;
 
   // --- Local "reported once per user session" state ---
-  // Tracks which specific time slots THIS user has reported as locked
-  // so they can't spam-click the button.
   final Set<String> _reportedSlots = <String>{};
-
-  // Latest counts fetched from the backend when user reports.
-  // Keyed by _slotKey(room).
   final Map<String, int> _slotReportCounts = <String, int>{};
 
   @override
   void initState() {
     super.initState();
 
+    // Default: "Free Now" = buildingCode null, startTime = now, endTime = null
     final now = TimeOfDay.now();
     _currentFilter = FilterCriteria(
       buildingCode: null,
@@ -60,12 +45,9 @@ class _FindRoomPageState extends State<FindRoomPage> {
       endTime: null,
     );
 
-
     _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
     CheckInService.instance.addListener(_onCheckinChange);
   }
-
-
 
   void _onCheckinChange() {
     if (!mounted) return;
@@ -111,6 +93,18 @@ class _FindRoomPageState extends State<FindRoomPage> {
   String _slotKey(Room r) =>
       '${r.buildingCode}-${r.roomNumber}|${r.date}|${r.start}-${r.end}';
 
+  // Pretty formatter "HH:mm" -> localized time (e.g. "3:00 PM")
+  String _fmt(BuildContext context, String hhmm) {
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return hhmm;
+
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = int.tryParse(parts[1]) ?? 0;
+
+    final dt = DateTime(2025, 1, 1, hour, minute);
+    return TimeOfDay.fromDateTime(dt).format(context);
+  }
+
   // Core fetch with current filters
   Future<RoomsPage> _fetchPage({
     required int limit,
@@ -118,7 +112,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
   }) async {
     try {
       final b = _buildingFrom(_currentFilter);
-      final s = _currentFilter?.startTime?.format24Hour(); // you had this helper earlier
+      final d = _dateFrom(_currentFilter);
+      final s = _currentFilter?.startTime?.format24Hour();
       final e = _currentFilter?.endTime?.format24Hour();
 
       final page = await Api.listRoomsPage(
@@ -127,16 +122,16 @@ class _FindRoomPageState extends State<FindRoomPage> {
         building: b,
         startTime: s,
         endTime: e,
+        date: d,
       );
 
       return page;
     } catch (e) {
+      // ignore: avoid_print
       print(">>> API ERROR (listRoomsPage): $e");
       rethrow;
     }
   }
-
-
 
   // Reload from first page (after setting/changing filters or on retry)
   void _reload() {
@@ -173,18 +168,17 @@ class _FindRoomPageState extends State<FindRoomPage> {
     if (_reportedSlots.contains(key)) return; // already reported once this session
 
     try {
-      // Call backend to increment and get the new global count
       final newCount = await Api.reportRoomLocked(r.id);
 
       setState(() {
-        _reportedSlots.add(key);        // disable further clicks for this user/session
+        _reportedSlots.add(key);
         _slotReportCounts[key] = newCount;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end}) reported as locked',
+            '${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)}) reported as locked',
           ),
         ),
       );
@@ -200,7 +194,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'You checked into ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})',
+          'You checked into ${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)})',
         ),
       ),
     );
@@ -213,7 +207,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'You checked out of ${r.buildingCode}-${r.roomNumber} (${r.start}-${r.end})',
+            'You checked out of ${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)})',
           ),
         ),
       );
@@ -242,11 +236,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
   String _currentFilterLabel() {
     final f = _currentFilter;
 
-    // If filter object doesn't exist → Free Now
     if (f == null) return "Free Now";
 
-    // If ALL filters are cleared → Availability Schedule
-    final noBuilding = (f.buildingCode == null || f.buildingCode!.isEmpty);
+    final noBuilding =
+    (f.buildingCode == null || f.buildingCode!.isEmpty);
     final noStart = (f.startTime == null);
     final noEnd = (f.endTime == null);
 
@@ -254,28 +247,25 @@ class _FindRoomPageState extends State<FindRoomPage> {
       return "Availability Schedule";
     }
 
-    // Default Start-Time = Free Now
     final now = TimeOfDay.now();
-    final defaultStart = now.hour == f.startTime?.hour &&
-                        now.minute == f.startTime?.minute &&
-                        f.endTime == null;
+    final defaultStart = f.startTime != null &&
+        f.endTime == null &&
+        now.hour == f.startTime!.hour &&
+        now.minute == f.startTime!.minute;
 
     if (defaultStart) {
       final formatted = _formatAMPM(now);
       return "Free Now ($formatted)";
     }
 
-    // Only startTime → Free At
     if (f.startTime != null && f.endTime == null) {
       return "Free At ${_formatAMPM(f.startTime!)}";
     }
 
-    // Only endTime → Free Until
     if (f.startTime == null && f.endTime != null) {
       return "Free Until ${_formatAMPM(f.endTime!)}";
     }
 
-    // Both → Free Between
     if (f.startTime != null && f.endTime != null) {
       return "Free Between ${_formatAMPM(f.startTime!)} – ${_formatAMPM(f.endTime!)}";
     }
@@ -283,12 +273,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
     return "Available Rooms";
   }
 
-
   String _formatAMPM(TimeOfDay t) {
     final dt = DateTime(2024, 1, 1, t.hour, t.minute);
-    return DateFormat.jm().format(dt); // requires intl package
+    return DateFormat.jm().format(dt); // requires intl
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -419,25 +407,22 @@ class _FindRoomPageState extends State<FindRoomPage> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // Groups
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: grouped.length,
                             itemBuilder: (context, i) {
                               final entry = grouped.entries.elementAt(i);
-                              final header = entry.key; // "AS-233 | 2025-08-25"
-                              final slots =
-                                  entry.value; // all times that day for that room
+                              final header = entry.key;
+                              final slots = entry.value;
 
                               final parts = header.split('|');
-                              final left = parts[0].trim(); // "AS-233"
+                              final left = parts[0].trim();
                               final right =
                               (parts.length > 1) ? parts[1].trim() : '';
 
                               return Container(
-                                margin:
-                                const EdgeInsets.symmetric(vertical: 8),
+                                margin: const EdgeInsets.symmetric(vertical: 8),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFCF6DB),
                                   borderRadius: BorderRadius.circular(12),
@@ -462,7 +447,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          left, // "{buildingCode}-{roomNumber}"
+                                          left,
                                           textAlign: TextAlign.center,
                                           style: const TextStyle(
                                             fontStyle: FontStyle.italic,
@@ -474,7 +459,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        right, // date
+                                        right,
                                         style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
@@ -483,28 +468,23 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                     ],
                                   ),
                                   children: [
-                                    // List all time ranges for the day
                                     ...slots.map((r) {
                                       final isCurrent =
                                       CheckInService.instance
                                           .isCurrentRoom(r);
                                       final key = _slotKey(r);
 
-                                      // Combine server truth + local session
-                                      final isReported =
-                                          r.userHasReported ||
-                                              _reportedSlots.contains(key);
+                                      final isReported = r.userHasReported ||
+                                          _reportedSlots.contains(key);
 
-                                      // Determine report count: use latest override if we have one,
-                                      // otherwise the value from backend.
                                       final reportCount =
                                           _slotReportCounts[key] ??
                                               r.lockedReports;
-                                      final hasAnyReports = reportCount > 0;
+                                      final hasAnyReports =
+                                          reportCount > 0;
                                       final reportLabel =
                                           '$reportCount Report${reportCount == 1 ? '' : 's'}';
 
-                                      // Build the "Locked" button with one-click disable behavior.
                                       final lockedButton = IgnorePointer(
                                         ignoring: isReported,
                                         child: Opacity(
@@ -555,8 +535,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                               ),
                                             ),
                                             const SizedBox(height: 8),
-
-                                            // Buttons row: Locked (+ stacked label) + Check-in/out
                                             Row(
                                               mainAxisAlignment:
                                               MainAxisAlignment
@@ -564,7 +542,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                               crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                               children: [
-                                                // Locked + reportLabel stacked vertically and centered under Locked
                                                 Column(
                                                   children: [
                                                     lockedButton,
@@ -580,13 +557,13 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                           const TextStyle(
                                                             color: Colors.red,
                                                             fontWeight:
-                                                            FontWeight.w600,
+                                                            FontWeight
+                                                                .w600,
                                                           ),
                                                         ),
                                                       ),
                                                   ],
                                                 ),
-
                                                 if (checkedIn && isCurrent)
                                                   GradientButton(
                                                     height: 35,
@@ -632,20 +609,21 @@ class _FindRoomPageState extends State<FindRoomPage> {
                           ),
 
                           const SizedBox(height: 16),
-                          // Pagination controls
                           Row(
                             mainAxisAlignment:
                             MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
-                                onPressed:
-                                (_prevTokens.length > 1) ? _goPrev : null,
+                                onPressed: (_prevTokens.length > 1)
+                                    ? _goPrev
+                                    : null,
                                 icon: const Icon(Icons.chevron_left),
                                 label: const Text('Previous'),
                               ),
                               OutlinedButton.icon(
-                                onPressed:
-                                (_nextToken != null) ? _goNext : null,
+                                onPressed: (_nextToken != null)
+                                    ? _goNext
+                                    : null,
                                 icon: const Icon(Icons.chevron_right),
                                 label: const Text('Next'),
                               ),

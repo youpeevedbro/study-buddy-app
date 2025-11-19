@@ -2,16 +2,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:study_buddy/services/auth_service.dart';
+
 import '../config/app_config.dart';
 import '../models/room.dart';
+import 'rooms_cache.dart';
 
 class Api {
   /// Base URL for the backend — resolved by AppConfig.init()
   static String get base => AppConfig.apiBase;
 
   /// Shared HTTP timeout for all backend calls.
-  /// Bump this if Cloud Run cold starts still hit the limit.
   static const Duration _timeout = Duration(seconds: 30);
 
   /// Build a Uri for GET/POST with optional query parameters.
@@ -22,11 +22,8 @@ class Api {
 
   /// Common headers, inject Firebase ID token if available.
   static Future<Map<String, String>> _headers() async {
-    final user = AuthService.instance.currentUser;
-    String? token;
-    if (user != null) {
-      token = await user.getIdToken(true);
-    }
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user?.getIdToken(true);
 
     return <String, String>{
       'Content-Type': 'application/json',
@@ -34,70 +31,126 @@ class Api {
     };
   }
 
-
-  /// Simple one-shot list (non-paginated). Accepts optional filters.
-  /// Handles either { "items": [...] } or a bare JSON array.
+  /// NON-PAGINATED
   static Future<List<Room>> listRooms({
     int limit = 200,
     String? building,
+    String? date,
   }) async {
     final qp = <String, String>{'limit': '$limit'};
     if (building?.isNotEmpty == true) qp['building'] = building!;
+    if (date?.isNotEmpty == true) qp['date'] = date!;
 
     final uri = _u('/rooms/', qp);
-    final res = await http
-        .get(uri, headers: await _headers())
-        .timeout(_timeout);
+    final res =
+    await http.get(uri, headers: await _headers()).timeout(_timeout);
 
     if (res.statusCode != 200) {
-      throw Exception('Failed to load rooms ${res.statusCode}: ${res.body}');
+      throw Exception("Failed to load rooms: ${res.statusCode} ${res.body}");
     }
 
     final decoded = jsonDecode(res.body);
-    final List<dynamic> list = decoded is Map<String, dynamic>
-        ? (decoded['items'] as List<dynamic>)
-        : (decoded as List<dynamic>);
+    final List<dynamic> list =
+    decoded is Map<String, dynamic> ? decoded['items'] : decoded;
 
-    return list
-        .cast<Map<String, dynamic>>()
-        .map((m) => Room.fromJson(m))
-        .toList();
+    return list.cast<Map<String, dynamic>>().map(Room.fromJson).toList();
   }
 
-  /// Paginated fetch. Backend should return:
-  /// { "items": [...], "nextPageToken": "..." }
+  /// PAGINATED + OPTIONAL LOCAL CACHE
+  ///
+  /// Backend returns:
+  ///   { "items": [...], "nextPageToken": "..." }
   static Future<RoomsPage> listRoomsPage({
     int limit = 50,
     String? pageToken,
     String? building,
-    String? startTime,    // "HH:mm"
-    String? endTime,      // "HH:mm"
+    String? startTime, // "HH:mm", optional (backend currently ignores them)
+    String? endTime,   // "HH:mm", optional
+    String? date,      // "YYYY-MM-DD"
   }) async {
     final qp = <String, String>{'limit': '$limit'};
     if (pageToken != null) qp['pageToken'] = pageToken;
     if (building?.isNotEmpty == true) qp['building'] = building!;
     if (startTime?.isNotEmpty == true) qp['startTime'] = startTime!;
     if (endTime?.isNotEmpty == true) qp['endTime'] = endTime!;
+    if (date?.isNotEmpty == true) qp['date'] = date!;
 
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? "anonymous";
+
+    final bool isFirstPage = pageToken == null || pageToken.isEmpty;
+    final bool hasTimeFilters =
+        (startTime != null && startTime.isNotEmpty) ||
+            (endTime != null && endTime.isNotEmpty);
+
+    // ---- Try cache ONLY for first page with no time filters ----
+    if (isFirstPage && !hasTimeFilters) {
+      final cached = await RoomsCache.load(
+        uid: uid,
+        limit: limit,
+        pageToken: null,
+        building: building,
+        date: date,
+      );
+
+      if (cached != null) {
+        try {
+          final data = jsonDecode(cached.body);
+
+          if (data is List) {
+            return RoomsPage(
+              items: data
+                  .cast<Map<String, dynamic>>()
+                  .map(Room.fromJson)
+                  .toList(),
+              nextPageToken: null,
+            );
+          }
+
+          return RoomsPage.fromJson(data as Map<String, dynamic>);
+        } catch (_) {
+          // If cache is corrupt, just fall through and refetch
+        }
+      }
+    }
+
+    // ---- No cache hit OR we have time filters / later pages → backend call ----
     final uri = _u('/rooms/', qp);
-    final resp = await http
-        .get(uri, headers: await _headers())
-        .timeout(_timeout);
+    final resp =
+    await http.get(uri, headers: await _headers()).timeout(_timeout);
 
     if (resp.statusCode != 200) {
-      throw Exception("Rooms request failed: ${resp.statusCode} ${resp.body}");
+      throw Exception(
+          "Rooms request failed: ${resp.statusCode} ${resp.body}");
     }
+
+    // Save first page without time filters to cache
+    if (isFirstPage && !hasTimeFilters) {
+      await RoomsCache.save(
+        uid: uid,
+        limit: limit,
+        pageToken: null,
+        building: building,
+        date: date,
+        body: resp.body,
+      );
+    }
+
     final data = jsonDecode(resp.body);
-    return data is List
-        ? RoomsPage(items: (data.cast<Map<String,dynamic>>()).map(Room.fromJson).toList(), nextPageToken: null)
-        : RoomsPage.fromJson(data as Map<String, dynamic>);
+    if (data is List) {
+      final items =
+      data.cast<Map<String, dynamic>>().map(Room.fromJson).toList();
+      return RoomsPage(items: items, nextPageToken: null);
+    }
+
+    return RoomsPage.fromJson(data as Map<String, dynamic>);
   }
 
-
-  /// (Optional) Convenience stream to iterate all pages.
+  /// Convenience stream to iterate all pages.
   static Stream<Room> listAllRooms({
     int pageSize = 100,
     String? building,
+    String? date,
   }) async* {
     String? token;
     do {
@@ -105,6 +158,7 @@ class Api {
         limit: pageSize,
         pageToken: token,
         building: building,
+        date: date,
       );
       for (final r in page.items) {
         yield r;
@@ -116,19 +170,17 @@ class Api {
   /// Increment lockedReports for a room slot and return the new count.
   static Future<int> reportRoomLocked(String roomId) async {
     final uri = _u('/rooms/$roomId/report_locked');
-    final resp = await http
-        .post(uri, headers: await _headers())
-        .timeout(_timeout);
+    final resp =
+    await http.post(uri, headers: await _headers()).timeout(_timeout);
 
     if (resp.statusCode != 200) {
       throw Exception(
-        'Failed to report room locked (${resp.statusCode}): ${resp.body}',
+        "Failed to report room locked: ${resp.statusCode} ${resp.body}",
       );
     }
 
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    final count = data['lockedReports'];
-    if (count is int) return count;
-    return int.tryParse(count?.toString() ?? '0') ?? 0;
+    final json = jsonDecode(resp.body) as Map<String, dynamic>;
+    final raw = json['lockedReports'];
+    return raw is int ? raw : int.tryParse(raw.toString()) ?? 0;
   }
 }
