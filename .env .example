@@ -1,0 +1,39 @@
+# ============================================
+# === STUDYBUDDY ENV CONFIG (EXAMPLE ONLY) ===
+# ============================================
+
+# === APP SETTINGS ===
+# Allowed domains for login validation
+ALLOWED_EMAIL_DOMAIN=@student.csulb.edu
+ALLOWED_EMAIL_DOMAINS=student.csulb.edu
+ALLOWED_SERVICE_ACCOUNTS=<YOUR_GCP_SERVICE_ACCOUNT_EMAIL>
+SERVICE_AUDIENCE=https://<your-cloud-run-service>.run.app
+
+# === API BASE URLS (emulator/device testing) ===
+API_BASE_IOS=https://<your-cloud-run-backend>.run.app
+API_BASE_ANDROID=https://<your-cloud-run-backend>.run.app
+
+# === FIREBASE PROJECT INFO ===
+FIREBASE_PROJECT_ID=<your-firebase-project-id>
+FIREBASE_STORAGE_BUCKET=<your-firebase-storage-bucket>
+FIREBASE_SENDER_ID=<your-firebase-sender-id>
+
+# === FIREBASE CLIENT KEYS (public keys, still replaced for clarity) ===
+FIREBASE_ANDROID_API_KEY=<your-android-api-key>
+FIREBASE_IOS_API_KEY=<your-ios-api-key>
+
+# === FIREBASE APP IDENTIFIERS ===
+FIREBASE_ANDROID_APP_ID=<your-android-app-id>
+FIREBASE_IOS_APP_ID=<your-ios-app-id>
+
+# === FIREBASE AUTH REDIRECTS ===
+FIREBASE_HANDLER_URL=<your-firebase-auth-handler-url>
+AAD_POST_LOGOUT_URL=<your-firebase-signed-out-url>
+
+# === MICROSOFT AAD SETTINGS ===
+MICROSOFT_TENANT_ID=<your-azure-ad-tenant-id>
+
+# === BACKEND SERVICE ACCOUNT (LOCAL BACKEND ONLY) ===
+# DO NOT commit actual service account paths.
+GOOGLE_APPLICATION_CREDENTIALS=<path-to-local-service-account-json>
+FIRESTORE_PROJECT_ID=<your-firestore-project-id>
