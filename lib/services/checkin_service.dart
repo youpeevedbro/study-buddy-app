@@ -20,36 +20,67 @@ class CheckInService extends ChangeNotifier {
     _checkedIn = true;
     _currentRoom = room;
 
-    // ===== TIME CALCULATION LOGIC =====
-
     Duration remainingDuration = Duration.zero;
 
     try {
-      // Build a date string. If missing, assume today.
       final now = DateTime.now();
-      final dateStr = (room.date.isNotEmpty)
-          ? room.date
-          : "${now.year.toString().padLeft(4, '0')}-"
-            "${now.month.toString().padLeft(2, '0')}-"
-            "${now.day.toString().padLeft(2, '0')}";
+      DateTime _today() => DateTime(now.year, now.month, now.day);
+
+      // Flexible date parsing: supports ISO (yyyy-mm-dd), M/D/YYYY, YYYY/M/D. Falls back to today.
+      DateTime _parseDateFlexible(String s) {
+        final raw = s.trim();
+        final iso = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+        final mdY = RegExp(r'^\d{1,2}/\d{1,2}/\d{4}$');
+        final yMdSlash = RegExp(r'^\d{4}/\d{1,2}/\d{1,2}$');
+        try {
+          if (iso.hasMatch(raw)) return DateTime.parse(raw);
+          if (mdY.hasMatch(raw)) {
+            final p = raw.split('/');
+            return DateTime(int.parse(p[2]), int.parse(p[0]), int.parse(p[1]));
+          }
+          if (yMdSlash.hasMatch(raw)) {
+            final p = raw.split('/');
+            return DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
+          }
+          final tryDt = DateTime.tryParse(raw);
+          if (tryDt != null) return DateTime(tryDt.year, tryDt.month, tryDt.day);
+        } catch (_) {
+          // fall through
+        }
+        return _today();
+      }
+
+      // Strict HH:mm parsing (accepts 9:05 or 09:05)
+      int? _parseHm(String s) {
+        final m = RegExp(r'^\s*(\d{1,2}):(\d{2})\s*$').firstMatch(s);
+        if (m == null) return null;
+        final h = int.tryParse(m.group(1)!);
+        final mm = int.tryParse(m.group(2)!);
+        if (h == null || mm == null) return null;
+        if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
+        return h * 60 + mm;
+      }
+
+      final baseDate = room.date.isNotEmpty ? _parseDateFlexible(room.date) : _today();
 
       DateTime? endDateTime;
 
       if (room.end.isNotEmpty) {
-        // Prefer explicit end time when available
-        endDateTime = DateTime.tryParse("${dateStr}T${room.end}:00");
-        if (endDateTime == null) {
-          debugPrint(
-              'CheckInService: Failed to parse end time "${room.end}" for date "$dateStr"');
+        final mins = _parseHm(room.end);
+        if (mins != null) {
+          final h = mins ~/ 60, m = mins % 60;
+          endDateTime = DateTime(baseDate.year, baseDate.month, baseDate.day, h, m);
+        } else {
+          debugPrint('CheckInService: could not parse end "${room.end}"');
         }
       } else if (room.start.isNotEmpty) {
-        // If no end but we have a start, default to 60 minutes session
-        final startDT = DateTime.tryParse("${dateStr}T${room.start}:00");
-        if (startDT != null) {
+        final mins = _parseHm(room.start);
+        if (mins != null) {
+          final h = mins ~/ 60, m = mins % 60;
+          final startDT = DateTime(baseDate.year, baseDate.month, baseDate.day, h, m);
           endDateTime = startDT.add(const Duration(minutes: 60));
         } else {
-          debugPrint(
-              'CheckInService: Failed to parse start time "${room.start}" for date "$dateStr"');
+          debugPrint('CheckInService: could not parse start "${room.start}"');
         }
       }
 
@@ -57,20 +88,15 @@ class CheckInService extends ChangeNotifier {
         final diff = endDateTime.difference(now);
         remainingDuration = diff.isNegative ? Duration.zero : diff;
       } else {
-        // As a last resort, start a 60-minute countdown so the UI is responsive
-        debugPrint(
-            'CheckInService: Missing start/end; defaulting to 60-minute countdown');
+        debugPrint('CheckInService: Missing/invalid times; defaulting to 60-minute countdown');
         remainingDuration = const Duration(minutes: 60);
       }
     } catch (e) {
-      // If parsing fails, default to 0 and log
       debugPrint('CheckInService: time calculation error: $e');
       remainingDuration = Duration.zero;
     }
 
-    // ===== START TIMER =====
     TimerService.instance.start(remainingDuration);
-
     notifyListeners();
   }
 
@@ -78,17 +104,12 @@ class CheckInService extends ChangeNotifier {
   void checkOut() {
     _checkedIn = false;
     _currentRoom = null;
-
-    TimerService.instance.stop(); // stop countdown
-
+    TimerService.instance.stop();
     notifyListeners();
   }
 
-  /// Does the given room/time slot equal the currently checked-in slot?
   bool isCurrentRoom(Room r) {
     if (_currentRoom == null) return false;
-
-    // If your Room has a unique id, using id is best.
     return _currentRoom!.id == r.id;
   }
 }

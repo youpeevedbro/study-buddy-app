@@ -21,6 +21,7 @@ class _DashboardState extends State<Dashboard> {
 
     // Rebuild when check-in status changes
     CheckInService.instance.addListener(_onExternalChange);
+    TimerService.instance.addListener(_onExternalChange);
   }
 
   void _onExternalChange() {
@@ -31,6 +32,7 @@ class _DashboardState extends State<Dashboard> {
   @override
   void dispose() {
     CheckInService.instance.removeListener(_onExternalChange);
+    TimerService.instance.removeListener(_onExternalChange);
     super.dispose();
   }
 
