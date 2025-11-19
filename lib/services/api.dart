@@ -40,11 +40,9 @@ class Api {
   static Future<List<Room>> listRooms({
     int limit = 200,
     String? building,
-    String? date,
   }) async {
     final qp = <String, String>{'limit': '$limit'};
     if (building?.isNotEmpty == true) qp['building'] = building!;
-    if (date?.isNotEmpty == true) qp['date'] = date!;
 
     final uri = _u('/rooms/', qp);
     final res = await http
@@ -72,12 +70,14 @@ class Api {
     int limit = 50,
     String? pageToken,
     String? building,
-    String? date,
+    String? startTime,    // "HH:mm"
+    String? endTime,      // "HH:mm"
   }) async {
     final qp = <String, String>{'limit': '$limit'};
     if (pageToken != null) qp['pageToken'] = pageToken;
     if (building?.isNotEmpty == true) qp['building'] = building!;
-    if (date?.isNotEmpty == true) qp['date'] = date!;
+    if (startTime?.isNotEmpty == true) qp['startTime'] = startTime!;
+    if (endTime?.isNotEmpty == true) qp['endTime'] = endTime!;
 
     final uri = _u('/rooms/', qp);
     final resp = await http
@@ -87,25 +87,17 @@ class Api {
     if (resp.statusCode != 200) {
       throw Exception("Rooms request failed: ${resp.statusCode} ${resp.body}");
     }
-
     final data = jsonDecode(resp.body);
-    if (data is List) {
-      // Backend returned a bare list; wrap it into a single page without a token.
-      final items = data
-          .cast<Map<String, dynamic>>()
-          .map((m) => Room.fromJson(m))
-          .toList();
-      return RoomsPage(items: items, nextPageToken: null);
-    }
-
-    return RoomsPage.fromJson(data as Map<String, dynamic>);
+    return data is List
+        ? RoomsPage(items: (data.cast<Map<String,dynamic>>()).map(Room.fromJson).toList(), nextPageToken: null)
+        : RoomsPage.fromJson(data as Map<String, dynamic>);
   }
+
 
   /// (Optional) Convenience stream to iterate all pages.
   static Stream<Room> listAllRooms({
     int pageSize = 100,
     String? building,
-    String? date,
   }) async* {
     String? token;
     do {
@@ -113,7 +105,6 @@ class Api {
         limit: pageSize,
         pageToken: token,
         building: building,
-        date: date,
       );
       for (final r in page.items) {
         yield r;

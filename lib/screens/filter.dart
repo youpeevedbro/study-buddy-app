@@ -24,14 +24,19 @@ class FilterCriteria {
   }
 
   factory FilterCriteria.fromJson(Map<String, dynamic> json) {
+    TimeOfDay? _parseHHMM(String? s) {
+      if (s == null) return null;
+      final parts = s.split(':');
+      if (parts.length != 2) return null;
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      return TimeOfDay(hour: h, minute: m);
+    }
+
     return FilterCriteria(
-      buildingCode: json['building'],
-      startTime: json['startTime'] != null
-          ? TimeOfDay.fromDateTime(DateTime.parse(json['startTime']))
-          : null,
-      endTime: json['endTime'] != null
-          ? TimeOfDay.fromDateTime(DateTime.parse(json['endTime']))
-          : null,
+      buildingCode: json['building'] as String?,
+      startTime: _parseHHMM(json['startTime'] as String?),
+      endTime: _parseHHMM(json['endTime'] as String?),
     );
   }
 }
@@ -59,6 +64,7 @@ class _FilterPageState extends State<FilterPage> {
   String? _selectedBuilding;
   TimeOfDay? startTime;
   TimeOfDay? endTime;
+  String? _timeError;    // 👈 NEW
 
   @override
   void initState() {
@@ -87,35 +93,66 @@ class _FilterPageState extends State<FilterPage> {
     }
   }
 
+  int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
+
+  // Placeholder backend call
   // Placeholder backend call
   Future<void> _applyFilters() async {
+    // 1) Validate time range if both set
+    if (startTime != null && endTime != null) {
+      final startMin = _toMinutes(startTime!);
+      final endMin   = _toMinutes(endTime!);
+
+      if (startMin >= endMin) {
+        // Show inline error in the sheet
+        setState(() {
+          _timeError = 'End time must be after start time.';
+        });
+        return;
+      }
+    }
+
+    // If we got here, times are fine → clear any old error
+    setState(() {
+      _timeError = null;
+    });
+
+    // 2) Build criteria as before
     final criteria = FilterCriteria(
       buildingCode: _selectedBuilding,
       startTime: startTime,
       endTime: endTime,
+      // overlap: _overlap,  // if/when you add it
     );
 
     try {
-      // TODO: Replace this with real backend or Python API call later
       print('Filter criteria: ${criteria.toJson()}');
-
-      // Return to parent
       Navigator.pop(context, criteria);
     } catch (e) {
       print('Filter error: $e');
+      // You *can* still use a SnackBar here since it’s a real error, not validation
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error applying filters: $e')),
       );
     }
   }
 
+
+
   void _clearFilters() {
     setState(() {
       _selectedBuilding = null;
-      startTime = null;
+
+      // Reset to “free AT the current time”
+      final now = TimeOfDay.now();
+      startTime = now;
       endTime = null;
+
+      // Clear any time validation error
+      _timeError = null;
     });
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +193,7 @@ class _FilterPageState extends State<FilterPage> {
                   ),
                   TextButton(
                     onPressed: _clearFilters,
-                    child: const Text("Clear All"),
+                    child: const Text("Reset"),
                   ),
                 ],
               ),
@@ -193,9 +230,26 @@ class _FilterPageState extends State<FilterPage> {
               const SizedBox(height: 20),
 
               // Time
-              const Text("Time",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              // Time
+              const Text(
+                "Free (at/between/until)",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
               const SizedBox(height: 10),
+
+              if (_timeError != null)               // 👈 NEW
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6.0),
+                  child: Text(
+                    _timeError!,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+
               Row(
                 children: [
                   _buildTimeField("Start Time", startTime, (t) {
@@ -207,6 +261,7 @@ class _FilterPageState extends State<FilterPage> {
                   }),
                 ],
               ),
+
               const SizedBox(height: 30),
 
               // Buttons
@@ -259,47 +314,62 @@ class _FilterPageState extends State<FilterPage> {
 
   // ---------------- Helper ----------------
   Widget _buildTimeField(
-      String label, TimeOfDay? time, Function(TimeOfDay?) onTimePicked) {
-    return Expanded(
-      child: InkWell(
-        onTap: () async {
-          final picked = await showTimePicker(
-            context: context,
-            initialTime: time ?? TimeOfDay.now(),
-            builder: (context, child) {
-              return Theme(
-                data: ThemeData.light().copyWith(
-                  colorScheme: const ColorScheme.light(
-                    primary: Color(0xFFE7C144),
-                    surface: Color(0xFFFCF6DB),
-                    onSurface: Colors.black,
+    String label, TimeOfDay? time, Function(TimeOfDay?) onTimePicked) {
+      return Expanded(
+        child: InkWell(
+          onTap: () async {
+            final picked = await showTimePicker(
+              context: context,
+              initialTime: time ?? TimeOfDay.now(),
+              builder: (context, child) {
+                return Theme(
+                  data: ThemeData.light().copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: Color(0xFFE7C144),
+                      surface: Color(0xFFFCF6DB),
+                      onSurface: Colors.black,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) onTimePicked(picked);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFCF6DB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade400),
+            ),
+            child: Row(
+              children: [
+                // Label / time text
+                Expanded(
+                  child: Text(
+                    time != null ? time.format(context) : label,
+                    style: const TextStyle(fontSize: 14),
                   ),
                 ),
-                child: child!,
-              );
-            },
-          );
-          if (picked != null) onTimePicked(picked);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFCF6DB),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.grey.shade400),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                time != null ? time.format(context) : label,
-                style: const TextStyle(fontSize: 14),
-              ),
-              const Icon(Icons.access_time, size: 18),
-            ],
+
+                // If a time is set, show a small "X" to clear it
+                if (time != null) ...[
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.close, size: 16),
+                    onPressed: () => onTimePicked(null),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+
+                // Clock icon
+                const Icon(Icons.access_time, size: 18),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 }

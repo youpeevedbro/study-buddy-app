@@ -11,6 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_web_auth_2: ^4.1.0
+  intl: ^0.19.0
 
   # HTTP + env
   http: ^1.2.2

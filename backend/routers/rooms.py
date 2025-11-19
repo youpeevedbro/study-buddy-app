@@ -1,16 +1,26 @@
 # backend/routers/rooms.py
-import base64
-import json
+import base64, json
 import logging
-from typing import List, Optional, Dict, Any
-
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import Any, Dict, List, Optional
 from google.cloud import firestore
 from google.api_core.exceptions import AlreadyExists
-
 from services.firestore_client import get_db
 from models.room import Room, RoomsResponse
 from auth import verify_firebase_token
+
+try:
+    from zoneinfo import ZoneInfo
+    TZ = ZoneInfo("America/Los_Angeles")
+except Exception:
+    TZ = None
+
+try:
+    from zoneinfo import ZoneInfo
+    TZ = ZoneInfo("America/Los_Angeles")
+except Exception:
+    TZ = None
 
 router = APIRouter()
 log = logging.getLogger("uvicorn.error")
@@ -19,6 +29,7 @@ log = logging.getLogger("uvicorn.error")
 COLLECTION = "availabilitySlots"
 # Subcollection used to track which users have reported a slot as locked.
 USER_SUBCOLLECTION = "lockedReportsUsers"
+
 
 
 def _doc_to_room(doc, user_has_reported: bool = False) -> Room:
@@ -46,31 +57,42 @@ def _decode_token(token: str) -> Dict[str, Any]:
     return json.loads(raw.decode("utf-8"))
 
 
+def _parse_hhmm_to_min(hhmm: Optional[str]) -> Optional[int]:
+    if not hhmm:
+        return None
+    try:
+        h, m = hhmm.split(":")
+        return int(h) * 60 + int(m)
+    except Exception:
+        return None
+
+
 @router.get("/", response_model=RoomsResponse)
 def list_rooms(
     limit: int = Query(50, ge=1, le=200),
     pageToken: Optional[str] = Query(None, alias="pageToken"),
-    building: Optional[str] = Query(None),
-    date: Optional[str] = Query(None),
+    building: Optional[str] = Query(None, description="buildingCode like AS, ECS, LA1"),
+    startTime: Optional[str] = Query(None, description="HH:mm (inclusive start of desired window)"),
+    endTime: Optional[str] = Query(None, description="HH:mm (exclusive end of desired window)"),
     claims: dict = Depends(verify_firebase_token),
 ):
     """
-    List rooms with cursor pagination.
-    Collection: availabilitySlots
+    Returns ONLY today's available room slots (from `availabilitySlots`).
 
-    Order: roomId, date, startMin
-    pageToken is a urlsafe base64-encoded JSON:
-      {
-        "roomId": "...",
-        "date": "...",
-        "startMin": 420
-      }
+    Time filter semantics (overlap mode):
 
-    Optional filters:
-      - building -> filters by buildingCode
-      - date     -> filters by date field ("YYYY-MM-DD")
+    - start only (T):  slot contains T
+                       => startMin <= T < endMin
 
-    Also populates Room.userHasReported based on the current user's uid.
+    - end only (E):    slot starts before E
+                       => startMin < E
+
+    - both S–E:        slot overlaps [S,E)
+                       => endMin > S AND startMin < E
+
+    Because Firestore only allows range filters on ONE field, we:
+    - push one side of the inequality into Firestore
+    - finish the other side(s) in Python.
     """
     try:
         db = get_db()
@@ -78,32 +100,123 @@ def list_rooms(
 
         uid = claims.get("uid") or claims.get("sub")
 
-        # Start with base query and apply filters
-        query = col
-        if building:
-            query = query.where("buildingCode", "==", building)
-        if date:
-            query = query.where("date", "==", date)
+        now = datetime.now(TZ) if TZ else datetime.utcnow()
+        # today = (now + timedelta(days=1)).strftime("%Y-%m-%d") # THIS IS FOR TESTING
+        today = now.strftime("%Y-%m-%d")
 
-        # Deterministic order for pagination
-        query = (
-            query.order_by("roomId")
-                 .order_by("date")
-                 .order_by("startMin")
-                 .limit(limit + 1)  # fetch one extra to detect "has more"
+        # Base query: today only
+        q = col.where("date", "==", today)
+
+        # Optional: building
+        if building:
+            q = q.where("buildingCode", "==", building)
+
+        # Parse time params
+        start_min_param = _parse_hhmm_to_min(startTime)
+        end_min_param = _parse_hhmm_to_min(endTime)
+
+        # Flags for Python-side filtering
+        filter_contains_T = False   # start-only case
+        filter_overlap_SE = False   # both S–E case
+
+        # --- Apply Firestore-side filters (only one inequality field allowed) ---
+        if start_min_param is not None and end_min_param is not None:
+            # Overlap S–E: endMin > S AND startMin < E
+            # Firestore: push startMin < E
+            q = q.where("startMin", "<", end_min_param)
+            filter_overlap_SE = True  # we'll enforce endMin > S in Python
+
+        elif start_min_param is not None and end_min_param is None:
+            # "Free AT T": startMin <= T < endMin
+            # Firestore: push endMin > T
+            q = q.where("endMin", ">", start_min_param)
+            filter_contains_T = True  # we'll enforce startMin <= T in Python
+
+        elif start_min_param is None and end_min_param is not None:
+            # "Free UNTIL E": slot started before E
+            # Firestore: startMin < E (no extra Python filter needed)
+            q = q.where("startMin", "<", end_min_param)
+
+        fetch_limit = 2000  # overfetch to account for post-filtering
+
+        # Stable ordering for pagination
+        q = (
+            q.order_by("roomId")
+             .order_by("date")
+             .order_by("startMin")
+             .limit(fetch_limit)
         )
 
+        # Cursor
         if pageToken:
             cursor = _decode_token(pageToken)
-            query = query.start_after(
-                [
-                    cursor.get("roomId", ""),
-                    cursor.get("date", ""),
-                    cursor.get("startMin", 0),
-                ]
-            )
+            q = q.start_after([
+                cursor.get("roomId", ""),
+                cursor.get("date", ""),
+                cursor.get("startMin", 0),
+            ])
 
-        docs = list(query.stream())
+        print(
+            f"[rooms] date={today} "
+            f"building={building!r} "
+            f"startTimeParam={startTime!r} (min={start_min_param}) "
+            f"endTimeParam={endTime!r} (min={end_min_param}) "
+            f"limit={limit} fetch_limit={fetch_limit}"
+        )
+
+        # --- Fetch from Firestore ---
+        docs = list(q.stream())
+        print(f"[rooms DEBUG] BEFORE post-filter: {len(docs)} docs")
+        preview_before = []
+        for d in docs[:15]:
+            data = d.to_dict() or {}
+            preview_before.append(
+                (
+                    data.get("buildingCode"),
+                    str(data.get("roomNumber")),
+                    data.get("startMin"),
+                    data.get("endMin"),
+                )
+            )
+        print("    first 15:", preview_before)
+
+        # --- Python-side filtering for the parts Firestore can't express ---
+        if filter_contains_T and start_min_param is not None:
+            # Keep only slots with startMin <= T
+            tmp = []
+            for d in docs:
+                data = d.to_dict() or {}
+                start_min = int(data.get("startMin", 9999))
+                if start_min <= start_min_param:
+                    tmp.append(d)
+            docs = tmp
+
+        if filter_overlap_SE and start_min_param is not None:
+            # We already enforced startMin < E in Firestore,
+            # now enforce endMin > S here.
+            tmp = []
+            for d in docs:
+                data = d.to_dict() or {}
+                end_min = int(data.get("endMin", -1))
+                if end_min > start_min_param:
+                    tmp.append(d)
+            docs = tmp
+
+        print(f"[rooms DEBUG] AFTER post-filter: {len(docs)} docs")
+        preview_after = []
+        for d in docs[:15]:
+            data = d.to_dict() or {}
+            preview_after.append(
+                (
+                    data.get("buildingCode"),
+                    str(data.get("roomNumber")),
+                    data.get("startMin"),
+                    data.get("endMin"),
+                )
+            )
+        print("    first 15:", preview_after)
+
+        # --- Pagination bookkeeping (on the filtered docs) ---
         has_more = len(docs) > limit
         docs = docs[:limit]
 
@@ -128,12 +241,12 @@ def list_rooms(
 
         next_token = None
         if has_more and docs:
-            last = docs[-1].to_dict() or {}
+            last_data = docs[-1].to_dict() or {}
             next_token = _encode_token(
                 {
-                    "roomId": last.get("roomId", ""),
-                    "date": last.get("date", ""),
-                    "startMin": last.get("startMin", 0),
+                    "roomId": last_data.get("roomId", ""),
+                    "date": last_data.get("date", ""),
+                    "startMin": last_data.get("startMin", 0),
                 }
             )
 
