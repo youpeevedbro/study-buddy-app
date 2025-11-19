@@ -1,17 +1,19 @@
 from fastapi import APIRouter, HTTPException
 from services.firestore_client import get_db, firestore
+from google.cloud.firestore_v1.base_query import FieldFilter
 from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupUpdate
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 router = APIRouter()
 COLLECTION = "studyGroups"
+USER_COLLECTION = "users"
 
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
     la_tz = ZoneInfo("America/Los_Angeles")
     dt_la = dt.replace(tzinfo=la_tz)
-    return dt_la.astimezone(timezone.utc) #datetime object in UTC
+    return dt_la.astimezone(timezone.utc) 
 
 def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse: 
     d = doc.to_dict()
@@ -24,50 +26,117 @@ def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse:
         endTime=d.get("endTime", ""),
         name=d.get("name", ""),
         quantity=d.get("quantity", ""),
-        # ADD owner fields
+        ownerID=d.get("ownerID", ""),
+        ownerHandle=d.get("ownerHandle", ""),
+        ownerDisplayName=d.get("ownerDisplayName", ""),
         availabilitySlotDocument=d.get("availabilitySlotDocument", "")
     )
 
+def _check_overlappingGroups(userData: dict, groupData: dict):
+    joinedGroups = userData.get("joinedStudyGroups", "")
+    newStartTime = convert_to_utc_datetime(groupData["date"], groupData["startTime"])
+    newEndTime = convert_to_utc_datetime(groupData["date"], groupData["endTime"])
+    for key, value in joinedGroups.items():
+        groupStartTime = convert_to_utc_datetime(value["date"], value["startTime"])
+        groupEndTime = convert_to_utc_datetime(value["date"], value["endTime"])
+        if not (newEndTime <= groupStartTime or newStartTime >= groupEndTime):
+            raise HTTPException(status_code=409, detail="Time overlap exists with joined Study Groups")
+
 
 @firestore.transactional
-def _create_group_transaction(transaction, newGroupRef, data):
-    # READ User's joined study groups
-    # Ensure no overlapping times
+def _create_group_transaction(transaction, userRef, newGroupRef, data):
+    user_doc = userRef.get(transaction=transaction)
+    if user_doc.exists:
+        user_dict = user_doc.to_dict()
+    else:
+        raise HTTPException(status_code=404, detail="Study Group Owner not found")
+    _check_overlappingGroups(user_dict, data)
+
+    groupID = newGroupRef.id
     transaction.set(newGroupRef, data)
-    # UPDATE User's joined study groups
+    transaction.update(userRef, {
+        "joinedStudyGroupIds": firestore.ArrayUnion([groupID]),
+        f"joinedStudyGroups.{groupID}": {"name": data["name"],
+                                        "startTime": data["startTime"],
+                                        "endTime": data["endTime"],
+                                        "date": data["date"] }
+    })
+    # possibly ADD: INCREMENENT studyGroupCount in availabilitySlots doc
 
 @firestore.transactional
-def _update_group_transaction(transaction, studyGroupRef, updates_data):
-    doc_dict = studyGroupRef.get(transaction=transaction).to_dict()
+def _add_groupMember_transaction(transaction, groupRef, userRef):
+    group_dict = groupRef.get(transaction=transaction).to_dict() or {}
+    transaction.update(groupRef, {"members": firestore.ArrayUnion([userRef.id]),
+                                  "quantity": firestore.Increment(1)})
+    transaction.update(userRef, {
+        "joinedStudyGroupIds": firestore.ArrayUnion([groupRef.id]),
+        f"joinedStudyGroups.{groupRef.id}": {"name": group_dict.get("name", ""),
+                                             "startTime": group_dict.get("startTime", ""),
+                                             "endTime": group_dict.get("endTime", ""),
+                                             "date": group_dict.get("date", "")}
+                                        
+    })
+    # possibly ADD: INCREMENT projectedMembers in availabilitySlot doc
+    # ADD: DELETE incoming_request doc associated with this user and studygroup
 
-    if any(key in updates_data for key in ["date", "startTime", "endTime"]):   # Manages Time Updates
-        date = updates_data["date"] if "date" in updates_data else doc_dict["date"]
-        startTime = updates_data["startTime"] if "startTime" in updates_data else doc_dict["startTime"]
-        endTime = updates_data["endTime"] if "endTime" in updates_data else doc_dict["endTime"]
-        updates_data["expireAt"] = convert_to_utc_datetime(date, endTime) # update expireAt field in case date or endTime changes
-        # READ User's joined study groups
-        # Ensure no overlapping times
-        # UPDATE all applicable User's joined study groups
-        # UPDATE incoming_requests documents 'expireAt' field
+@firestore.transactional
+def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, usersQuery):
+    user_docs = usersQuery.get(transaction=transaction)
+    doc = studyGroupRef.get(transaction=transaction)
+    if doc.exists:
+        originalGroupDict = doc.to_dict()
+    else:
+        raise HTTPException(status_code=404, detail="Study Group doc not found")
+    
+    user_groupUpdates = {"name": originalGroupDict["name"], "startTime": originalGroupDict["startTime"], 
+                        "endTime": originalGroupDict["endTime"], "date": originalGroupDict["date"]}
+
+    if any(key in updates_data for key in ["date", "startTime", "endTime"]):   # Any time changes
+        user_groupUpdates = {
+            field: updates_data.get(field, originalGroupDict.get(field))
+            for field in ["date", "startTime", "endTime"]
+        }
+        updates_data["expireAt"] = convert_to_utc_datetime(user_groupUpdates["date"], user_groupUpdates["endTime"]) # update expireAt field in case date or endTime changes
+        # ADD: READ Owner's joined study groups + Ensure no overlapping times
+        # ADD: UPDATE all applicable incoming_requests documents 'expireAt' field
     
     if "name" in updates_data:
-        # UPDATE all applicable incoming requests documents
-        # UPDATE all applicable User's joined study groups
-        print("updating...")
+        # ADD: UPDATE all applicable incoming_requests documents 'studyGroupName' field
+        user_groupUpdates.update({"name": updates_data["name"]})
     
     if "availabilitySlotDocument" in updates_data:
-        # DECREMENT quantity in old availabilitySlots?
-        # INCREMENT quantity in new availabilitySlots?
+        # possibly ADD: DECREMENT studygroup count in old availabilitySlots doc
+        # possibly ADD: INCREMENT studygroup count in new availabilitySlots doc
         print("updating...")
     
-    transaction.update(studyGroupRef, updates_data)   #Updates StudyGroup Doc
+    transaction.update(studyGroupRef, updates_data)   # Updates StudyGroup Doc
+    if any(key in updates_data for key in ["date", "startTime", "endTime", "name"]): # Only update users if necessary
+        for doc in user_docs:
+            transaction.update(doc.reference, {f"joinedStudyGroups.{studyGroupRef.id}": user_groupUpdates})
 
 @firestore.transactional
-def _delete_group_transaction(transaction, studyGroupRef):
-    # DELETE study group from applicable User documents (joinedStudyGroups)
-    # DELETE incoming_requests documents related to study group (collection group query)
-    # DECREMENT quantity in study group's related availabilitySlotDoc?
-    transaction.delete(studyGroupRef)
+def _delete_groupMember_transaction(transaction, groupRef, userRef):
+    transaction.update(groupRef, {"members": firestore.ArrayRemove([userRef.id]),
+                                 "quantity": firestore.Increment(-1)})
+
+    transaction.update(userRef, {
+        "joinedStudyGroupIds": firestore.ArrayRemove([groupRef.id]),
+        f"joinedStudyGroups.{groupRef.id}": firestore.DELETE_FIELD
+    })
+    # possibly ADD: DECREMENT projectedMembers in availabilitySlot doc
+    
+
+
+@firestore.transactional
+def _delete_group_transaction(transaction, groupRef, usersQuery):
+    user_docs = usersQuery.get(transaction=transaction)
+    for doc in user_docs:
+        transaction.update(doc.reference, {
+            "joinedStudyGroupIds": firestore.ArrayRemove([groupRef.id]),
+            f"joinedStudyGroups.{groupRef.id}": firestore.DELETE_FIELD})
+    # ADD: DELETE all applicable incoming_requests docs associated with study group (collection group query)
+    # possibly ADD: DECREMENT studygroup count in availabilitySlot doc
+    transaction.delete(groupRef)
 
 
 #ADD dependendency: get User
@@ -78,14 +147,22 @@ def create_group(group: StudyGroupCreate):
         col = db.collection(COLLECTION)
         transaction = db.transaction()
 
+        
+        uid = "INSERT_USER_ID" #eventually REPLACE with User ID from client
+        userRef = db.collection(USER_COLLECTION).document(uid)
+        userDoc = userRef.get().to_dict() or {}
+
         newGroupRef = col.document() # creates studyGroup doc ref + auto-ID
         data = group.model_dump()
-        data.update({"id": newGroupRef.id,  # ADD owner fields + members 
+        data.update({"id": newGroupRef.id,  
                      "quantity": 1, 
+                     "ownerID": userRef.id,
+                     "ownerHandle": userDoc.get("handle", ""),
+                     "ownerDisplayName": userDoc.get("displayName", ""),
+                     "members": [userRef.id],
                      "expireAt":convert_to_utc_datetime(data["date"], data["endTime"]) })
         
-        _create_group_transaction(transaction, newGroupRef, data)
-        #INCREMENENT availabilityslots?
+        _create_group_transaction(transaction, userRef, newGroupRef, data)
         
     except Exception as e:
         # Surface exact failure in response while we debug
@@ -95,13 +172,17 @@ def create_group(group: StudyGroupCreate):
 #                    + ensure User being added is not already a member
 @router.post("/{group_id}/members/{user_id}")
 def add_group_member(group_id: str, user_id: str):
+    """
+    Adding a new member to a study group. Use when Study Group Owner accepts a request to join.
+    """
     try:
         db = get_db()
         col = db.collection(COLLECTION)
+        transaction = db.transaction()
+
         groupRef = col.document(group_id)
-        # UPDATE availability slot document for quantity?
-        groupRef.update({"members": firestore.ArrayUnion([user_id])})
-        groupRef.update({"quantity": firestore.Increment(1)})
+        userRef = db.collection(USER_COLLECTION).document(user_id)
+        _add_groupMember_transaction(transaction, groupRef, userRef)
         
     except Exception as e:
         # Surface exact failure in response while we debug
@@ -133,9 +214,10 @@ def update_group(group_id: str, group_update: StudyGroupUpdate):
         col = db.collection(COLLECTION)
         studyGroupRef = col.document(group_id)
         groupUpdates_dict = group_update.model_dump(exclude_unset=True)
+        usersQuery = db.collection(USER_COLLECTION).where(filter=FieldFilter("joinedStudyGroupIds", "array_contains", group_id))
 
         transaction = db.transaction()
-        _update_group_transaction(transaction, studyGroupRef, groupUpdates_dict)
+        _update_group_transaction(transaction, studyGroupRef, groupUpdates_dict, usersQuery)
 
     except Exception as e:
         # Surface exact failure in response while we debug
@@ -145,13 +227,17 @@ def update_group(group_id: str, group_update: StudyGroupUpdate):
 # ADD dependency: get User + ensure User is member of study group
 @router.delete("/{group_id}/members/{user_id}")
 def delete_group_member(group_id: str, user_id: str):
+    """
+    Deleting a member from a study group. Use when User decides to leave a study group.
+    """
     try:
         db = get_db()
         col = db.collection(COLLECTION)
+        transaction = db.transaction()
+
         groupRef = col.document(group_id)
-        # UPDATE availability slot document for quantity?
-        groupRef.update({"members": firestore.ArrayRemove([user_id])})
-        groupRef.update({"quantity": firestore.Increment(-1)})
+        userRef = db.collection(USER_COLLECTION).document(user_id)
+        _delete_groupMember_transaction(transaction, groupRef, userRef)
         
     except Exception as e:
         # Surface exact failure in response while we debug
@@ -165,7 +251,8 @@ def delete_group(group_id: str):
         col = db.collection(COLLECTION)
         transaction = db.transaction()
         groupRef = col.document(group_id)
-        _delete_group_transaction(transaction, groupRef)
+        usersQuery = db.collection(USER_COLLECTION).where(filter=FieldFilter("joinedStudyGroupIds", "array_contains", group_id))
+        _delete_group_transaction(transaction, groupRef, usersQuery)
 
     except Exception as e:
         # Surface exact failure in response while we debug

@@ -37,7 +37,9 @@ class StudyGroupPublicResponse(BaseModel):
     endTime: str
     name: str
     quantity: int
-    # ADD owner fields
+    ownerID: str
+    ownerHandle: str
+    ownerDisplayName: str
     availabilitySlotDocument: str
 
 # Response model for getting a Study Group (where user is a member)
@@ -50,7 +52,9 @@ class StudyGroupPrivateResponse(BaseModel):
     endTime: str
     name: str
     quantity: int
-    # ADD owner fields
+    ownerID: str
+    ownerHandle: str
+    ownerDisplayName: str
     members: list[str]  #List of User IDs
     availabilitySlotDocument: str
 
