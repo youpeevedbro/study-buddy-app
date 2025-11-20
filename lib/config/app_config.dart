@@ -43,10 +43,11 @@ class AppConfig {
     );
 
     // ---- AAD ----
-    aadPostLogoutUrl  = _read(
-      'AAD_POST_LOGOUT_URL',
-      def: 'https://$firebaseProjectId.web.app/signed-out/',
-    );
+    // aadPostLogoutUrl  = _read(
+    //   'AAD_POST_LOGOUT_URL',
+    //   def: 'https://$firebaseProjectId.web.app/signed-out/',
+    // );
+    aadPostLogoutUrl  = _read('AAD_POST_LOGOUT_URL', def: '');
     microsoftTenantId = _read('MICROSOFT_TENANT_ID', def: '');
 
     // ---- App ----
