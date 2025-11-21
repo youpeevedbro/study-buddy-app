@@ -22,4 +22,21 @@ class GroupService {
       body: jsonEncode(group.toJson()),
     );
   }
+
+  Future<List<JoinedGroup>> listMyStudyGroups() async {
+    final uri = Uri.parse("$baseUrl/group/myStudyGroups");
+    final resp = await http.get(uri);
+    
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to retrieve myStudyGroups (${resp.statusCode}): ${resp.body}',
+      );
+    }
+
+    final data = json.decode(resp.body);
+    final List<dynamic> joinedGroups = data["items"];
+    return joinedGroups
+        .map((m) => JoinedGroup.fromJson(m))
+        .toList();
+  }
 }

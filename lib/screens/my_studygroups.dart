@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart';
 import 'addgroup2.dart';
+import '../models/group.dart';
+import '../services/group_service.dart';
+import '../services/api.dart';
 
 class StudyGroup {
   final String name;
@@ -47,7 +50,6 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
     ),
   ];
 
-  int _expandedIndex = -1;
 
   void _navigateToAddGroup() async {
     // Wait for data from AddGroupPage
@@ -160,7 +162,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   padding: const EdgeInsets.all(10),
-                  child: SingleChildScrollView(
+                  child: const Groups(), /*SingleChildScrollView( 
                     child: ExpansionPanelList(
                       elevation: 0,
                       expandedHeaderPadding: EdgeInsets.zero,
@@ -243,13 +245,147 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                         );
                       }).toList(),
                     ),
-                  ),
+                  ),*/
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class Groups extends StatelessWidget {
+  const Groups({super.key});
+  final GroupService _service = const GroupService();
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Container(
+        child: FutureBuilder<List<JoinedGroup>>(
+          future: _service.listMyStudyGroups(),
+          //future: Api.listMyStudyGroups(),
+          builder: (BuildContext context, AsyncSnapshot<List<JoinedGroup>> snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (snap.hasError) {
+              return 
+                Text(
+                  'Error: ${snap.error}',
+                  style: const TextStyle(height: 1.3),
+                );
+                        
+            }
+            final groups = snap.data ?? [];
+
+            if (groups.isEmpty) {
+              return const Padding(
+                  padding: EdgeInsets.all(30),
+                  child: Center(child: Text('You currently do not have any joined study groups')),
+                );
+            }
+
+            return GroupPanels(groups: groups);
+          }
+        ),
+      ),
+    );
+  }
+}
+
+
+class GroupPanels extends StatefulWidget {
+  final List<JoinedGroup> groups;
+  const GroupPanels({super.key, required this.groups});
+
+  @override
+  State<GroupPanels> createState() => _GroupPanelsState(groups: groups);
+}
+
+
+class _GroupPanelsState extends State<GroupPanels> {
+  final List<JoinedGroup> _groups;
+  _GroupPanelsState({required List<JoinedGroup> groups}) : _groups = groups;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ExpansionPanelList(
+      expansionCallback: (int panelIndex, bool isExpanded) {
+        setState(() {
+          _groups[panelIndex].isExpanded = isExpanded;
+        });
+      },
+      children: _groups.map<ExpansionPanel>((JoinedGroup group) {
+        return ExpansionPanel(
+          canTapOnHeader: true,
+          backgroundColor: const Color(0xFFFCF6DB),
+          headerBuilder: (BuildContext context, bool isExpanded) {
+            return ListTile(
+              //title: Text(group.name),
+              title: Center(
+                child: Text(
+                  group.name,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    //fontStyle: FontStyle.italic,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isExpanded
+                        ? theme.primaryColor
+                        : Colors.black,
+                  ),
+                ),
+              ),
+            );
+          },
+          body: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(20),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Location: ___",
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Text("Date: ${group.date}",
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  Text(
+                      "Time: ${group.startTime} - ${group.endTime}",
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+          isExpanded: group.isExpanded,
+        );
+      }).toList(),
     );
   }
 }

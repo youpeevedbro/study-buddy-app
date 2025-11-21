@@ -62,3 +62,32 @@ class Group {
     };
   }
 }
+
+class JoinedGroup {
+  final String id;
+  final String name;
+  final String startTime;
+  final String endTime;
+  final String date;
+  bool isExpanded;
+
+  JoinedGroup({
+    required this.id,
+    required this.name,
+    required this.startTime,
+    required this.endTime,
+    required this.date,
+    this.isExpanded = false
+  });
+
+
+  factory JoinedGroup.fromJson(Map<String, dynamic> json) {
+    return JoinedGroup(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      startTime: json['startTime'] as String,
+      endTime: json['endTime'] as String,
+      date: json['date'] as String,
+    );
+  }
+}
