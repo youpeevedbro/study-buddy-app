@@ -10,7 +10,7 @@ import firebase_admin
 from firebase_admin import credentials
 
 from routers import rooms
-from routers import addgroup
+from routers import addgroup, groups
 from auth import verify_firebase_token  # use shared auth helper
 
 # --------------------------------------------------------------------
@@ -79,6 +79,13 @@ app.include_router(
     addgroup.router,
     prefix="/groups",
     tags=["groups"],
+)
+
+app.include_router(
+    groups.router,
+    prefix="/group",
+    tags=["group"],
+    #dependencies=[Depends(verify_firebase_token)],
 )
 
 # --------------------------------------------------------------------

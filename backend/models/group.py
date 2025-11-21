@@ -1,3 +1,4 @@
+from typing import List
 from pydantic import BaseModel
 
 # Request model for creating a Study Group
@@ -67,6 +68,16 @@ class StudyGroupUpdate(BaseModel):
     endTime: str | None = None
     name: str | None = None
     availabilitySlotDocument: str | None = None
+
+class JoinedStudyGroup(BaseModel):
+    id: str
+    name: str
+    startTime: str
+    endTime: str
+    date: str
+
+class JoinedStudyGroupResponse(BaseModel):
+    items: List[JoinedStudyGroup]
 
 
 

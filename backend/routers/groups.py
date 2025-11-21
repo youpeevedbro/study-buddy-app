@@ -1,13 +1,16 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupUpdate
+from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from auth import verify_firebase_token
 
 router = APIRouter()
 COLLECTION = "studyGroups"
 USER_COLLECTION = "users"
+UID = input("Enter User ID: ") # TEMPORARY 
 
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
@@ -33,7 +36,7 @@ def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse:
     )
 
 def _check_overlappingGroups(userData: dict, groupData: dict):
-    joinedGroups = userData.get("joinedStudyGroups", "")
+    joinedGroups = userData.get("joinedStudyGroups", {})
     newStartTime = convert_to_utc_datetime(groupData["date"], groupData["startTime"])
     newEndTime = convert_to_utc_datetime(groupData["date"], groupData["endTime"])
     for key, value in joinedGroups.items():
@@ -92,10 +95,11 @@ def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, us
                         "endTime": originalGroupDict["endTime"], "date": originalGroupDict["date"]}
 
     if any(key in updates_data for key in ["date", "startTime", "endTime"]):   # Any time changes
-        user_groupUpdates = {
+        user_groupTimeUpdates = {
             field: updates_data.get(field, originalGroupDict.get(field))
             for field in ["date", "startTime", "endTime"]
         }
+        user_groupUpdates.update(user_groupTimeUpdates)
         updates_data["expireAt"] = convert_to_utc_datetime(user_groupUpdates["date"], user_groupUpdates["endTime"]) # update expireAt field in case date or endTime changes
         # ADD: READ Owner's joined study groups + Ensure no overlapping times
         # ADD: UPDATE all applicable incoming_requests documents 'expireAt' field
@@ -148,7 +152,7 @@ def create_group(group: StudyGroupCreate):
         transaction = db.transaction()
 
         
-        uid = "INSERT_USER_ID" #eventually REPLACE with User ID from client
+        uid = UID # Eventually replace with uid from client
         userRef = db.collection(USER_COLLECTION).document(uid)
         userDoc = userRef.get().to_dict() or {}
 
@@ -188,6 +192,41 @@ def add_group_member(group_id: str, user_id: str):
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
+# ADD dependency: get User
+@router.get("/myStudyGroups")
+#def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedStudyGroupResponse:
+def get_joined_groups() -> JoinedStudyGroupResponse:
+    try:
+
+        uid = UID # Eventually replace with uid from client
+
+        db = get_db()
+        col = db.collection(USER_COLLECTION)
+        doc = col.document(uid).get()
+        items: List[JoinedStudyGroup] = []
+        if doc.exists:
+            user_dict = doc.to_dict()
+            joinedGroups = user_dict.get("joinedStudyGroups", {})
+            for key, value in joinedGroups.items():
+                groupEndTime = convert_to_utc_datetime(value["date"], value["endTime"])
+                if groupEndTime < datetime.now(timezone.utc):
+                    continue   # do not send past study groups
+                items.append(
+                    JoinedStudyGroup(
+                        id = key,
+                        name = value.get("name", ""),
+                        startTime = value.get("startTime", ""),
+                        endTime = value.get("endTime", ""),
+                        date = value.get("date", "")
+                ))
+            items.sort(key=lambda item: convert_to_utc_datetime(item.date, item.startTime))
+            return JoinedStudyGroupResponse(items=items)
+        else:
+            raise HTTPException(status_code=404, detail="User doc not found")
+    except Exception as e:
+        # Surface exact failure in response while we debug
+        raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
+
 
 
 # ADD dependency: get User
