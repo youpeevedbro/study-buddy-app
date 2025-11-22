@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List
+from typing import List, Union
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup
+from google.cloud.firestore_v1.field_path import FieldPath
+from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from auth import verify_firebase_token
@@ -23,15 +24,33 @@ def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse:
     return StudyGroupPublicResponse(
         id=d.get("id", ""),
         buildingCode=d.get("buildingCode", ""),
-        roomNumber=d.get("roomNumber", ""),
+        roomNumber=str(d.get("roomNumber", "")),
         date=d.get("date", ""),
         startTime=d.get("startTime", ""),
         endTime=d.get("endTime", ""),
         name=d.get("name", ""),
-        quantity=d.get("quantity", ""),
+        quantity=int(d.get("quantity", 0)),
         ownerID=d.get("ownerID", ""),
         ownerHandle=d.get("ownerHandle", ""),
         ownerDisplayName=d.get("ownerDisplayName", ""),
+        availabilitySlotDocument=d.get("availabilitySlotDocument", "")
+    )
+
+def _doc_to_privateStudyGroup(doc, members) -> StudyGroupPrivateResponse: 
+    d = doc.to_dict()
+    return StudyGroupPrivateResponse(
+        id=d.get("id", ""),
+        buildingCode=d.get("buildingCode", ""),
+        roomNumber=str(d.get("roomNumber", "")),
+        date=d.get("date", ""),
+        startTime=d.get("startTime", ""),
+        endTime=d.get("endTime", ""),
+        name=d.get("name", ""),
+        quantity=int(d.get("quantity", 0)),
+        ownerID=d.get("ownerID", ""),
+        ownerHandle=d.get("ownerHandle", ""),
+        ownerDisplayName=d.get("ownerDisplayName", ""),
+        members=members,
         availabilitySlotDocument=d.get("availabilitySlotDocument", "")
     )
 
@@ -45,6 +64,11 @@ def _check_overlappingGroups(userData: dict, groupData: dict):
         if not (newEndTime <= groupStartTime or newStartTime >= groupEndTime):
             raise HTTPException(status_code=409, detail="Time overlap exists with joined Study Groups")
 
+def _check_user_groupMembership(uid: str, groupData: dict):
+    if uid in groupData.get("members", []):
+        return True
+    else:
+        return False
 
 @firestore.transactional
 def _create_group_transaction(transaction, userRef, newGroupRef, data):
@@ -230,13 +254,25 @@ def get_joined_groups() -> JoinedStudyGroupResponse:
 
 
 # ADD dependency: get User
-@router.get("/{group_id}") 
-def get_group(group_id: str) -> StudyGroupPublicResponse:
+@router.get("/{group_id}", response_model=Union[StudyGroupPrivateResponse, StudyGroupPublicResponse]) 
+def get_group(group_id: str):
     try:
+
+        uid = UID # Eventually replace with uid from client
+
         db = get_db()
         col = db.collection(COLLECTION)
         doc = col.document(group_id).get()
         if doc.exists:
+            group_dict = doc.to_dict()
+            if _check_user_groupMembership(uid, group_dict): #true when user is member of group
+                members = []
+                member_ids = group_dict.get("members", [])
+                member_docs = db.collection(USER_COLLECTION).where(FieldPath.document_id(), "in", member_ids).get() #only up to 30 members
+                for user_doc in member_docs:
+                    members.append(user_doc.to_dict().get("displayName", ""))
+
+                return _doc_to_privateStudyGroup(doc, members)  
             return _doc_to_publicStudyGroup(doc)
         else:
             raise HTTPException(status_code=404, detail="Study Group not found")

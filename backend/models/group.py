@@ -32,7 +32,7 @@ class StudyGroupCreate(BaseModel):
 class StudyGroupPublicResponse(BaseModel):
     id: str
     buildingCode: str
-    roomNumber: int
+    roomNumber: str
     date: str
     startTime: str
     endTime: str
@@ -47,7 +47,7 @@ class StudyGroupPublicResponse(BaseModel):
 class StudyGroupPrivateResponse(BaseModel):
     id: str
     buildingCode: str
-    roomNumber: int
+    roomNumber: str
     date: str
     startTime: str
     endTime: str
@@ -56,7 +56,7 @@ class StudyGroupPrivateResponse(BaseModel):
     ownerID: str
     ownerHandle: str
     ownerDisplayName: str
-    members: list[str]  #List of User IDs
+    members: List[str]  #List of Member Display Names
     availabilitySlotDocument: str
 
 # Request model for updating a Study Group

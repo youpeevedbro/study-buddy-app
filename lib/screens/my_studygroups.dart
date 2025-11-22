@@ -280,7 +280,7 @@ class Groups extends StatelessWidget {
                   'Error: ${snap.error}',
                   style: const TextStyle(height: 1.3),
                 );
-                        
+        
             }
             final groups = snap.data ?? [];
 
@@ -311,6 +311,7 @@ class GroupPanels extends StatefulWidget {
 
 class _GroupPanelsState extends State<GroupPanels> {
   final List<JoinedGroup> _groups;
+  final GroupService _service = const GroupService();
   _GroupPanelsState({required List<JoinedGroup> groups}) : _groups = groups;
 
   @override
@@ -328,61 +329,90 @@ class _GroupPanelsState extends State<GroupPanels> {
           backgroundColor: const Color(0xFFFCF6DB),
           headerBuilder: (BuildContext context, bool isExpanded) {
             return ListTile(
-              //title: Text(group.name),
-              title: Center(
-                child: Text(
-                  group.name,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    //fontStyle: FontStyle.italic,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: isExpanded
-                        ? theme.primaryColor
-                        : Colors.black,
-                  ),
-                ),
+              title: Text(
+                group.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isExpanded
+                    ? theme.primaryColor
+                    : Colors.black,
+                )
               ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    group.date,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600
+                    )),
+                  Text('${group.startTime} - ${group.endTime}')
+                ],
+              )
             );
           },
-          body: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(20),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Location: ___",
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Text("Date: ${group.date}",
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
+          body: group.isExpanded
+            ? FutureBuilder(
+            future: _service.getStudyGroup(group.id),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snap.hasError) {
+                return 
                   Text(
-                      "Time: ${group.startTime} - ${group.endTime}",
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ),
+                    'Error: ${snap.error}',
+                    style: const TextStyle(height: 1.3),
+                  ); 
+              }
+              final groupResponse = snap.data!;
+              return Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(20),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Location: ${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text("Owner: ${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text(
+                          "${groupResponse.quantity} members: ${groupResponse.members}",
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              );
+            }
+          )
+          : Container(),
           isExpanded: group.isExpanded,
         );
       }).toList(),

@@ -39,4 +39,18 @@ class GroupService {
         .map((m) => JoinedGroup.fromJson(m))
         .toList();
   }
+
+  Future<StudyGroupResponse> getStudyGroup(id) async {
+    final uri = Uri.parse("$baseUrl/group/$id");
+    final resp = await http.get(uri);
+    
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to retrieve StudyGroups (${resp.statusCode}): ${resp.body}',
+      );
+    }
+
+    final data = json.decode(resp.body);
+    return StudyGroupResponse.fromJson(data);
+  }
 }

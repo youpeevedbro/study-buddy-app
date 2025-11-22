@@ -63,6 +63,77 @@ class Group {
   }
 }
 
+class StudyGroupResponse {
+  final String id;
+  final String buildingCode;
+  final String roomNumber;
+  final String date;
+  final String startTime;
+  final String endTime;
+  final String name;
+  final int quantity;
+  final String ownerID;
+  final String ownerHandle;
+  final String ownerDisplayName;
+  final List<String>? members;  
+  final String availabilitySlotDoc;
+
+  StudyGroupResponse({
+    required this.id,
+    required this.buildingCode,
+    required this.roomNumber,
+    required this.date,
+    required this.startTime,
+    required this.endTime,
+    required this.name,
+    required this.quantity,
+    required this.ownerID,
+    required this.ownerHandle,
+    required this.ownerDisplayName,
+    this.members,
+    required this.availabilitySlotDoc
+  });
+
+  factory StudyGroupResponse.fromJson(Map<String, dynamic> json) {
+    if (json.containsKey('members')) {
+      final List<dynamic> list = json["members"];
+      final List<String> memberslist = list.cast<String>();
+
+      return StudyGroupResponse(
+      id: json['id'] as String,
+      buildingCode: json['buildingCode'] as String,
+      roomNumber: json['roomNumber'] as String,
+      date: json['date'] as String,
+      startTime: json['startTime'] as String,
+      endTime: json['endTime'] as String,
+      name: json['name'] as String,
+      quantity: json['quantity'] as int,
+      ownerID: json['ownerID'] as String,
+      ownerHandle: json['ownerHandle'] as String,
+      ownerDisplayName: json['ownerDisplayName'] as String,
+      members: memberslist,
+      availabilitySlotDoc: json['availabilitySlotDocument'] as String,
+    );
+    }
+    return StudyGroupResponse(    // does not include members field
+      id: json['id'] as String,
+      buildingCode: json['buildingCode'] as String,
+      roomNumber: json['roomNumber'] as String,
+      date: json['date'] as String,
+      startTime: json['startTime'] as String,
+      endTime: json['endTime'] as String,
+      name: json['name'] as String,
+      quantity: json['quantity'] as int,
+      ownerID: json['ownerID'] as String,
+      ownerHandle: json['ownerHandle'] as String,
+      ownerDisplayName: json['ownerDisplayName'] as String,
+      availabilitySlotDoc: json['availabilitySlotDocument'] as String,
+    );
+  }
+
+}
+
+
 class JoinedGroup {
   final String id;
   final String name;
