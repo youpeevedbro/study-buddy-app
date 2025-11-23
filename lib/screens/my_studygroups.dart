@@ -154,7 +154,6 @@ class _GroupsState extends State<Groups> {
   final GroupService _service = const GroupService();
   late Future<List<JoinedGroup>> _futureGroups;
 
-  //late Future<List<JoinedGroup>> _futureGroups;
   @override
   void initState() {
     super.initState();
@@ -222,6 +221,7 @@ class GroupPanels extends StatefulWidget {
 
 class _GroupPanelsState extends State<GroupPanels> {
   bool _isDeleting = false;
+  bool _isLeaving = false;
   late List<JoinedGroup> _groups;
   late VoidCallback _onReloadNeeded;
   final GroupService _service = const GroupService();
@@ -255,7 +255,6 @@ class _GroupPanelsState extends State<GroupPanels> {
             ElevatedButton(
               onPressed: _isDeleting ? null : () { 
                 _handleDelete(groupID);
-                //_onReloadNeeded();
                 },
               child: _isDeleting
               ? SizedBox(
@@ -296,6 +295,66 @@ class _GroupPanelsState extends State<GroupPanels> {
       }
     } finally {
       if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+
+  Future<void> _showLeaveConfirmationDialog(BuildContext context, String groupID) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Are you sure you want to leave this Study Group?'),
+          content: const Text('After leaving, you will have to send another request if you wish to rejoin this group.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            ElevatedButton(
+              onPressed: _isLeaving ? null : () { 
+                _handleLeaving(groupID);
+                },
+              child: _isLeaving
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                ),
+              ) : Text("Leave")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleLeaving(String groupID) async {
+    setState(() {
+      _isLeaving = true;
+    });
+
+    try {
+      await _service.leaveStudyGroup(groupID); 
+      _onReloadNeeded();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully left Study Group')),
+      );
+      if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+      }
+    } catch(e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLeaving = false);
     }
   }
 
@@ -428,7 +487,7 @@ class _GroupPanelsState extends State<GroupPanels> {
                         Align(
                           alignment: Alignment.bottomRight,
                           child: ElevatedButton(
-                            onPressed: (){}, 
+                            onPressed: () => _showLeaveConfirmationDialog(context, groupResponse.id), 
                             style: ElevatedButton.styleFrom(
                               backgroundColor: theme.colorScheme.error,
                               foregroundColor: theme.colorScheme.onError,

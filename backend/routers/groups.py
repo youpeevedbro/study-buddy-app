@@ -11,7 +11,8 @@ from auth import verify_firebase_token
 router = APIRouter()
 COLLECTION = "studyGroups"
 USER_COLLECTION = "users"
-UID = input("Enter User ID: ") # TEMPORARY 
+
+UID = input("\nEnter User ID: ") # TEMPORARY 
 
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
@@ -60,17 +61,22 @@ def _check_overlappingGroups(userData: dict, groupData: dict):
     joinedGroups = userData.get("joinedStudyGroups", {})
     newStartTime = convert_to_utc_datetime(groupData["date"], groupData["startTime"])
     newEndTime = convert_to_utc_datetime(groupData["date"], groupData["endTime"])
+
     for key, value in joinedGroups.items():
         groupStartTime = convert_to_utc_datetime(value["date"], value["startTime"])
         groupEndTime = convert_to_utc_datetime(value["date"], value["endTime"])
+
         if not (newEndTime <= groupStartTime or newStartTime >= groupEndTime):
             raise HTTPException(status_code=409, detail="Time overlap exists with joined Study Groups")
 
-def _check_user_groupMembership(uid: str, groupData: dict):
-    if uid in groupData.get("members", []):
-        return True
+
+def _get_user_groupRole(uid: str, groupData: dict) -> UserGroupRole:
+    if uid == groupData.get("ownerID", ""):
+        return UserGroupRole.OWNER
+    elif uid in groupData.get("members", []):
+        return UserGroupRole.MEMBER
     else:
-        return False
+        return UserGroupRole.PUBLIC
 
 @firestore.transactional
 def _create_group_transaction(transaction, userRef, newGroupRef, data):
@@ -256,7 +262,9 @@ def get_joined_groups() -> JoinedStudyGroupResponse:
 
 
 # ADD dependency: get User
-@router.get("/{group_id}", response_model=Union[StudyGroupPrivateResponse, StudyGroupPublicResponse]) 
+@router.get("/{group_id}", 
+            response_model=Union[StudyGroupPrivateResponse, StudyGroupPublicResponse]
+) 
 def get_group(group_id: str):
     try:
 
@@ -268,11 +276,9 @@ def get_group(group_id: str):
       
         if doc.exists:
             group_dict = doc.to_dict()
-            if _check_user_groupMembership(uid, group_dict):  # true when user is member of group
-                if uid == group_dict.get("ownerID", ""):
-                    access = UserGroupRole.OWNER
-                else:
-                    access = UserGroupRole.MEMBER
+            user_role = _get_user_groupRole(uid, group_dict)
+            
+            if user_role == UserGroupRole.MEMBER or user_role == UserGroupRole.OWNER:
 
                 members = []
                 member_ids = group_dict.get("members", [])
@@ -280,13 +286,13 @@ def get_group(group_id: str):
                 for user_doc in member_docs:
                     members.append(user_doc.to_dict().get("displayName", ""))
             
-
-                return _doc_to_privateStudyGroup(doc, members, access)  
+                return _doc_to_privateStudyGroup(doc, members, user_role)  
             
             return _doc_to_publicStudyGroup(doc)
         else:
             raise HTTPException(status_code=404, detail="Study Group not found")
-    except HTTPException as e:
+        
+    except HTTPException as e: # front end catches 404 error when using this endpoint
         if e.status_code == 404:
             raise e
     except Exception as e:
@@ -313,19 +319,29 @@ def update_group(group_id: str, group_update: StudyGroupUpdate):
     
 
 # ADD dependency: get User + ensure User is member of study group
-@router.delete("/{group_id}/members/{user_id}")
-def delete_group_member(group_id: str, user_id: str):
+@router.delete("/{group_id}/members/currentUser")
+def delete_group_member(group_id: str):
     """
     Deleting a member from a study group. Use when User decides to leave a study group.
     """
     try:
+
+        uid = UID # REPLACE WITH UID FROM CLIENT
+
         db = get_db()
         col = db.collection(COLLECTION)
         transaction = db.transaction()
 
         groupRef = col.document(group_id)
-        userRef = db.collection(USER_COLLECTION).document(user_id)
-        _delete_groupMember_transaction(transaction, groupRef, userRef)
+        groupDoc = groupRef.get()
+        userRef = db.collection(USER_COLLECTION).document(uid)
+
+        if groupDoc.exists:
+            user_role = _get_user_groupRole(uid, groupDoc.to_dict())
+            if user_role == UserGroupRole.OWNER:
+                raise HTTPException(status_code=403, detail=f"Study Group Owners cannot leave groups they have created. Must delete instead.")
+            if user_role == UserGroupRole.MEMBER:
+                _delete_groupMember_transaction(transaction, groupRef, userRef)
         
     except Exception as e:
         # Surface exact failure in response while we debug

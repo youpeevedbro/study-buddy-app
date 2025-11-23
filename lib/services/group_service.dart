@@ -60,6 +60,17 @@ class GroupService {
     return StudyGroupResponse.fromJson(data);
   }
 
+  Future<void> leaveStudyGroup(groupId) async {
+    final uri = Uri.parse("$baseUrl/group/$groupId/members/currentUser");
+    final resp = await http.delete(uri);
+    
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to leave StudyGroup (${resp.statusCode}): ${resp.body}',
+      );
+    }
+  }
+
   Future<void> deleteStudyGroup(id) async {
     final uri = Uri.parse("$baseUrl/group/$id");
     final resp = await http.delete(uri);

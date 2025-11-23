@@ -72,7 +72,7 @@ class StudyGroupResponse {
   final String endTime;
   final String name;
   final int quantity;
-  final String access;
+  final String access; // 'owner', 'member', or 'public'
   final String ownerID;
   final String ownerHandle;
   final String ownerDisplayName;
