@@ -117,7 +117,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
         ],
       ),
     );
-}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -231,46 +231,23 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.edit, color: theme.primaryColor),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Edit Account",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: theme.primaryColor,
+                  child: Transform.translate( //transform was needed to align icon+text better
+                    offset: const Offset(-10, 0), // ← adjust this number to shift the button LEFT/RIGHT
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.edit, color: theme.primaryColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Edit Account",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: theme.primaryColor,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // Logout
-              InkWell(
-                onTap: _logout,
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.logout, color: theme.primaryColor),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Logout",
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: theme.primaryColor,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -282,13 +259,37 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 width: double.infinity,
                 height: 50,
                 borderRadius: BorderRadius.circular(12.0),
-                onPressed: () => _deleteAccount(context),
+                onPressed: _logout,
                 child: const Text(
-                  'Delete Account',
+                  'Logout',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22.0,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 100),
+
+              // Delete Account
+              InkWell(
+                onTap: () => _deleteAccount(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Delete Account",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.red.shade700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
