@@ -66,16 +66,17 @@ class _UserProfilePageState extends State<UserProfilePage> {
     if (!mounted) return;
 
     // Go back to the root (AuthGate as home); it will show Landing if user == null
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    Navigator.of(context).pushNamedAndRemoveUntil('/landing', (_) => false);
   }
 
-  void _disableAccount(BuildContext context) {
+  void _deleteAccount(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirm Disable"),
+        title: const Text("Delete Account"),
         content: const Text(
-          "Are you sure you want to disable your account?",
+          "This will permanently delete your Study Buddy account and profile data. "
+          "This action cannot be undone. Are you sure?",
         ),
         actions: [
           TextButton(
@@ -88,29 +89,35 @@ class _UserProfilePageState extends State<UserProfilePage> {
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
+              Navigator.of(ctx).pop(); // close confirm dialog first
+
               try {
-                final user = AuthService.instance.currentUser;
-                if (user != null) {
-                  // Soft-disable account in Firestore
-                  await UserService.instance.updateDisableAccount(true);
-                }
-              } catch (_) {
-                // optional: show snackbar
+                // 1) Delete Firestore + Auth user
+                await UserService.instance.deleteCurrentUserAccount();
+
+                // 2) Extra safety: ensure client is fully signed out
+                await AuthService.instance.signOut();
+
+                if (!mounted) return;
+
+                // 3) Clear navigation stack and go to landing/auth gate
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/landing', (_) => false);
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to delete account: $e'),
+                  ),
+                );
               }
-
-              if (!mounted) return;
-              Navigator.of(ctx).pop(); // close confirm dialog
-
-              // Clear navigation stack and go to landing/auth gate
-              Navigator.of(context)
-                  .pushNamedAndRemoveUntil('/landing', (_) => false);
             },
-            child: const Text("Disable"),
+            child: const Text("Delete"),
           ),
         ],
       ),
     );
-  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -270,14 +277,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
               const SizedBox(height: 15),
 
-              // Disable Account Button
+              // Delete Account Button
               GradientButton(
                 width: double.infinity,
                 height: 50,
                 borderRadius: BorderRadius.circular(12.0),
-                onPressed: () => _disableAccount(context),
+                onPressed: () => _deleteAccount(context),
                 child: const Text(
-                  'Disable Account',
+                  'Delete Account',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 22.0,

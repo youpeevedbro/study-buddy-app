@@ -14,7 +14,6 @@ class UserProfile {
 
   final List<String> joinedStudyGroupIds;
 
-  final bool disableAccount;
 
   UserProfile({
     required this.uid,
@@ -26,7 +25,6 @@ class UserProfile {
     required this.checkedInRoomLabel,
     required this.checkedInEnd,
     required this.joinedStudyGroupIds,
-    required this.disableAccount,
   });
 
   factory UserProfile.fromFirestore(String uid, Map<String, dynamic> data) {
@@ -46,7 +44,6 @@ class UserProfile {
       joinedStudyGroupIds:
           List<String>.from(data['joinedStudyGroupIds'] ?? []),
 
-      disableAccount: data['disableAccount'] ?? false,
     );
   }
 

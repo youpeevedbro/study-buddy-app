@@ -75,7 +75,6 @@ class UserService {
       checkedInRoomLabel: null,
       checkedInEnd: null,
       joinedStudyGroupIds: const [],
-      disableAccount: false,
     );
 
     // 3) Write to Firestore
@@ -86,7 +85,6 @@ class UserService {
       'checkedInRoomLabel': profile.checkedInRoomLabel,
       'checkedInEnd': profile.checkedInEnd,
       'joinedStudyGroupIds': profile.joinedStudyGroupIds,
-      'disableAccount': profile.disableAccount,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -128,17 +126,34 @@ class UserService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
-  /// Soft-disable or re-enable the current account.
-  Future<void> updateDisableAccount(bool disabled) async {
+
+  /// Permanently delete the current user's account.
+  /// This will:
+  ///   1. Delete Firestore users/{uid}
+  ///   2. Delete the Firebase Auth user
+  Future<void> deleteCurrentUserAccount() async {
     final user = _auth.currentUser;
     if (user == null) {
       throw StateError('No Firebase user is logged in.');
     }
 
-    await _usersCol.doc(user.uid).update({
-      'disableAccount': disabled,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final uid = user.uid;
+
+    // 1) Delete Firestore profile document
+    await _usersCol.doc(uid).delete();
+
+    // 2) Delete the Firebase Auth user
+    try {
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      // Firebase can require recent login for sensitive actions like delete().
+      if (e.code == 'requires-recent-login') {
+        throw Exception(
+          'For security reasons, please sign out and log in again before deleting your account.',
+        );
+      }
+      rethrow;
+    }
   }
 
   /// Update both displayName and handle for the current user.
@@ -184,6 +199,4 @@ class UserService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
-
-
 }
