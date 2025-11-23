@@ -3,7 +3,7 @@ from typing import List, Union
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.field_path import FieldPath
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup
+from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from auth import verify_firebase_token
@@ -30,13 +30,14 @@ def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse:
         endTime=d.get("endTime", ""),
         name=d.get("name", ""),
         quantity=int(d.get("quantity", 0)),
+        access=UserGroupRole.PUBLIC,
         ownerID=d.get("ownerID", ""),
         ownerHandle=d.get("ownerHandle", ""),
         ownerDisplayName=d.get("ownerDisplayName", ""),
         availabilitySlotDocument=d.get("availabilitySlotDocument", "")
     )
 
-def _doc_to_privateStudyGroup(doc, members) -> StudyGroupPrivateResponse: 
+def _doc_to_privateStudyGroup(doc, members: list[str], access: UserGroupRole) -> StudyGroupPrivateResponse: 
     d = doc.to_dict()
     return StudyGroupPrivateResponse(
         id=d.get("id", ""),
@@ -47,6 +48,7 @@ def _doc_to_privateStudyGroup(doc, members) -> StudyGroupPrivateResponse:
         endTime=d.get("endTime", ""),
         name=d.get("name", ""),
         quantity=int(d.get("quantity", 0)),
+        access=access,
         ownerID=d.get("ownerID", ""),
         ownerHandle=d.get("ownerHandle", ""),
         ownerDisplayName=d.get("ownerDisplayName", ""),
@@ -263,19 +265,30 @@ def get_group(group_id: str):
         db = get_db()
         col = db.collection(COLLECTION)
         doc = col.document(group_id).get()
+      
         if doc.exists:
             group_dict = doc.to_dict()
-            if _check_user_groupMembership(uid, group_dict): #true when user is member of group
+            if _check_user_groupMembership(uid, group_dict):  # true when user is member of group
+                if uid == group_dict.get("ownerID", ""):
+                    access = UserGroupRole.OWNER
+                else:
+                    access = UserGroupRole.MEMBER
+
                 members = []
                 member_ids = group_dict.get("members", [])
                 member_docs = db.collection(USER_COLLECTION).where(FieldPath.document_id(), "in", member_ids).get() #only up to 30 members
                 for user_doc in member_docs:
                     members.append(user_doc.to_dict().get("displayName", ""))
+            
 
-                return _doc_to_privateStudyGroup(doc, members)  
+                return _doc_to_privateStudyGroup(doc, members, access)  
+            
             return _doc_to_publicStudyGroup(doc)
         else:
             raise HTTPException(status_code=404, detail="Study Group not found")
+    except HTTPException as e:
+        if e.status_code == 404:
+            raise e
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")

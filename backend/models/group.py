@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import List
 from pydantic import BaseModel
 
@@ -27,6 +28,11 @@ class StudyGroupCreate(BaseModel):
         }
     }
 
+class UserGroupRole(str, Enum):
+    PUBLIC = "public"
+    MEMBER = "member"
+    OWNER = "owner"
+
 
 # Response model for getting a Study Group (where user is not a member)
 class StudyGroupPublicResponse(BaseModel):
@@ -38,6 +44,7 @@ class StudyGroupPublicResponse(BaseModel):
     endTime: str
     name: str
     quantity: int
+    access: UserGroupRole
     ownerID: str
     ownerHandle: str
     ownerDisplayName: str
@@ -53,6 +60,7 @@ class StudyGroupPrivateResponse(BaseModel):
     endTime: str
     name: str
     quantity: int
+    access: UserGroupRole
     ownerID: str
     ownerHandle: str
     ownerDisplayName: str

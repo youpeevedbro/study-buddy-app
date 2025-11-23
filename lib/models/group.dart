@@ -72,6 +72,7 @@ class StudyGroupResponse {
   final String endTime;
   final String name;
   final int quantity;
+  final String access;
   final String ownerID;
   final String ownerHandle;
   final String ownerDisplayName;
@@ -87,6 +88,7 @@ class StudyGroupResponse {
     required this.endTime,
     required this.name,
     required this.quantity,
+    required this.access,
     required this.ownerID,
     required this.ownerHandle,
     required this.ownerDisplayName,
@@ -108,6 +110,7 @@ class StudyGroupResponse {
       endTime: json['endTime'] as String,
       name: json['name'] as String,
       quantity: json['quantity'] as int,
+      access: json['access'] as String,
       ownerID: json['ownerID'] as String,
       ownerHandle: json['ownerHandle'] as String,
       ownerDisplayName: json['ownerDisplayName'] as String,
@@ -124,6 +127,7 @@ class StudyGroupResponse {
       endTime: json['endTime'] as String,
       name: json['name'] as String,
       quantity: json['quantity'] as int,
+      access: json['access'] as String,
       ownerID: json['ownerID'] as String,
       ownerHandle: json['ownerHandle'] as String,
       ownerDisplayName: json['ownerDisplayName'] as String,
