@@ -96,6 +96,35 @@ class StudyGroupResponse {
     required this.availabilitySlotDoc
   });
 
+  StudyGroupResponse copyWith({
+    String? buildingCode,
+    String? roomNumber,
+    String? date,
+    String? startTime,
+    String? endTime,
+    String? name,
+    String? availabilitySlotDoc
+  }) {
+    return StudyGroupResponse(
+      id: this.id,
+      buildingCode: buildingCode ?? this.buildingCode,
+      roomNumber: roomNumber ?? this.roomNumber,
+      date: date ?? this.date,
+      startTime: startTime ?? this.startTime,
+      endTime: endTime ?? this.endTime,
+      name: name ?? this.name,
+      quantity: this.quantity,
+      access: this.access,
+      ownerID: this.ownerID,
+      ownerHandle: this.ownerHandle,
+      ownerDisplayName: this.ownerDisplayName,
+      members: this.members,
+      availabilitySlotDoc: availabilitySlotDoc ?? this.availabilitySlotDoc
+    );
+  }
+
+  
+
   factory StudyGroupResponse.fromJson(Map<String, dynamic> json) {
     if (json.containsKey('members')) {
       final List<dynamic> list = json["members"];
@@ -135,6 +164,12 @@ class StudyGroupResponse {
     );
   }
 
+  Map<String, dynamic> toJsonForName() {
+    return {
+      'name': name
+    };
+  }
+  
 }
 
 

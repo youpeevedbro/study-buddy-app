@@ -60,6 +60,23 @@ class GroupService {
     return StudyGroupResponse.fromJson(data);
   }
 
+  Future<void> updateStudyGroup(StudyGroupResponse groupUpdated) async {
+    String groupId = groupUpdated.id;
+
+    final uri = Uri.parse("$baseUrl/group/$groupId");
+    final resp = await http.patch(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(groupUpdated.toJsonForName())
+    );
+    
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to update StudyGroup (${resp.statusCode}): ${resp.body}',
+      );
+    }
+  }
+
   Future<void> leaveStudyGroup(groupId) async {
     final uri = Uri.parse("$baseUrl/group/$groupId/members/currentUser");
     final resp = await http.delete(uri);

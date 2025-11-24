@@ -69,13 +69,13 @@ class StudyGroupPrivateResponse(BaseModel):
 
 # Request model for updating a Study Group
 class StudyGroupUpdate(BaseModel):
-    buildingCode: str | None = None
-    roomNumber: int | None = None
-    date: str | None = None
-    startTime: str | None = None
-    endTime: str | None = None
-    name: str | None = None
-    availabilitySlotDocument: str | None = None
+    #buildingCode: str | None = None
+    #roomNumber: int | None = None
+    #date: str | None = None
+    #startTime: str | None = None
+    #endTime: str | None = None
+    name: str 
+    #availabilitySlotDocument: str | None = None
 
 class JoinedStudyGroup(BaseModel):
     id: str

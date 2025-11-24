@@ -118,11 +118,9 @@ def _add_groupMember_transaction(transaction, groupRef, userRef):
 def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, usersQuery):
     user_docs = usersQuery.get(transaction=transaction)
     doc = studyGroupRef.get(transaction=transaction)
-    if doc.exists:
-        originalGroupDict = doc.to_dict()
-    else:
-        raise HTTPException(status_code=404, detail="Study Group doc not found")
-    
+
+    """
+    originalGroupDict = doc.to_dict()
     user_groupUpdates = {"name": originalGroupDict["name"], "startTime": originalGroupDict["startTime"], 
                         "endTime": originalGroupDict["endTime"], "date": originalGroupDict["date"]}
 
@@ -144,11 +142,19 @@ def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, us
         # possibly ADD: DECREMENT studygroup count in old availabilitySlots doc
         # possibly ADD: INCREMENT studygroup count in new availabilitySlots doc
         print("updating...")
+    """
     
     transaction.update(studyGroupRef, updates_data)   # Updates StudyGroup Doc
+    for doc in user_docs: # Updates all applicable User docs
+        transaction.update(doc.reference, {f"joinedStudyGroups.{studyGroupRef.id}.name": updates_data.get("name")} )
+    # ADD: UPDATE all applicable incoming_requests documents 'studyGroupName' field
+
+
+    """
     if any(key in updates_data for key in ["date", "startTime", "endTime", "name"]): # Only update users if necessary
         for doc in user_docs:
             transaction.update(doc.reference, {f"joinedStudyGroups.{studyGroupRef.id}": user_groupUpdates})
+    """
 
 @firestore.transactional
 def _delete_groupMember_transaction(transaction, groupRef, userRef):
@@ -304,9 +310,21 @@ def get_group(group_id: str):
 @router.patch("/{group_id}")
 def update_group(group_id: str, group_update: StudyGroupUpdate):
     try:
+
+        uid = UID # Eventually replace with uid from client
+
         db = get_db()
         col = db.collection(COLLECTION)
         studyGroupRef = col.document(group_id)
+        groupDoc = studyGroupRef.get()
+
+        if not groupDoc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+
+        user_role = _get_user_groupRole(uid, groupDoc.to_dict())
+        if user_role != UserGroupRole.OWNER:
+            raise HTTPException(status_code=403, detail=f"Only Study Group Owners can edit groups")
+
         groupUpdates_dict = group_update.model_dump(exclude_unset=True)
         usersQuery = db.collection(USER_COLLECTION).where(filter=FieldFilter("joinedStudyGroupIds", "array_contains", group_id))
 

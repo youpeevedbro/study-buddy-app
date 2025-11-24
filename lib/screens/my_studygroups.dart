@@ -222,9 +222,13 @@ class GroupPanels extends StatefulWidget {
 class _GroupPanelsState extends State<GroupPanels> {
   bool _isDeleting = false;
   bool _isLeaving = false;
+  bool _isEditing = false;
   late List<JoinedGroup> _groups;
   late VoidCallback _onReloadNeeded;
   final GroupService _service = const GroupService();
+
+   final _formKey = GlobalKey<FormState>();
+   final TextEditingController _groupNameController = TextEditingController();
 
   //late VoidCallback onReloadNeeded;
 
@@ -358,6 +362,88 @@ class _GroupPanelsState extends State<GroupPanels> {
     }
   }
 
+  Future<void> _showEditConfirmationDialog(BuildContext context, StudyGroupResponse groupResp) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Editing Study Group: \n${groupResp.name}"),
+          contentPadding: EdgeInsets.fromLTRB(22, 44.0, 22, 20.0),
+          content: Form(
+            key: _formKey,
+            child: TextFormField(
+              controller: _groupNameController,
+              decoration: InputDecoration(
+                labelText: 'Study Group name..',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16)
+                )
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter some text';
+                }
+                return null;
+              }
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            ElevatedButton(
+              onPressed: _isEditing ? null : () { 
+                if (_formKey.currentState!.validate()) {
+                  StudyGroupResponse groupUpdated = groupResp.copyWith(name: _groupNameController.text.trim());
+                  _handleUpdate(groupUpdated); 
+                }
+              },
+              child: _isEditing
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                ),
+              ) : Text("Submit")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleUpdate(StudyGroupResponse groupUpdated) async {
+    setState(() {
+      _isEditing = true;
+    });
+
+    try {
+      await _service.updateStudyGroup(groupUpdated); 
+      _onReloadNeeded();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully updated Study Group')),
+      );
+      if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+      }
+    } catch(e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isEditing = false);
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -461,28 +547,50 @@ class _GroupPanelsState extends State<GroupPanels> {
                       const SizedBox(height: 8),
                     
                       if (groupResponse.access == "owner")... [
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: ElevatedButton(
-                            onPressed: () => _showDeleteConfirmationDialog(context, groupResponse.id), 
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: theme.colorScheme.error,
-                              foregroundColor: theme.colorScheme.onError,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10), // Rounded corners
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () => _showEditConfirmationDialog(context, groupResponse), 
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                  foregroundColor: theme.colorScheme.onSurfaceVariant,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10), // Rounded corners
+                                  ),
+                                  maximumSize: Size(140,60)
+                                ),
+                                child: Text(
+                                  "Edit",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700
+                                  )
+                                ),
                               ),
-                              maximumSize: Size(140,60)
-                            ),
-                            child: Text(
-                              "DELETE",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700
-                              )
-                            ),
-                          ),
+                              SizedBox(width: 15),
+                              ElevatedButton(
+                                onPressed: () => _showDeleteConfirmationDialog(context, groupResponse.id), 
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.error,
+                                  foregroundColor: theme.colorScheme.onError,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10), // Rounded corners
+                                  ),
+                                  maximumSize: Size(140,60)
+                                ),
+                                child: Text(
+                                  "DELETE",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700
+                                  )
+                                ),
+                              ),
+                            ]
                         ),
                       ],
+
                       if (groupResponse.access == "member")... [
                         Align(
                           alignment: Alignment.bottomRight,
