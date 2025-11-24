@@ -15,16 +15,65 @@ class Dashboard extends StatefulWidget {
   State<Dashboard> createState() => _DashboardState();
 }
 
-class _DashboardState extends State<Dashboard> {
+class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkAuth();
     // Rebuild when timer or check-in state changes
     TimerService.instance.addListener(_onExternalChange);
     CheckInService.instance.addListener(_onExternalChange);
     TimerService.instance.onTimerComplete = _autoCheckout;
   }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // When app comes back from background → sync timer
+      _restoreCheckinFromProfile();
+    }
+  }
+
+  Future<void> _restoreCheckinFromProfile() async {
+    final profile = await UserService.instance.getCurrentUserProfile();
+    if (profile == null) {
+      // no profile yet → nothing to restore
+      return;
+    }
+
+    if (!profile.checkedIn) {
+      // Make sure local state & timer are cleared
+      CheckInService.instance.checkOut();
+      return;
+    }
+
+    final end = profile.checkedInEnd;
+    if (end == null) {
+      // Bad / missing end time → clear state
+      CheckInService.instance.checkOut();
+      return;
+    }
+
+    final now = DateTime.now();
+    final remaining = end.difference(now).inSeconds;
+
+    if (remaining <= 0) {
+      // The slot already ended while the app was closed:
+      // fix Firestore + local state
+      await UserService.instance.checkOutFromRoom();
+      CheckInService.instance.checkOut();
+      return;
+    }
+
+    // Still checked in and time remaining > 0:
+    // 1) Hydrate CheckInService (label, checkedIn flag)
+    CheckInService.instance.hydrateFromProfile(profile);
+
+    // 2) Restart the timer for the remaining duration
+    TimerService.instance.start(Duration(seconds: remaining));
+  }
+
 
   Future<void> _autoCheckout() async {
     try {
@@ -58,6 +107,7 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     TimerService.instance.removeListener(_onExternalChange);
     CheckInService.instance.removeListener(_onExternalChange);
     TimerService.instance.onTimerComplete = null;
@@ -69,8 +119,14 @@ class _DashboardState extends State<Dashboard> {
     if (!mounted) return;
     if (!loggedIn) {
       Navigator.pushNamedAndRemoveUntil(context, '/landing', (_) => false);
+    } else {
+      // After confirming login, restore check-in state if needed
+      await _restoreCheckinFromProfile();
+      if (!mounted) return;
+      setState(() {}); // ensure UI reflects restored state
     }
   }
+
 
   bool _checkingOut = false;
 
@@ -131,11 +187,12 @@ class _DashboardState extends State<Dashboard> {
     final theme = Theme.of(context);
     final checkedIn = CheckInService.instance.checkedIn;
     final currentRoom = CheckInService.instance.currentRoom;
+    final currentLabel = CheckInService.instance.currentRoomLabel;
 
     // Show building + room (e.g., ECS-228B) when checked in
     final roomLabel = currentRoom != null
         ? "${currentRoom.buildingCode}-${currentRoom.roomNumber}"
-        : "Room Number";
+        : (currentLabel ?? "Room Number");
 
     return Scaffold(
       backgroundColor: Colors.white,

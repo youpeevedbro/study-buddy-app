@@ -20,7 +20,7 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
-  static const bool _debugFixed8am = true; // set to false for real current time
+  static const bool _debugFixed8am = false; // set to false for real current time
 
   /// Convert this room's date + end time into a DateTime.
   DateTime? _slotEndDateTime(Room r) {
