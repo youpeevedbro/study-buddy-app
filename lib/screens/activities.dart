@@ -254,7 +254,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                                     ),
                                   ),
 
-                                  // LITTLE HINT TEXT
+                                  // HINT TEXT
                                   const Text(
                                     "Swipe →",
                                     style: TextStyle(fontSize: 12, color: Colors.grey),
@@ -263,7 +263,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                               ),
                             ),
 
-                            // Divider between rows (Outlook-like)
                             const Divider(height: 1, thickness: 0.6, color: Colors.black12),
                           ],
                         ),
