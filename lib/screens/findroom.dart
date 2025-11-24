@@ -18,6 +18,28 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
+  int _hhmmToMinutes(String hhmm) {
+    if (hhmm.isEmpty) return -1;
+    final parts = hhmm.split(':');
+    if (parts.length != 2) return -1;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    return h * 60 + m;
+  }
+
+  bool _isSlotActiveNow(Room r) {
+    final now = DateTime.now();
+    final nowMin = now.hour * 60 + now.minute;
+
+    final startMin = _hhmmToMinutes(r.start);
+    final endMin = _hhmmToMinutes(r.end);
+
+    if (startMin < 0 || endMin < 0) return false;
+
+    // active if: start <= now < end
+    return startMin <= nowMin && nowMin < endMin;
+  }
+
   // --- Pagination state ---
   static const int _pageSize = 50;
   String? _nextToken;
@@ -239,7 +261,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
     if (f == null) return "Free Now";
 
     final noBuilding =
-    (f.buildingCode == null || f.buildingCode!.isEmpty);
+        (f.buildingCode == null || f.buildingCode!.isEmpty);
     final noStart = (f.startTime == null);
     final noEnd = (f.endTime == null);
 
@@ -273,6 +295,11 @@ class _FindRoomPageState extends State<FindRoomPage> {
     return "Available Rooms";
   }
 
+  String _currentDateLabel() {
+    final dt = DateTime.now(); // always today
+    return DateFormat('EEEE, MMM d, yyyy').format(dt);
+  }
+
   String _formatAMPM(TimeOfDay t) {
     final dt = DateTime(2024, 1, 1, t.hour, t.minute);
     return DateFormat.jm().format(dt); // requires intl
@@ -281,6 +308,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    final checkedIn = CheckInService.instance.checkedIn;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -313,8 +342,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 20),
-
-                // Header row
+                // Header row + date
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -331,6 +359,15 @@ class _FindRoomPageState extends State<FindRoomPage> {
                       icon: const Icon(Icons.filter_list, size: 28),
                     ),
                   ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _currentDateLabel(),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
 
                 const Divider(color: Colors.black, thickness: 2),
@@ -402,8 +439,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
                         grouped.putIfAbsent(key, () => []).add(r);
                       }
 
-                      final checkedIn = CheckInService.instance.checkedIn;
-
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -416,10 +451,17 @@ class _FindRoomPageState extends State<FindRoomPage> {
                               final header = entry.key;
                               final slots = entry.value;
 
+                              // Left = room label (e.g. "ECS-407")
                               final parts = header.split('|');
                               final left = parts[0].trim();
-                              final right =
-                              (parts.length > 1) ? parts[1].trim() : '';
+
+                              // Header shows first slot's time range instead of the date
+                              String headerTimeRange = '';
+                              if (slots.isNotEmpty) {
+                                final firstSlot = slots.first;
+                                headerTimeRange =
+                                    '${_fmt(context, firstSlot.start)} - ${_fmt(context, firstSlot.end)}';
+                              }
 
                               return Container(
                                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -459,7 +501,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        right,
+                                        headerTimeRange,
                                         style: const TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
@@ -469,9 +511,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                   ),
                                   children: [
                                     ...slots.map((r) {
+                                      final isActiveNow = _isSlotActiveNow(r);
                                       final isCurrent =
-                                      CheckInService.instance
-                                          .isCurrentRoom(r);
+                                          CheckInService.instance
+                                              .isCurrentRoom(r);
                                       final key = _slotKey(r);
 
                                       final isReported = r.userHasReported ||
@@ -485,14 +528,19 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                       final reportLabel =
                                           '$reportCount Report${reportCount == 1 ? '' : 's'}';
 
+                                      // Locked button disabled if already reported OR slot not active
+                                      final shouldDisableLocked =
+                                          isReported || !isActiveNow;
+
                                       final lockedButton = IgnorePointer(
-                                        ignoring: isReported,
+                                        ignoring: shouldDisableLocked,
                                         child: Opacity(
-                                          opacity: isReported ? 0.5 : 1.0,
+                                          opacity:
+                                              shouldDisableLocked ? 0.4 : 1.0,
                                           child: GradientButton(
                                             height: 35,
                                             borderRadius:
-                                            BorderRadius.circular(12.0),
+                                                BorderRadius.circular(12.0),
                                             onPressed: () =>
                                                 _reportLocked(r),
                                             child: const Text(
@@ -506,14 +554,53 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                         ),
                                       );
 
+                                      // Check-in / Check-out disabled if slot not active
+                                      final checkInOutButton = IgnorePointer(
+                                        ignoring: !isActiveNow,
+                                        child: Opacity(
+                                          opacity: !isActiveNow ? 0.4 : 1.0,
+                                          child: checkedIn && isCurrent
+                                              ? GradientButton(
+                                                  height: 35,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          12.0),
+                                                  onPressed: () =>
+                                                      _checkOut(r),
+                                                  child: const Text(
+                                                    'Check-out',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 16.0,
+                                                    ),
+                                                  ),
+                                                )
+                                              : GradientButton(
+                                                  height: 35,
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          12.0),
+                                                  onPressed: () =>
+                                                      _checkIn(r),
+                                                  child: const Text(
+                                                    'Check-in',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 16.0,
+                                                    ),
+                                                  ),
+                                                ),
+                                        ),
+                                      );
+
                                       return Container(
-                                        margin: const EdgeInsets.only(
-                                            bottom: 10),
+                                        margin:
+                                            const EdgeInsets.only(bottom: 10),
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
                                           borderRadius:
-                                          BorderRadius.circular(10),
+                                              BorderRadius.circular(10),
                                           boxShadow: [
                                             BoxShadow(
                                               color: Colors.black
@@ -525,7 +612,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                         ),
                                         child: Column(
                                           crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
@@ -537,10 +624,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                             const SizedBox(height: 8),
                                             Row(
                                               mainAxisAlignment:
-                                              MainAxisAlignment
-                                                  .spaceEvenly,
+                                                  MainAxisAlignment
+                                                      .spaceEvenly,
                                               crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Column(
                                                   children: [
@@ -548,54 +635,23 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                     if (hasAnyReports)
                                                       Padding(
                                                         padding:
-                                                        const EdgeInsets
-                                                            .only(
-                                                            top: 4.0),
+                                                            const EdgeInsets
+                                                                .only(
+                                                                top: 4.0),
                                                         child: Text(
                                                           reportLabel,
                                                           style:
-                                                          const TextStyle(
+                                                              const TextStyle(
                                                             color: Colors.red,
                                                             fontWeight:
-                                                            FontWeight
-                                                                .w600,
+                                                                FontWeight
+                                                                    .w600,
                                                           ),
                                                         ),
                                                       ),
                                                   ],
                                                 ),
-                                                if (checkedIn && isCurrent)
-                                                  GradientButton(
-                                                    height: 35,
-                                                    borderRadius:
-                                                    BorderRadius.circular(
-                                                        12.0),
-                                                    onPressed: () =>
-                                                        _checkOut(r),
-                                                    child: const Text(
-                                                      'Check-out',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 16.0,
-                                                      ),
-                                                    ),
-                                                  )
-                                                else
-                                                  GradientButton(
-                                                    height: 35,
-                                                    borderRadius:
-                                                    BorderRadius.circular(
-                                                        12.0),
-                                                    onPressed: () =>
-                                                        _checkIn(r),
-                                                    child: const Text(
-                                                      'Check-in',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 16.0,
-                                                      ),
-                                                    ),
-                                                  ),
+                                                checkInOutButton,
                                               ],
                                             ),
                                           ],
@@ -611,7 +667,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                                MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
                                 onPressed: (_prevTokens.length > 1)
@@ -634,7 +690,6 @@ class _FindRoomPageState extends State<FindRoomPage> {
                     },
                   ),
                 ),
-
                 const SizedBox(height: 20),
               ],
             ),

@@ -16,12 +16,6 @@ try:
 except Exception:
     TZ = None
 
-try:
-    from zoneinfo import ZoneInfo
-    TZ = ZoneInfo("America/Los_Angeles")
-except Exception:
-    TZ = None
-
 router = APIRouter()
 log = logging.getLogger("uvicorn.error")
 
