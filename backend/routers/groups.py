@@ -20,8 +20,9 @@ def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt_la = dt.replace(tzinfo=la_tz)
     return dt_la.astimezone(timezone.utc) 
 
-def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse: 
+def _doc_to_publicStudyGroup(doc, owner_doc) -> StudyGroupPublicResponse: 
     d = doc.to_dict()
+    o = owner_doc.to_dict()
     return StudyGroupPublicResponse(
         id=d.get("id", ""),
         buildingCode=d.get("buildingCode", ""),
@@ -32,14 +33,15 @@ def _doc_to_publicStudyGroup(doc) -> StudyGroupPublicResponse:
         name=d.get("name", ""),
         quantity=int(d.get("quantity", 0)),
         access=UserGroupRole.PUBLIC,
-        ownerID=d.get("ownerID", ""),
-        ownerHandle=d.get("ownerHandle", ""),
-        ownerDisplayName=d.get("ownerDisplayName", ""),
+        ownerID=owner_doc.id,
+        ownerHandle=o.get("handle", ""),
+        ownerDisplayName=o.get("displayName", ""),
         availabilitySlotDocument=d.get("availabilitySlotDocument", "")
     )
 
-def _doc_to_privateStudyGroup(doc, members: list[str], access: UserGroupRole) -> StudyGroupPrivateResponse: 
+def _doc_to_privateStudyGroup(doc, owner_doc, members: list[str], access: UserGroupRole) -> StudyGroupPrivateResponse: 
     d = doc.to_dict()
+    o = owner_doc.to_dict()
     return StudyGroupPrivateResponse(
         id=d.get("id", ""),
         buildingCode=d.get("buildingCode", ""),
@@ -50,9 +52,9 @@ def _doc_to_privateStudyGroup(doc, members: list[str], access: UserGroupRole) ->
         name=d.get("name", ""),
         quantity=int(d.get("quantity", 0)),
         access=access,
-        ownerID=d.get("ownerID", ""),
-        ownerHandle=d.get("ownerHandle", ""),
-        ownerDisplayName=d.get("ownerDisplayName", ""),
+        ownerID=owner_doc.id,
+        ownerHandle=o.get("handle", ""),
+        ownerDisplayName=o.get("displayName", ""),
         members=members,
         availabilitySlotDocument=d.get("availabilitySlotDocument", "")
     )
@@ -191,16 +193,14 @@ def create_group(group: StudyGroupCreate):
 
         
         uid = UID # Eventually replace with uid from client
+
         userRef = db.collection(USER_COLLECTION).document(uid)
-        userDoc = userRef.get().to_dict() or {}
 
         newGroupRef = col.document() # creates studyGroup doc ref + auto-ID
         data = group.model_dump()
         data.update({"id": newGroupRef.id,  
                      "quantity": 1, 
                      "ownerID": userRef.id,
-                     "ownerHandle": userDoc.get("handle", ""),
-                     "ownerDisplayName": userDoc.get("displayName", ""),
                      "members": [userRef.id],
                      "expireAt":convert_to_utc_datetime(data["date"], data["endTime"]) })
         
@@ -283,22 +283,31 @@ def get_group(group_id: str):
         if doc.exists:
             group_dict = doc.to_dict()
             user_role = _get_user_groupRole(uid, group_dict)
-            
-            if user_role == UserGroupRole.MEMBER or user_role == UserGroupRole.OWNER:
 
-                members = []
-                member_ids = group_dict.get("members", [])
-                member_docs = db.collection(USER_COLLECTION).where(FieldPath.document_id(), "in", member_ids).get() #only up to 30 members
-                for user_doc in member_docs:
-                    members.append(user_doc.to_dict().get("displayName", ""))
+         
+            ownerID = group_dict.get("ownerID", "")
+            owner_doc = db.collection(USER_COLLECTION).document(ownerID).get()
+
+            if owner_doc.exists:
+                if user_role == UserGroupRole.MEMBER or user_role == UserGroupRole.OWNER:
+
+                    members = []
+                    member_ids = group_dict.get("members", [])
+                    member_docs = db.collection(USER_COLLECTION).where(FieldPath.document_id(), "in", member_ids).get() #only up to 30 members
+                    for user_doc in member_docs:
+                        members.append(user_doc.to_dict().get("displayName", ""))
+                
+                    return _doc_to_privateStudyGroup(doc, owner_doc, members, user_role)  
+                
+                # user_role is public access
+                return _doc_to_publicStudyGroup(doc, owner_doc)
             
-                return _doc_to_privateStudyGroup(doc, members, user_role)  
-            
-            return _doc_to_publicStudyGroup(doc)
+            else:
+                raise HTTPException(status_code=404, detail="This Study Group may no longer exist. Study Group Owner not found.")
         else:
-            raise HTTPException(status_code=404, detail="Study Group not found")
-        
-    except HTTPException as e: # front end catches 404 error when using this endpoint
+            raise HTTPException(status_code=404, detail="Study Group not found.")
+    
+    except HTTPException as e: 
         if e.status_code == 404:
             raise e
     except Exception as e:
