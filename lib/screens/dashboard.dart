@@ -5,6 +5,7 @@ import 'package:study_buddy/components/cursive_divider.dart';
 import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
+import '../services/user_service.dart';
 import 'dart:async';
 
 class Dashboard extends StatefulWidget {
@@ -22,6 +23,32 @@ class _DashboardState extends State<Dashboard> {
     // Rebuild when timer or check-in state changes
     TimerService.instance.addListener(_onExternalChange);
     CheckInService.instance.addListener(_onExternalChange);
+    TimerService.instance.onTimerComplete = _autoCheckout;
+  }
+
+  Future<void> _autoCheckout() async {
+    try {
+      // 1. Update Firestore
+      await UserService.instance.checkOutFromRoom();
+
+      // 2. Update local state
+      CheckInService.instance.checkOut();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Your session has ended. You have been checked out."),
+        ),
+      );
+    } catch (e) {
+      // Optional: handle failure silently or log it
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Auto-checkout failed: $e"),
+        ),
+      );
+    }
   }
 
   void _onExternalChange() {
@@ -33,6 +60,7 @@ class _DashboardState extends State<Dashboard> {
   void dispose() {
     TimerService.instance.removeListener(_onExternalChange);
     CheckInService.instance.removeListener(_onExternalChange);
+    TimerService.instance.onTimerComplete = null;
     super.dispose();
   }
 
@@ -44,15 +72,59 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
-  void _checkOutRoom() {
-    CheckInService.instance.checkOut(); // flips to false + stops timer
+  bool _checkingOut = false;
+
+  Future<void> _checkOutRoom() async {
+    if (_checkingOut) return; // prevents double-taps
+
+    setState(() => _checkingOut = true);
+
+    try {
+      // 1) Update Firestore user document
+      await UserService.instance.checkOutFromRoom();
+
+      // 2) Update local in-memory service + stop timer
+      CheckInService.instance.checkOut();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You have checked out of your current room."),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to check out: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _checkingOut = false);
+      }
+    }
   }
 
+
   String _formatTime(int totalSeconds) {
-    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
-    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
-    return "$minutes:$seconds";
+    if (totalSeconds < 0) totalSeconds = 0;
+
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final seconds = totalSeconds % 60;
+
+    final mm = minutes.toString().padLeft(2, '0');
+    final ss = seconds.toString().padLeft(2, '0');
+
+    if (hours > 0) {
+      final hh = hours.toString().padLeft(2, '0');
+      return "$hh:$mm:$ss";    // e.g. 07:59:41
+    } else {
+      return "$mm:$ss";        // e.g. 59:41
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {

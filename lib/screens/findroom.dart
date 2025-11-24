@@ -9,6 +9,8 @@ import '../components/grad_button.dart';
 import '../services/api.dart';
 import '../models/room.dart';
 import '../services/checkin_service.dart';
+import '../services/user_service.dart';
+import '../services/timer_service.dart';
 
 class FindRoomPage extends StatefulWidget {
   const FindRoomPage({super.key});
@@ -18,6 +20,39 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
+  static const bool _debugFixed8am = true; // set to false for real current time
+
+  /// Convert this room's date + end time into a DateTime.
+  DateTime? _slotEndDateTime(Room r) {
+    try {
+      if (r.date.isEmpty || r.end.isEmpty) return null;
+
+      final dateParts = r.date.split('-'); // "2025-11-24"
+      if (dateParts.length != 3) return null;
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      final timeParts = r.end.split(':');   // "08:30"
+      if (timeParts.length != 2) return null;
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      return DateTime(year, month, day, hour, minute);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  DateTime _now() {
+    final real = DateTime.now();
+    if (_debugFixed8am) {
+      // pretend it's 8:00 am *today*
+      return DateTime(real.year, real.month, real.day, 8, 59);
+    }
+    return real;
+  }
+  
   int _hhmmToMinutes(String hhmm) {
     if (hhmm.isEmpty) return -1;
     final parts = hhmm.split(':');
@@ -28,7 +63,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
   }
 
   bool _isSlotActiveNow(Room r) {
-    final now = DateTime.now();
+    // final now = DateTime.now(); // THIS IS THE REAL ONE
+    final now = _now(); // THIS IS FOR DEBUGGING
     final nowMin = now.hour * 60 + now.minute;
 
     final startMin = _hhmmToMinutes(r.start);
@@ -60,7 +96,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
     super.initState();
 
     // Default: "Free Now" = buildingCode null, startTime = now, endTime = null
-    final now = TimeOfDay.now();
+    // final now = TimeOfDay.now(); // THIS IS THE REAL ONE
+    final now = _debugFixed8am ? const TimeOfDay(hour: 8, minute: 59) : TimeOfDay.now(); // THIS IS FOR DEBUGGING
     _currentFilter = FilterCriteria(
       buildingCode: null,
       startTime: now,
@@ -211,21 +248,62 @@ class _FindRoomPageState extends State<FindRoomPage> {
     }
   }
 
-  void _checkIn(Room r) {
-    CheckInService.instance.checkIn(room: r);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'You checked into ${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)})',
-        ),
-      ),
-    );
-    setState(() {}); // refresh current page so buttons update
-  }
+    Future<void> _checkIn(Room r) async {
+      try {
+        // 1) Update Firestore user doc
+        await UserService.instance.checkInToRoom(r);
 
-  void _checkOut(Room r) {
-    if (CheckInService.instance.isCurrentRoom(r)) {
+        // 2) Update local in-memory check-in state
+        CheckInService.instance.checkIn(room: r);
+
+        // 3) Start countdown timer for the remaining duration of this slot
+        final end = _slotEndDateTime(r);
+        final now = _now(); // uses your debug 8am override
+        if (end != null) {
+          final diff = end.difference(now);
+          if (diff.inSeconds > 0) {
+            TimerService.instance.start(diff);
+          } else {
+            // slot already ended or invalid -> make sure timer is stopped
+            TimerService.instance.stop();
+          }
+        }
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'You checked into ${r.buildingCode}-${r.roomNumber} '
+              '(${_fmt(context, r.start)}-${_fmt(context, r.end)})',
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to check in: $e'),
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() {}); // refresh buttons if needed
+        }
+      }
+    }
+
+
+  Future<void> _checkOut(Room r) async {
+    if (!CheckInService.instance.isCurrentRoom(r)) return;
+
+    try {
+      // 1) Update Firestore user doc
+      await UserService.instance.checkOutFromRoom();
+
+      // 2) Update in-memory state + stop timer
       CheckInService.instance.checkOut();
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -233,9 +311,20 @@ class _FindRoomPageState extends State<FindRoomPage> {
           ),
         ),
       );
-      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to check out: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
+
 
   // Pagination controls
   void _goNext() {

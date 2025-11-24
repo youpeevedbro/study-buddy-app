@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/user_profile.dart';
+import '../models/room.dart';
 
 class UserService {
   UserService._();
@@ -14,6 +15,66 @@ class UserService {
 
   CollectionReference<Map<String, dynamic>> get _usersCol =>
       _firestore.collection('users');
+
+  /// Compute when this slot ends as a DateTime, or null if parsing fails.
+  DateTime? _computeCheckedInEnd(Room room) {
+    try {
+      if (room.date.isEmpty || room.end.isEmpty) return null;
+
+      final dateParts = room.date.split('-');
+      if (dateParts.length != 3) return null;
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      final timeParts = room.end.split(':');
+      if (timeParts.length != 2) return null;
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      return DateTime(year, month, day, hour, minute);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Check the current user into a given room/time slot.
+  Future<void> checkInToRoom(Room room) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('No Firebase user is logged in.');
+    }
+
+    final uid = user.uid;
+    final end = _computeCheckedInEnd(room);
+
+    await _usersCol.doc(uid).update({
+      'checkedIn': true,
+      'checkedInRoomId': room.id,
+      'checkedInRoomLabel':
+          '${room.buildingCode}-${room.roomNumber}', // e.g. "ECS-407"
+      'checkedInEnd': end != null ? Timestamp.fromDate(end) : null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Check the current user out of whatever room they're in.
+  Future<void> checkOutFromRoom() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw StateError('No Firebase user is logged in.');
+    }
+
+    final uid = user.uid;
+
+    await _usersCol.doc(uid).update({
+      'checkedIn': false,
+      'checkedInRoomId': null,
+      'checkedInRoomLabel': null,
+      'checkedInEnd': null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   /// Check if the current logged-in user already has a profile doc.
   Future<bool> currentUserProfileExists() async {

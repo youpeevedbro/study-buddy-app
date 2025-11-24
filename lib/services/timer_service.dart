@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 class TimerService extends ChangeNotifier {
   TimerService._();
   static final TimerService instance = TimerService._();
+  VoidCallback? onTimerComplete;
 
   Timer? _timer;
   int _secondsRemaining = 0;
@@ -20,6 +21,14 @@ class TimerService extends ChangeNotifier {
       if (_secondsRemaining > 0) {
         _secondsRemaining--;
         notifyListeners();
+
+        if (_secondsRemaining == 0) {
+          // Timer just reached zero — trigger auto-checkout
+          stop();
+          if (onTimerComplete != null) {
+            onTimerComplete!();
+          }
+        }
       } else {
         stop();
       }
