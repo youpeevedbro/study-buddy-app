@@ -19,9 +19,12 @@ import 'screens/studygroup.dart';
 import 'screens/addgroup2.dart';
 import 'screens/login.dart';
 import 'screens/onboarding/create_profile.dart';
+import 'config/dev_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Prints whether fake time is on/off
+  DevConfig.printDebugInfo();
 
   // --- ENV + CONFIG ---
   await dotenv.load(fileName: ".env");

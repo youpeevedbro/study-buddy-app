@@ -7,6 +7,7 @@ import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
 import 'dart:async';
+import '../config/dev_config.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -30,10 +31,18 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // When app comes back from background → sync timer
-      _restoreCheckinFromProfile();
+      // 1) Stop any old countdown
+      TimerService.instance.stop();
+
+      // 2) Rehydrate from Firestore and restart timer based on end time
+      _restoreCheckinFromProfile().then((_) {
+        if (!mounted) return;
+        setState(() {}); // just to be extra sure UI redraws
+      });
     }
   }
+
+
 
   Future<void> _restoreCheckinFromProfile() async {
     final profile = await UserService.instance.getCurrentUserProfile();
@@ -55,7 +64,7 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
       return;
     }
 
-    final now = DateTime.now();
+    final now = DevConfig.now();
     final remaining = end.difference(now).inSeconds;
 
     if (remaining <= 0) {
