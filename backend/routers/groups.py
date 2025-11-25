@@ -3,7 +3,7 @@ from typing import List, Union
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.field_path import FieldPath
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole
+from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole, StudyGroupPublicList
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from auth import verify_firebase_token
@@ -266,6 +266,35 @@ def get_joined_groups() -> JoinedStudyGroupResponse:
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
 
+# ADD dependency: get User
+@router.get("/")
+def get_all_groups() -> StudyGroupPublicList:
+    try:
+        db = get_db()
+        col = db.collection(COLLECTION)
+        items: List[StudyGroupPublicResponse] = []
+
+        docs = col.stream()
+        for doc in docs:
+            groupEndTime = doc.to_dict()["expireAt"]
+            if groupEndTime < datetime.now(timezone.utc):
+                continue   # do not send past study groups
+
+            ownerID = doc.to_dict().get("ownerID", "")
+            owner_doc = db.collection(USER_COLLECTION).document(ownerID).get()
+            if not owner_doc.exists:
+                continue
+            
+            publicResp = _doc_to_publicStudyGroup(doc, owner_doc)
+            items.append(publicResp)
+        
+        items.sort(key=lambda item: convert_to_utc_datetime(item.date, item.startTime))
+        return StudyGroupPublicList(items=items)
+            
+    
+    except Exception as e:
+        # Surface exact failure in response while we debug
+        raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
 # ADD dependency: get User
 @router.get("/{group_id}", 

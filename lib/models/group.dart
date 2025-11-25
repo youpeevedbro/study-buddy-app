@@ -78,6 +78,7 @@ class StudyGroupResponse {
   final String ownerDisplayName;
   final List<String>? members;  
   final String availabilitySlotDoc;
+  bool isExpanded; // manages state of its expansion panel in studygroups.dart
 
   StudyGroupResponse({
     required this.id,
@@ -93,7 +94,8 @@ class StudyGroupResponse {
     required this.ownerHandle,
     required this.ownerDisplayName,
     this.members,
-    required this.availabilitySlotDoc
+    required this.availabilitySlotDoc,
+    this.isExpanded = false
   });
 
   StudyGroupResponse copyWith({
@@ -119,7 +121,8 @@ class StudyGroupResponse {
       ownerHandle: this.ownerHandle,
       ownerDisplayName: this.ownerDisplayName,
       members: this.members,
-      availabilitySlotDoc: availabilitySlotDoc ?? this.availabilitySlotDoc
+      availabilitySlotDoc: availabilitySlotDoc ?? this.availabilitySlotDoc,
+      isExpanded: this.isExpanded
     );
   }
 
@@ -169,7 +172,7 @@ class StudyGroupResponse {
       'name': name
     };
   }
-  
+
 }
 
 

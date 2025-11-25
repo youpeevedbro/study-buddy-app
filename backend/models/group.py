@@ -87,6 +87,10 @@ class JoinedStudyGroup(BaseModel):
 class JoinedStudyGroupResponse(BaseModel):
     items: List[JoinedStudyGroup]
 
+# Response model for list of all study groups
+class StudyGroupPublicList(BaseModel):
+    items: List[StudyGroupPublicResponse]
+
 
 
 

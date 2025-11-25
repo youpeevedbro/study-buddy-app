@@ -40,18 +40,32 @@ class GroupService {
         .toList();
   }
 
+  Future<List<StudyGroupResponse>> listAllStudyGroups() async {
+    final uri = Uri.parse("$baseUrl/group/");
+    final resp = await http.get(uri);
+    
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to retrieve myStudyGroups (${resp.statusCode}): ${resp.body}',
+      );
+    }
+
+    final data = json.decode(resp.body);
+    final List<dynamic> publicGroups = data["items"];
+    return publicGroups
+        .map((m) => StudyGroupResponse.fromJson(m))
+        .toList();
+  }
+
   Future<StudyGroupResponse> getStudyGroup(id) async {
     final uri = Uri.parse("$baseUrl/group/$id");
     final resp = await http.get(uri);
 
-    /*
     if (resp.statusCode == 404) {
       throw Exception(
         'Looks like this study group document no longer exists..'
       );
     }
-    */
-    
     if (resp.statusCode != 200) {
       throw Exception(
         'Failed to retrieve StudyGroups (${resp.statusCode}): ${resp.body}',
