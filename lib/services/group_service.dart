@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/group.dart';
@@ -8,12 +9,27 @@ import '../models/group.dart';
 class GroupService {
   const GroupService();
 
-  String get baseUrl {
+  String get baseUrl {  // eventually replace
     if (kIsWeb) return 'http://localhost:8000';
     if (Platform.isAndroid) return 'http://10.0.2.2:8000';
     return 'http://localhost:8000';
   }
 
+  /// Shared HTTP timeout for all backend calls.
+  static const Duration _timeout = Duration(seconds: 30);
+
+  /// Common headers, inject Firebase ID token if available.
+  static Future<Map<String, String>> _headers() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final token = await user?.getIdToken(true);
+
+    return <String, String>{
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  /*
   Future<http.Response> createGroup(Group group) async {
     final uri = Uri.parse('$baseUrl/groups/create');
     return http.post(
@@ -22,10 +38,32 @@ class GroupService {
       body: jsonEncode(group.toJson()),
     );
   }
+  */
+
+  Future<void> createStudyGroup(SelectedGroupFields group) async {
+
+    final uri = Uri.parse("$baseUrl/group/");  // eventually replace endpoint
+    final resp = await http.post(
+      uri, 
+      headers: await _headers(),
+      body: jsonEncode(group.toJson())).timeout(_timeout);
+    /*
+    final resp = await http.post(
+      uri,
+      headers: const {'Content-Type': 'application/json'},
+      body: jsonEncode(group.toJson())
+    );*/
+    
+    if (resp.statusCode != 200) {
+      throw Exception(
+        'Failed to create StudyGroup (${resp.statusCode}): ${resp.body}',
+      );
+    }
+  }
 
   Future<List<JoinedGroup>> listMyStudyGroups() async {
-    final uri = Uri.parse("$baseUrl/group/myStudyGroups");
-    final resp = await http.get(uri);
+    final uri = Uri.parse("$baseUrl/group/myStudyGroups");  // eventually replace endpoint
+    final resp = await http.get(uri, headers: await _headers()).timeout(_timeout);
     
     if (resp.statusCode != 200) {
       throw Exception(
@@ -41,8 +79,8 @@ class GroupService {
   }
 
   Future<List<StudyGroupResponse>> listAllStudyGroups() async {
-    final uri = Uri.parse("$baseUrl/group/");
-    final resp = await http.get(uri);
+    final uri = Uri.parse("$baseUrl/group/");   // eventually replace endpoint
+    final resp = await http.get(uri, headers: await _headers()).timeout(_timeout);
     
     if (resp.statusCode != 200) {
       throw Exception(
@@ -58,8 +96,8 @@ class GroupService {
   }
 
   Future<StudyGroupResponse> getStudyGroup(id) async {
-    final uri = Uri.parse("$baseUrl/group/$id");
-    final resp = await http.get(uri);
+    final uri = Uri.parse("$baseUrl/group/$id");  // eventually replace endpoint
+    final resp = await http.get(uri, headers: await _headers()).timeout(_timeout);
 
     if (resp.statusCode == 404) {
       throw Exception(
@@ -79,12 +117,12 @@ class GroupService {
   Future<void> updateStudyGroup(StudyGroupResponse groupUpdated) async {
     String groupId = groupUpdated.id;
 
-    final uri = Uri.parse("$baseUrl/group/$groupId");
+    final uri = Uri.parse("$baseUrl/group/$groupId");  // eventually replace endpoint
     final resp = await http.patch(
       uri,
-      headers: const {'Content-Type': 'application/json'},
+      headers: await _headers(),
       body: jsonEncode(groupUpdated.toJsonForName())
-    );
+    ).timeout(_timeout);
     
     if (resp.statusCode != 200) {
       throw Exception(
@@ -94,8 +132,8 @@ class GroupService {
   }
 
   Future<void> leaveStudyGroup(groupId) async {
-    final uri = Uri.parse("$baseUrl/group/$groupId/members/currentUser");
-    final resp = await http.delete(uri);
+    final uri = Uri.parse("$baseUrl/group/$groupId/members/currentUser");  // eventually replace endpoint
+    final resp = await http.delete(uri, headers: await _headers()).timeout(_timeout);
     
     if (resp.statusCode != 200) {
       throw Exception(
@@ -105,8 +143,8 @@ class GroupService {
   }
 
   Future<void> deleteStudyGroup(id) async {
-    final uri = Uri.parse("$baseUrl/group/$id");
-    final resp = await http.delete(uri);
+    final uri = Uri.parse("$baseUrl/group/$id");  // eventually replace endpoint
+    final resp = await http.delete(uri, headers: await _headers()).timeout(_timeout);
     
     if (resp.statusCode != 200) {
       throw Exception(

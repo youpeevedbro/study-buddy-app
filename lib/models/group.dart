@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+/*
 class Group {
   final String name;
   final DateTime date; // logical date (no time)
@@ -43,7 +45,8 @@ class Group {
   Map<String, dynamic> toJson() {
     String mmddyyyy(DateTime d) =>
         "${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}";
-
+        
+    
     String hhmmAmPm(TimeOfDay tod) {
       final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
       final minute = tod.minute.toString().padLeft(2, '0');
@@ -59,6 +62,59 @@ class Group {
       'creator_id': creatorId,
       'building': building,
       'room': room,
+    };
+  }
+}
+*/
+
+class SelectedGroupFields {  //stores user inputs when creating a group
+  String? name;
+  DateTime? date;
+  String? building;
+  String? roomNumber;
+  TimeOfDay? startTime;
+  TimeOfDay? endTime;
+  String? availabilitySlotDoc;
+
+  SelectedGroupFields({
+    this.name, 
+    required this.date,
+    this.building,
+    this.roomNumber,
+    this.startTime,
+    this.endTime,
+    this.availabilitySlotDoc
+    });
+
+    Map<String, dynamic> toJson() {
+    
+    String hhmm(TimeOfDay t) {
+      final hour = t.hour.toString().padLeft(2, '0');
+      final minute = t.minute.toString().padLeft(2, '0');
+      return '$hour:$minute';
+    }
+    
+    String yyyymmdd(DateTime d) =>
+        //"${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}";
+        "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
+    
+    /*
+    String minutes(TimeOfDay t) {
+      int minutes =  t.hour*60 + t.minute;
+      return minutes.toString();
+    }*/
+
+
+    return {
+      'name': name,
+      'date': yyyymmdd(date!),
+      'startTime': hhmm(startTime!),
+      'endTime': hhmm(endTime!),
+      'buildingCode': building,
+      'roomNumber': roomNumber,
+      'availabilitySlotDocument': availabilitySlotDoc 
+      //'$building-${roomNumber}_${date!.year}-${date!.month}-${date!.day}_${minutes(startTime!)}_${minutes(endTime!)}'
+
     };
   }
 }

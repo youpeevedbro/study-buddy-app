@@ -14,24 +14,21 @@ class MyStudyGroupsPage extends StatefulWidget {
 }
 
 class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
+  Key _key = UniqueKey(); // initial key
 
-
+  void rebuildGroups() {
+    setState(() {
+      _key = UniqueKey(); // assign a new key to rebuild
+    });
+  }
 
   void _navigateToAddGroup() async {
-    // Wait for data from AddGroupPage
-    final newGroup = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddGroupPage()),
     );
-
-    // Add group if returned
-    /*
-    if (newGroup != null && newGroup is StudyGroup) {
-      setState(() => _groups.add(newGroup));
-    }*/
-
+    rebuildGroups();
   }
-    
 
   @override
   Widget build(BuildContext context) {
@@ -101,11 +98,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                     ),
                   ),
                   GradientButton(
-                    onPressed: () {}, /*{
-                      if (_groups.isNotEmpty) {
-                        setState(() => _groups.removeLast());
-                      }
-                    },*/
+                    onPressed: () {}, 
                     borderRadius: BorderRadius.circular(12),
                     child: const Text(
                       "Remove",
@@ -131,7 +124,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   padding: const EdgeInsets.all(10),
-                  child: const Groups(), 
+                  child: Groups(key: _key), 
                 ),
               ),
             ),
@@ -230,9 +223,6 @@ class _GroupPanelsState extends State<GroupPanels> {
    final _formKey = GlobalKey<FormState>();
    final TextEditingController _groupNameController = TextEditingController();
 
-  //late VoidCallback onReloadNeeded;
-
-  
   @override
   void initState() {
     super.initState();

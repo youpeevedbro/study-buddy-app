@@ -12,8 +12,6 @@ router = APIRouter()
 COLLECTION = "studyGroups"
 USER_COLLECTION = "users"
 
-UID = input("\nEnter User ID: ") # TEMPORARY 
-
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
     la_tz = ZoneInfo("America/Los_Angeles")
@@ -120,43 +118,13 @@ def _add_groupMember_transaction(transaction, groupRef, userRef):
 def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, usersQuery):
     user_docs = usersQuery.get(transaction=transaction)
     doc = studyGroupRef.get(transaction=transaction)
-
-    """
-    originalGroupDict = doc.to_dict()
-    user_groupUpdates = {"name": originalGroupDict["name"], "startTime": originalGroupDict["startTime"], 
-                        "endTime": originalGroupDict["endTime"], "date": originalGroupDict["date"]}
-
-    if any(key in updates_data for key in ["date", "startTime", "endTime"]):   # Any time changes
-        user_groupTimeUpdates = {
-            field: updates_data.get(field, originalGroupDict.get(field))
-            for field in ["date", "startTime", "endTime"]
-        }
-        user_groupUpdates.update(user_groupTimeUpdates)
-        updates_data["expireAt"] = convert_to_utc_datetime(user_groupUpdates["date"], user_groupUpdates["endTime"]) # update expireAt field in case date or endTime changes
-        # ADD: READ Owner's joined study groups + Ensure no overlapping times
-        # ADD: UPDATE all applicable incoming_requests documents 'expireAt' field
     
-    if "name" in updates_data:
-        # ADD: UPDATE all applicable incoming_requests documents 'studyGroupName' field
-        user_groupUpdates.update({"name": updates_data["name"]})
-    
-    if "availabilitySlotDocument" in updates_data:
-        # possibly ADD: DECREMENT studygroup count in old availabilitySlots doc
-        # possibly ADD: INCREMENT studygroup count in new availabilitySlots doc
-        print("updating...")
-    """
-    
-    transaction.update(studyGroupRef, updates_data)   # Updates StudyGroup Doc
-    for doc in user_docs: # Updates all applicable User docs
+    transaction.update(studyGroupRef, updates_data)   # Updates Study group doc
+    for doc in user_docs: # Updates all applicable User docs - only updates name
         transaction.update(doc.reference, {f"joinedStudyGroups.{studyGroupRef.id}.name": updates_data.get("name")} )
     # ADD: UPDATE all applicable incoming_requests documents 'studyGroupName' field
 
 
-    """
-    if any(key in updates_data for key in ["date", "startTime", "endTime", "name"]): # Only update users if necessary
-        for doc in user_docs:
-            transaction.update(doc.reference, {f"joinedStudyGroups.{studyGroupRef.id}": user_groupUpdates})
-    """
 
 @firestore.transactional
 def _delete_groupMember_transaction(transaction, groupRef, userRef):
@@ -183,17 +151,15 @@ def _delete_group_transaction(transaction, groupRef, usersQuery):
     transaction.delete(groupRef)
 
 
-#ADD dependendency: get User
+
 @router.post("/")
-def create_group(group: StudyGroupCreate): 
+def create_group(group: StudyGroupCreate, claims: dict = Depends(verify_firebase_token),): 
     try:
         db = get_db()
         col = db.collection(COLLECTION)
         transaction = db.transaction()
 
-        
-        uid = UID # Eventually replace with uid from client
-
+        uid = claims.get("uid") or claims.get("sub")
         userRef = db.collection(USER_COLLECTION).document(uid)
 
         newGroupRef = col.document() # creates studyGroup doc ref + auto-ID
@@ -210,10 +176,11 @@ def create_group(group: StudyGroupCreate):
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
+
 # ADD dependency: User accepting request to join is Study Group Owner 
 #                    + ensure User being added is not already a member
 @router.post("/{group_id}/members/{user_id}")
-def add_group_member(group_id: str, user_id: str):
+def add_group_member(group_id: str, user_id: str, claims: dict = Depends(verify_firebase_token)):
     """
     Adding a new member to a study group. Use when Study Group Owner accepts a request to join.
     """
@@ -230,17 +197,17 @@ def add_group_member(group_id: str, user_id: str):
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
-# ADD dependency: get User
+
 @router.get("/myStudyGroups")
-#def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedStudyGroupResponse:
-def get_joined_groups() -> JoinedStudyGroupResponse:
+def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedStudyGroupResponse:
     try:
 
-        uid = UID # Eventually replace with uid from client
+        uid = claims.get("uid") or claims.get("sub")
 
         db = get_db()
         col = db.collection(USER_COLLECTION)
         doc = col.document(uid).get()
+
         items: List[JoinedStudyGroup] = []
         if doc.exists:
             user_dict = doc.to_dict()
@@ -266,9 +233,9 @@ def get_joined_groups() -> JoinedStudyGroupResponse:
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
 
-# ADD dependency: get User
+
 @router.get("/")
-def get_all_groups() -> StudyGroupPublicList:
+def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupPublicList:
     try:
         db = get_db()
         col = db.collection(COLLECTION)
@@ -284,7 +251,7 @@ def get_all_groups() -> StudyGroupPublicList:
             owner_doc = db.collection(USER_COLLECTION).document(ownerID).get()
             if not owner_doc.exists:
                 continue
-            
+
             publicResp = _doc_to_publicStudyGroup(doc, owner_doc)
             items.append(publicResp)
         
@@ -296,14 +263,14 @@ def get_all_groups() -> StudyGroupPublicList:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
-# ADD dependency: get User
+
 @router.get("/{group_id}", 
             response_model=Union[StudyGroupPrivateResponse, StudyGroupPublicResponse]
 ) 
-def get_group(group_id: str):
+def get_group(group_id: str, claims: dict = Depends(verify_firebase_token)):
     try:
 
-        uid = UID # Eventually replace with uid from client
+        uid = claims.get("uid") or claims.get("sub")
 
         db = get_db()
         col = db.collection(COLLECTION)
@@ -344,12 +311,12 @@ def get_group(group_id: str):
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
 
-# ADD dependencies: get User + ensure User is owner of Study Group
+
 @router.patch("/{group_id}")
-def update_group(group_id: str, group_update: StudyGroupUpdate):
+def update_group(group_id: str, group_update: StudyGroupUpdate, claims: dict = Depends(verify_firebase_token)):
     try:
 
-        uid = UID # Eventually replace with uid from client
+        uid = claims.get("uid") or claims.get("sub")
 
         db = get_db()
         col = db.collection(COLLECTION)
@@ -374,15 +341,15 @@ def update_group(group_id: str, group_update: StudyGroupUpdate):
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
     
 
-# ADD dependency: get User + ensure User is member of study group
+
 @router.delete("/{group_id}/members/currentUser")
-def delete_group_member(group_id: str):
+def delete_group_member(group_id: str, claims: dict = Depends(verify_firebase_token)):
     """
     Deleting a member from a study group. Use when User decides to leave a study group.
     """
     try:
 
-        uid = UID # REPLACE WITH UID FROM CLIENT
+        uid = claims.get("uid") or claims.get("sub")
 
         db = get_db()
         col = db.collection(COLLECTION)
@@ -403,16 +370,28 @@ def delete_group_member(group_id: str):
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
-# ADD dependency: get User + ensure User is owner of study group
+
 @router.delete("/{group_id}")
-def delete_group(group_id: str):
+def delete_group(group_id: str, claims: dict = Depends(verify_firebase_token)):
     try:
+
+        uid = claims.get("uid") or claims.get("sub")
+
         db = get_db()
         col = db.collection(COLLECTION)
         transaction = db.transaction()
+
         groupRef = col.document(group_id)
+        groupDoc = groupRef.get()
         usersQuery = db.collection(USER_COLLECTION).where(filter=FieldFilter("joinedStudyGroupIds", "array_contains", group_id))
-        _delete_group_transaction(transaction, groupRef, usersQuery)
+        
+        if groupDoc.exists:
+            user_role = _get_user_groupRole(uid, groupDoc.to_dict())
+            
+            if user_role != UserGroupRole.OWNER:
+                raise HTTPException(status_code=403, detail=f"Only Study Group Owners can delete groups")
+            
+            _delete_group_transaction(transaction, groupRef, usersQuery)
 
     except Exception as e:
         # Surface exact failure in response while we debug

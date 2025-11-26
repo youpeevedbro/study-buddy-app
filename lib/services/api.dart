@@ -7,6 +7,9 @@ import '../config/app_config.dart';
 import '../models/room.dart';
 import 'rooms_cache.dart';
 
+import 'package:flutter/foundation.dart' show kIsWeb; //can remove later
+import 'dart:io' show Platform; //can remove later
+
 class Api {
   /// Base URL for the backend — resolved by AppConfig.init()
   static String get base => AppConfig.apiBase;
@@ -54,6 +57,12 @@ class Api {
     decoded is Map<String, dynamic> ? decoded['items'] : decoded;
 
     return list.cast<Map<String, dynamic>>().map(Room.fromJson).toList();
+  }
+
+  static String localBase(){  // Can remove later
+    if (kIsWeb) return 'http://localhost:8000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
+    return 'http://localhost:8000';
   }
 
   /// PAGINATED + OPTIONAL LOCAL CACHE
@@ -115,7 +124,8 @@ class Api {
     }
 
     // ---- No cache hit OR we have time filters / later pages → backend call ----
-    final uri = _u('/rooms/', qp);
+    //final uri = _u('/rooms/', qp);
+    final uri = Uri.parse("${localBase()}/rooms/").replace(queryParameters: qp);  //TEMPORARY TO TEST CHANGES TO rooms.py
     final resp =
     await http.get(uri, headers: await _headers()).timeout(_timeout);
 

@@ -1,10 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:study_buddy/screens/findroom_forgroup.dart';
 import 'dart:convert';
 
 import '../components/grad_button.dart';
 import '../models/group.dart';
 import '../services/group_service.dart';
+import 'package:intl/intl.dart';
 
 class AddGroupPage extends StatefulWidget {
   const AddGroupPage({super.key});
@@ -14,16 +16,99 @@ class AddGroupPage extends StatefulWidget {
 }
 
 class _AddGroupPageState extends State<AddGroupPage> {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _groupNameController = TextEditingController();
+  final _dateFieldKey = GlobalKey<FormFieldState>();
+  final _formKeyForGroupCreation = GlobalKey<FormState>();
+  final TextEditingController _groupNameController = TextEditingController();  
   final TextEditingController _buildingController = TextEditingController();
-  final TextEditingController _roomNumberController = TextEditingController();
+  final TextEditingController _roomController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _startTimeController = TextEditingController();
   final TextEditingController _endTimeController = TextEditingController();
 
   bool _submitting = false;
+  bool _canEdit = true;
   final GroupService _service = const GroupService();
+
+  SelectedGroupFields? _groupFields;
+
+  String _formatDate(DateTime d) {
+    DateFormat formattedDate = DateFormat('yyyy-MM-dd');
+    String date = formattedDate.format(d);
+    return date;
+  }
+
+  TimeOfDay? _parseHHMM(String? s) {
+      if (s == null) return null;
+      final parts = s.split(':');
+      if (parts.length != 2) return null;
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts[1]) ?? 0;
+      return TimeOfDay(hour: h, minute: m);
+    }
+
+  Future<JoinedGroup?> _checkOverlappingGroups(DateTime newStart, DateTime newEnd) async {
+    try {
+      List<JoinedGroup> groups = await _service.listMyStudyGroups();
+      
+      for (JoinedGroup group in groups) {
+        DateTime groupDate = DateTime.parse(group.date);
+        final start = _parseHHMM(group.startTime);
+        final end = _parseHHMM(group.endTime);
+        if (start == null || end == null) {
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to check for overlapping groups')),
+          );
+          return null;
+        } 
+
+        DateTime groupStart = DateTime(groupDate.year, groupDate.month, groupDate.day, start.hour, start.minute);
+        DateTime groupEnd = DateTime(groupDate.year, groupDate.month, groupDate.day, end.hour, end.minute);
+        
+        if (!(groupStart.isAfter(newEnd) || newStart.isAfter(groupEnd))) {
+          return group;
+        }
+      }
+      
+    } catch(e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } 
+  }
+
+  
+
+  void _reload() {
+    setState(() {
+      _formKeyForGroupCreation.currentState!.reset();
+      _dateController.text = _formatDate(_groupFields!.date!);
+      _buildingController.text = _groupFields!.building!;
+      _roomController.text = _groupFields!.roomNumber!;
+      _startTimeController.text = _formatTime(_groupFields!.startTime!);
+      _endTimeController.text = _formatTime(_groupFields!.endTime!);
+      _canEdit = false;
+    });
+  }
+
+  void _navigateToFindRoomForGroup() async {
+    if (!_dateFieldKey.currentState!.validate()) return;
+    final filters = SelectedGroupFields(date: DateTime.parse(_dateController.text));
+    
+    final newTimeSlot = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => FindRoomForGroupPage(initialFilters: filters)),
+    );
+    
+    if (newTimeSlot != null) {
+      setState(() => _groupFields = newTimeSlot);
+      _reload();
+    }
+
+  }
+
 
   // Helpers to parse/format "hh:mm AM/PM" to/from TimeOfDay
   TimeOfDay? _parseTime(String value) {
@@ -37,6 +122,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
     return TimeOfDay(hour: hour, minute: minute);
   }
 
+  
   String _formatTime(TimeOfDay tod) {
     final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
     final minute = tod.minute.toString().padLeft(2, '0');
@@ -51,9 +137,14 @@ class _AddGroupPageState extends State<AddGroupPage> {
 
   // Controller-aware Cupertino time picker
   void _showCupertinoTimePickerFor(TextEditingController controller) {
-    final now = DateTime.now();
+    final date = _groupFields!.date!;
+    final start = _groupFields!.startTime!;
+    final end = _groupFields!.endTime!;
+    DateTime minTime = DateTime(date.year, date.month, date.day, start.hour, start.minute);
+    DateTime maxTime = DateTime(date.year, date.month, date.day, end.hour, end.minute);
+
     final initialTod = _parseTime(controller.text) ?? TimeOfDay.now();
-    DateTime initial = DateTime(now.year, now.month, now.day, initialTod.hour, initialTod.minute);
+    DateTime initial = DateTime(date.year, date.month, date.day, initialTod.hour, initialTod.minute);
     TimeOfDay temp = initialTod;
 
     showCupertinoModalPopup(
@@ -91,6 +182,9 @@ class _AddGroupPageState extends State<AddGroupPage> {
                 mode: CupertinoDatePickerMode.time,
                 use24hFormat: false,
                 initialDateTime: initial,
+                minimumDate: minTime,
+                maximumDate: maxTime,
+                minuteInterval: 5,
                 onDateTimeChanged: (dt) {
                   temp = TimeOfDay.fromDateTime(dt); // commit on Done
                 },
@@ -104,23 +198,30 @@ class _AddGroupPageState extends State<AddGroupPage> {
 
   // Date picker
   Future<void> _selectDate(BuildContext context) async {
+    if (!_canEdit) return;
+    String d = _dateController.text;
+    DateTime initialDate = (d != null && d.isNotEmpty) ? DateTime.parse(d) : DateTime.now();
     DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now(),
+      initialDate: initialDate, 
       firstDate: DateTime(2024),
       lastDate: DateTime(2101),
     );
     if (picked != null) {
       setState(() {
-        _dateController.text =
-            "${picked.month.toString().padLeft(2, '0')}/${picked.day.toString().padLeft(2, '0')}/${picked.year}";
+        //_date = picked;
+        _dateController.text = _formatDate(picked);
       });
     }
   }
 
+  
   Future<void> _createGroup() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKeyForGroupCreation.currentState!.validate()) return;
 
+    DateTime date = DateTime.parse(_dateController.text);
+
+    /*
     // Parse date MM/DD/YYYY
     final parts = _dateController.text.split('/');
     if (parts.length != 3) {
@@ -134,45 +235,56 @@ class _AddGroupPageState extends State<AddGroupPage> {
       int.parse(parts[0]),
       int.parse(parts[1]),
     );
+    */
 
-    final startTod = _parseTime(_startTimeController.text);
-    final endTod = _parseTime(_endTimeController.text);
-    if (startTod == null || endTod == null) {
+    final startTime = _parseTime(_startTimeController.text);
+    final endTime = _parseTime(_endTimeController.text);
+    if (startTime == null || endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please choose start and end time')),
+        const SnackBar(content: Text('Times invalid.')),
+      );
+      return;
+    }
+    if (startTime.isAfter(endTime) || startTime.isAtSameTimeAs(endTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('End time must be after start time.')),
       );
       return;
     }
 
-    final group = Group(
+    DateTime groupStart = DateTime(date.year, date.month, date.day, startTime.hour, startTime.minute);
+    DateTime groupEnd = DateTime(date.year, date.month, date.day, endTime.hour, endTime.minute);
+    final result = await _checkOverlappingGroups(groupStart, groupEnd);
+    if (result != null) {
+      _showOverlappedGroupDialog(context, result);
+      /*
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cannot create group as the following study group overlaps in time: ${result.name}')),
+      );*/
+      return;
+    }
+
+    final group = SelectedGroupFields(
       name: _groupNameController.text.trim(),
       date: date,
-      startTime: startTod,
-      endTime: endTod,
-      creatorId: 'user_123',
       building: _buildingController.text.trim(),
-      room: _roomNumberController.text.trim(),
+      roomNumber: _roomController.text.trim(),
+      startTime: startTime,
+      endTime: endTime,
+      availabilitySlotDoc: _groupFields!.availabilitySlotDoc
     );
 
     setState(() => _submitting = true);
     try {
-      final resp = await _service.createGroup(group);
+      await _service.createStudyGroup(group);
       if (!mounted) return;
-      if (resp.statusCode >= 200 && resp.statusCode < 300) {
-        // Optional: read returned JSON
-        // ignore: unused_local_variable
-        final _ = jsonDecode(resp.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Yay! Your new group is created!')),
-        );
-        if (Navigator.of(context).canPop()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully created Study Group')),
+      );
+      if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: ${resp.statusCode} ${resp.body}')),
-        );
       }
+
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -183,6 +295,38 @@ class _AddGroupPageState extends State<AddGroupPage> {
       if (mounted) setState(() => _submitting = false);
     }
   }
+
+  Future<void> _showOverlappedGroupDialog(BuildContext context, JoinedGroup group) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Cannot create study group.\nTime overlap with the following joined group:'),
+          content: Text('${group.name} \nDate: ${group.date} \nTime: ${group.startTime}-${group.endTime}'),
+          actions: <Widget>[
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: Text("Ok")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+  _groupNameController.dispose();
+  _buildingController.dispose();
+  _roomController.dispose();
+  _dateController.dispose();
+   _startTimeController.dispose(); 
+  _endTimeController.dispose();
+    super.dispose();
+  }
+  
 
   @override
   Widget build(BuildContext context) {
@@ -212,53 +356,124 @@ class _AddGroupPageState extends State<AddGroupPage> {
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Form(
-          key: _formKey,
+          key: _formKeyForGroupCreation,
           child: ListView(
             children: [
-              const SizedBox(height: 20),
-
+              const SizedBox(height: 10),
+              
+            const SizedBox(height: 10),
               // Group Name
               TextFormField(
                 controller: _groupNameController,
-                decoration: const InputDecoration(labelText: 'Group Name'),
-                validator: (value) =>
-                    value!.isEmpty ? 'Please enter a group name' : null,
-              ),
-              const SizedBox(height: 15),
-
-              // Building
-              TextFormField(
-                controller: _buildingController,
-                decoration: const InputDecoration(labelText: 'Building'),
-                validator: (value) =>
-                    value!.isEmpty ? 'Please enter a building' : null,
-              ),
-              const SizedBox(height: 15),
-
-              // Room Number
-              TextFormField(
-                controller: _roomNumberController,
-                decoration: const InputDecoration(labelText: 'Room Number'),
-                validator: (value) =>
-                    value!.isEmpty ? 'Please enter a room number' : null,
+                decoration: InputDecoration(
+                  labelText: 'Group Name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  )
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'You must enter a group name';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 15),
 
               // Date (Calendar)
               TextFormField(
+                key: _dateFieldKey,
                 controller: _dateController,
                 readOnly: true,
-                decoration: const InputDecoration(
+                enableInteractiveSelection: false,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'You must enter a date to see time slots';
+                  }
+                  return null;
+                },
+                decoration: InputDecoration(
                   labelText: 'Date (MM/DD/YYYY)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12)
+                  ),
                   suffixIcon: Icon(Icons.calendar_today),
                 ),
-                onTap: () => _selectDate(context),
+                //onTap: () => _selectDate(context),
+                onTap: (){
+                  if (_canEdit  == true){
+                    _selectDate(context);
+                  }
+                }
+              ),
+              const SizedBox(height: 20),
+
+              GradientButton(
+                //onPressed: _submitting ? null : _createGroup,
+                onPressed: () => _navigateToFindRoomForGroup(),
+                borderRadius: BorderRadius.circular(12),
+                height: 40,
+                child: _submitting
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Find time slots',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20,
+                        ),
+                      ),
+              ),
+              SizedBox(height: 30),
+              
+              // Building
+              TextFormField(
+                controller: _buildingController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Find Time Slots to set a building';
+                  }
+                  return null;
+                },
+                readOnly: true,
+                enableInteractiveSelection: false,
+                decoration: const InputDecoration(
+                  labelText: 'Building',
+                ),
+              ),
+              const SizedBox(height: 15),
+
+              // Room Number
+              TextFormField(
+                controller: _roomController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Find Time Slots to set a room';
+                  }
+                  return null;
+                },
+                enableInteractiveSelection: false,
+                readOnly: true,
+                decoration: const InputDecoration(labelText: 'Room Number'),
               ),
               const SizedBox(height: 15),
 
               // Start Time
               TextFormField(
                 controller: _startTimeController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Find Time Slots to set a start time';
+                  }
+                  return null;
+                },
                 readOnly: true,
                 decoration: const InputDecoration(
                   labelText: 'Start Time',
@@ -271,6 +486,12 @@ class _AddGroupPageState extends State<AddGroupPage> {
               // End Time
               TextFormField(
                 controller: _endTimeController,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Find Time Slots to set an end time';
+                  }
+                  return null;
+                },
                 readOnly: true,
                 decoration: const InputDecoration(
                   labelText: 'End Time',
@@ -281,7 +502,8 @@ class _AddGroupPageState extends State<AddGroupPage> {
               const SizedBox(height: 30),
 
               GradientButton(
-                onPressed: _submitting ? null : _createGroup,
+                //onPressed: _submitting ? null : _createGroup,
+                onPressed: () => _createGroup(),
                 borderRadius: BorderRadius.circular(12),
                 height: 50,
                 child: _submitting
@@ -294,7 +516,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
                         ),
                       )
                     : const Text(
-                        'Create',
+                        'Create Group',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
@@ -302,6 +524,8 @@ class _AddGroupPageState extends State<AddGroupPage> {
                         ),
                       ),
               ),
+              SizedBox(height: 30),
+
             ],
           ),
         ),
