@@ -77,6 +77,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
         );
       }
     } 
+    return null;
   }
 
   
@@ -106,9 +107,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
       setState(() => _groupFields = newTimeSlot);
       _reload();
     }
-
   }
-
 
   // Helpers to parse/format "hh:mm AM/PM" to/from TimeOfDay
   TimeOfDay? _parseTime(String value) {
@@ -136,11 +135,11 @@ class _AddGroupPageState extends State<AddGroupPage> {
   }
 
   // Controller-aware Cupertino time picker
-  void _showCupertinoTimePickerFor(TextEditingController controller) {
-    final date = _groupFields!.date!;
-    final start = _groupFields!.startTime!;
+  void _showCupertinoTimePickerFor(TextEditingController controller) { 
+    final date = _groupFields!.date!;         
+    final start = _groupFields!.startTime!;  //contains start and end times from the availabilityslot chosen
     final end = _groupFields!.endTime!;
-    DateTime minTime = DateTime(date.year, date.month, date.day, start.hour, start.minute);
+    DateTime minTime = DateTime(date.year, date.month, date.day, start.hour, start.minute); 
     DateTime maxTime = DateTime(date.year, date.month, date.day, end.hour, end.minute);
 
     final initialTod = _parseTime(controller.text) ?? TimeOfDay.now();
@@ -182,7 +181,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
                 mode: CupertinoDatePickerMode.time,
                 use24hFormat: false,
                 initialDateTime: initial,
-                minimumDate: minTime,
+                minimumDate: minTime,   //cannot set time outside of availslot range
                 maximumDate: maxTime,
                 minuteInterval: 5,
                 onDateTimeChanged: (dt) {
@@ -209,7 +208,6 @@ class _AddGroupPageState extends State<AddGroupPage> {
     );
     if (picked != null) {
       setState(() {
-        //_date = picked;
         _dateController.text = _formatDate(picked);
       });
     }
@@ -221,22 +219,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
 
     DateTime date = DateTime.parse(_dateController.text);
 
-    /*
-    // Parse date MM/DD/YYYY
-    final parts = _dateController.text.split('/');
-    if (parts.length != 3) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a valid date')),
-      );
-      return;
-    }
-    final date = DateTime(
-      int.parse(parts[2]),
-      int.parse(parts[0]),
-      int.parse(parts[1]),
-    );
-    */
-
+    
     final startTime = _parseTime(_startTimeController.text);
     final endTime = _parseTime(_endTimeController.text);
     if (startTime == null || endTime == null) {
@@ -322,9 +305,9 @@ class _AddGroupPageState extends State<AddGroupPage> {
   _buildingController.dispose();
   _roomController.dispose();
   _dateController.dispose();
-   _startTimeController.dispose(); 
+  _startTimeController.dispose(); 
   _endTimeController.dispose();
-    super.dispose();
+  super.dispose();
   }
   
 

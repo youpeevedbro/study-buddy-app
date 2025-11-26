@@ -47,12 +47,6 @@ class GroupService {
       uri, 
       headers: await _headers(),
       body: jsonEncode(group.toJson())).timeout(_timeout);
-    /*
-    final resp = await http.post(
-      uri,
-      headers: const {'Content-Type': 'application/json'},
-      body: jsonEncode(group.toJson())
-    );*/
     
     if (resp.statusCode != 200) {
       throw Exception(

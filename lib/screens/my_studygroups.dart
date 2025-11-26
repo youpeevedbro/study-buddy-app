@@ -3,8 +3,6 @@ import '../components/grad_button.dart';
 import 'addgroup2.dart';
 import '../models/group.dart';
 import '../services/group_service.dart';
-import '../services/api.dart';
-
 
 class MyStudyGroupsPage extends StatefulWidget {
   const MyStudyGroupsPage({super.key});
@@ -97,6 +95,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                           fontSize: 18),
                     ),
                   ),
+                  /*
                   GradientButton(
                     onPressed: () {}, 
                     borderRadius: BorderRadius.circular(12),
@@ -108,6 +107,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                           fontSize: 18),
                     ),
                   ),
+                  */
                 ],
               ),
             ),
@@ -216,7 +216,7 @@ class _GroupPanelsState extends State<GroupPanels> {
   bool _isDeleting = false;
   bool _isLeaving = false;
   bool _isEditing = false;
-  late List<JoinedGroup> _groups;
+  late List<JoinedGroup> _groups;  //only information from the 'joinedStudyGroups' field in User doc
   late VoidCallback _onReloadNeeded;
   final GroupService _service = const GroupService();
 
@@ -474,7 +474,7 @@ class _GroupPanelsState extends State<GroupPanels> {
               )
             );
           },
-          body: group.isExpanded  //when expanded -> query for more study group information
+          body: group.isExpanded  //when expanded -> query for more study group information (queries study group collection)
             ? FutureBuilder(
             future: _service.getStudyGroup(group.id),
             builder: (context, snap) {

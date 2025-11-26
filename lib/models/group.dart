@@ -1,73 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/*
-class Group {
-  final String name;
-  final DateTime date; // logical date (no time)
-  final TimeOfDay startTime; // time only
-  final TimeOfDay endTime; // time only
-  final String creatorId;
-  final String building;
-  final String room; // room number/code
 
-  const Group({
-    required this.name,
-    required this.date,
-    required this.startTime,
-    required this.endTime,
-    required this.creatorId,
-    required this.building,
-    required this.room,
-  });
-
-  Group copyWith({
-    String? name,
-    DateTime? date,
-    TimeOfDay? startTime,
-    TimeOfDay? endTime,
-    String? creatorId,
-    String? building,
-    String? room,
-  }) {
-    return Group(
-      name: name ?? this.name,
-      date: date ?? this.date,
-      startTime: startTime ?? this.startTime,
-      endTime: endTime ?? this.endTime,
-      creatorId: creatorId ?? this.creatorId,
-      building: building ?? this.building,
-      room: room ?? this.room,
-    );
-  }
-
-  // Backend expects legacy string fields.
-  Map<String, dynamic> toJson() {
-    String mmddyyyy(DateTime d) =>
-        "${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}";
-        
-    
-    String hhmmAmPm(TimeOfDay tod) {
-      final hour = tod.hourOfPeriod.toString().padLeft(2, '0');
-      final minute = tod.minute.toString().padLeft(2, '0');
-      final period = tod.period == DayPeriod.am ? 'AM' : 'PM';
-      return '$hour:$minute $period';
-    }
-
-    return {
-      'name': name,
-      'date': mmddyyyy(date),
-      'starttime': hhmmAmPm(startTime),
-      'endtime': hhmmAmPm(endTime),
-      'creator_id': creatorId,
-      'building': building,
-      'room': room,
-    };
-  }
-}
-*/
-
-class SelectedGroupFields {  //stores user inputs when creating a group
+class SelectedGroupFields {  //stores user's selections to create a group
   String? name;
   DateTime? date;
   String? building;
@@ -87,24 +22,14 @@ class SelectedGroupFields {  //stores user inputs when creating a group
     });
 
     Map<String, dynamic> toJson() {
-    
     String hhmm(TimeOfDay t) {
       final hour = t.hour.toString().padLeft(2, '0');
       final minute = t.minute.toString().padLeft(2, '0');
       return '$hour:$minute';
     }
-    
     String yyyymmdd(DateTime d) =>
-        //"${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}/${d.year}";
         "${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}";
     
-    /*
-    String minutes(TimeOfDay t) {
-      int minutes =  t.hour*60 + t.minute;
-      return minutes.toString();
-    }*/
-
-
     return {
       'name': name,
       'date': yyyymmdd(date!),
@@ -113,13 +38,11 @@ class SelectedGroupFields {  //stores user inputs when creating a group
       'buildingCode': building,
       'roomNumber': roomNumber,
       'availabilitySlotDocument': availabilitySlotDoc 
-      //'$building-${roomNumber}_${date!.year}-${date!.month}-${date!.day}_${minutes(startTime!)}_${minutes(endTime!)}'
-
     };
   }
 }
 
-class StudyGroupResponse {
+class StudyGroupResponse {  //holds public or private response data for study group
   final String id;
   final String buildingCode;
   final String roomNumber;
@@ -132,7 +55,7 @@ class StudyGroupResponse {
   final String ownerID;
   final String ownerHandle;
   final String ownerDisplayName;
-  final List<String>? members;  
+  final List<String>? members;  //currently holds displayNames
   final String availabilitySlotDoc;
   bool isExpanded; // manages state of its expansion panel in studygroups.dart
 
@@ -228,11 +151,9 @@ class StudyGroupResponse {
       'name': name
     };
   }
-
 }
 
-
-class JoinedGroup {
+class JoinedGroup {  //only holds data from the 'joinedStudyGroups' field in User document
   final String id;
   final String name;
   final String startTime;
@@ -248,7 +169,6 @@ class JoinedGroup {
     required this.date,
     this.isExpanded = false
   });
-
 
   factory JoinedGroup.fromJson(Map<String, dynamic> json) {
     return JoinedGroup(

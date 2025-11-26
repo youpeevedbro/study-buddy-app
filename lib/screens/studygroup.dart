@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:study_buddy/models/group.dart';
 import '../services/group_service.dart';
+import '../services/api.dart';
 import '../components/grad_button.dart';
 
 class StudyGroupsPage extends StatefulWidget {
@@ -12,38 +13,9 @@ class StudyGroupsPage extends StatefulWidget {
 }
 
 class _StudyGroupsPageState extends State<StudyGroupsPage> {
-  /*
-  // Dummy data for study groups
-  final List<Map<String, dynamic>> _groups = [
-    {
-      "name": "Data Structures Study Group",
-      "time": "Mon, 3:00 PM - 5:00 PM",
-      "location": "Library Room 204",
-      "status": "Open for new members"
-    },
-    {
-      "name": "Algorithms Review Session",
-      "time": "Wed, 6:00 PM - 8:00 PM",
-      "location": "EN2 - 310",
-      "status": "Full" 
-    },
-    {
-      "name": "Machine Learning Study Group",
-      "time": "Fri, 2:00 PM - 4:00 PM",
-      "location": "VEC - 120",
-      "status": "Open for new members"
-    },
-    {
-      "name": "CSULB Finals Prep Group",
-      "time": "Sat, 1:00 PM - 3:00 PM",
-      "location": "COB - 205",
-      "status": "Open for new members"
-    },
-  ];
-
-  int _expandedIndex = -1;
   
-
+  
+  /*
   void _sendJoinRequest(int index) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -150,7 +122,7 @@ class _AllGroupsState extends State<AllGroups> {
   @override
   void initState() {
     super.initState();
-    _futureGroups = _service.listAllStudyGroups();
+    _futureGroups = _service.listAllStudyGroups();  //returns StudyGroupResponses with appropriate access ('owner', 'member', or 'public')
   } 
 
   
@@ -289,92 +261,75 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                 ),
             );
           },
-          body: group.isExpanded  //when expanded -> query for more study group information
-            ? FutureBuilder(
-            future: _service.getStudyGroup(group.id),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snap.hasError) {
-                return 
-                  Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Text(
-                      '${snap.error}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600
-                      ),
+          body: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(20),
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
                     ),
-                  ); 
-              }
-
-              final groupResponse = snap.data!;
-              return Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(20),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Location: ${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      Text("Time: ${groupResponse.startTime} - ${groupResponse.endTime}",
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 6),
-                      Text(
-                          "Number of members: ${groupResponse.quantity}",
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)
-                      ),
-                      const SizedBox(height: 14),
-                    
-                      if (groupResponse.access == "public")... [
-                        Align(
-                          alignment: Alignment.center,
-                          child: GradientButton(
-                            height: 35,
-                            borderRadius: BorderRadius.circular(12.0),
-                            onPressed: () {},
-                            child: const Text(
-                              "Send Join Request",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18.0,
-                              ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Location: ${group.buildingCode} - ${group.roomNumber}",
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Text("Time: ${group.startTime} - ${group.endTime}",
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Text(
+                        "Number of members: ${group.quantity}",
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)
+                    ),
+                    const SizedBox(height: 14),
+                  
+                    if (group.access == "public")... [
+                      Align(
+                        alignment: Alignment.center,
+                        child: GradientButton(
+                          height: 35,
+                          borderRadius: BorderRadius.circular(12.0),
+                          onPressed: () {},
+                          child: const Text(
+                            "Send Join Request",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18.0,
                             ),
                           ),
                         ),
-                      ]
-                    ],
-                  ),
+                      ),
+                    ]
+                    else if (group.access == "owner" || group.access == "member")... [
+                      Align(
+                        alignment: Alignment.center,
+                        child: Column(
+                          children: [
+                            Text("You are already part of this study group"),
+                            Text("Members: ${group.members}")
+                          ],
+                        )
+                      ),
+                    ]
+                  ],
                 ),
-              );
-            }
-          )
-          : Container(),
+              ),
+            ),
           isExpanded: group.isExpanded,  //keeps panel expanded when isExpanded field is true
         );
       }).toList(),

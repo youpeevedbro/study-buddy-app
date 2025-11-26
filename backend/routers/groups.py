@@ -3,7 +3,7 @@ from typing import List, Union
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.field_path import FieldPath
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole, StudyGroupPublicList
+from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole, StudyGroupList
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from auth import verify_firebase_token
@@ -151,7 +151,6 @@ def _delete_group_transaction(transaction, groupRef, usersQuery):
     transaction.delete(groupRef)
 
 
-
 @router.post("/")
 def create_group(group: StudyGroupCreate, claims: dict = Depends(verify_firebase_token),): 
     try:
@@ -180,7 +179,8 @@ def create_group(group: StudyGroupCreate, claims: dict = Depends(verify_firebase
 # ADD dependency: User accepting request to join is Study Group Owner 
 #                    + ensure User being added is not already a member
 @router.post("/{group_id}/members/{user_id}")
-def add_group_member(group_id: str, user_id: str, claims: dict = Depends(verify_firebase_token)):
+#def add_group_member(group_id: str, user_id: str, claims: dict = Depends(verify_firebase_token)):
+def add_group_member(group_id: str, user_id: str):
     """
     Adding a new member to a study group. Use when Study Group Owner accepts a request to join.
     """
@@ -200,6 +200,9 @@ def add_group_member(group_id: str, user_id: str, claims: dict = Depends(verify_
 
 @router.get("/myStudyGroups")
 def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedStudyGroupResponse:
+    """
+    Returns data from 'joinedStudyGroups' field in User document
+    """
     try:
 
         uid = claims.get("uid") or claims.get("sub")
@@ -235,11 +238,18 @@ def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedSt
 
 
 @router.get("/")
-def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupPublicList:
+def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupList:
+    """"
+    Returns List of Study Groups with appropriate access based on user.
+    Owners and members have access to the 'members' field.
+    Users who are not members can see number of people in a group but do not have access to the 'members' field.
+    """
     try:
         db = get_db()
         col = db.collection(COLLECTION)
         items: List[StudyGroupPublicResponse] = []
+
+        uid = claims.get("uid") or claims.get("sub")
 
         docs = col.stream()
         for doc in docs:
@@ -250,13 +260,26 @@ def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupP
             ownerID = doc.to_dict().get("ownerID", "")
             owner_doc = db.collection(USER_COLLECTION).document(ownerID).get()
             if not owner_doc.exists:
-                continue
+                continue  # do not send groups with invalid field for 'ownerID'
+            
+            doc_dict = doc.to_dict()
+            user_role = _get_user_groupRole(uid, doc_dict)
+            if user_role == UserGroupRole.MEMBER or user_role == UserGroupRole.OWNER:
 
-            publicResp = _doc_to_publicStudyGroup(doc, owner_doc)
-            items.append(publicResp)
+                members = []
+                member_ids = doc_dict.get("members", [])
+                member_docs = db.collection(USER_COLLECTION).where(FieldPath.document_id(), "in", member_ids).get() #only up to 30 members
+                for user_doc in member_docs:
+                    members.append(user_doc.to_dict().get("displayName", ""))
+            
+                items.append(_doc_to_privateStudyGroup(doc, owner_doc, members, user_role))
+            
+            else: # user role is public access
+                items.append(_doc_to_publicStudyGroup(doc, owner_doc))
+
         
         items.sort(key=lambda item: convert_to_utc_datetime(item.date, item.startTime))
-        return StudyGroupPublicList(items=items)
+        return StudyGroupList(items=items)
             
     
     except Exception as e:
@@ -265,9 +288,11 @@ def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupP
 
 
 @router.get("/{group_id}", 
-            response_model=Union[StudyGroupPrivateResponse, StudyGroupPublicResponse]
-) 
+            response_model=Union[StudyGroupPrivateResponse, StudyGroupPublicResponse]) 
 def get_group(group_id: str, claims: dict = Depends(verify_firebase_token)):
+    """
+    Returns single study group with appropriate access based on the user sending the request
+    """
     try:
 
         uid = claims.get("uid") or claims.get("sub")
@@ -314,6 +339,10 @@ def get_group(group_id: str, claims: dict = Depends(verify_firebase_token)):
 
 @router.patch("/{group_id}")
 def update_group(group_id: str, group_update: StudyGroupUpdate, claims: dict = Depends(verify_firebase_token)):
+    """
+    Only updates 'name' field of a study group. 
+    Updates study group document and applicable user documents
+    """
     try:
 
         uid = claims.get("uid") or claims.get("sub")
@@ -376,7 +405,7 @@ def delete_group(group_id: str, claims: dict = Depends(verify_firebase_token)):
     try:
 
         uid = claims.get("uid") or claims.get("sub")
-
+    
         db = get_db()
         col = db.collection(COLLECTION)
         transaction = db.transaction()

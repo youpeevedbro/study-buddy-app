@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List
+from typing import List, Union
 from pydantic import BaseModel
 
 # Request model for creating a Study Group
@@ -88,8 +88,8 @@ class JoinedStudyGroupResponse(BaseModel):
     items: List[JoinedStudyGroup]
 
 # Response model for list of all study groups
-class StudyGroupPublicList(BaseModel):
-    items: List[StudyGroupPublicResponse]
+class StudyGroupList(BaseModel):
+    items: List[Union[StudyGroupPublicResponse, StudyGroupPrivateResponse]]
 
 
 
