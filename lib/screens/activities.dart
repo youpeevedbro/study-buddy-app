@@ -102,7 +102,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                 child: const Text("My Study Groups"),
               ),
 
-              const SizedBox(height: 60),
+              const SizedBox(height: 70),
 
               //---------------------------------------------------
               // INCOMING REQUESTS SECTION HEADER
@@ -117,6 +117,15 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               ),
               const Divider(thickness: 1.5, color: Colors.black),
               const SizedBox(height: 10),
+              const Text(
+                'Swipe right to accept requests, left to decline.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(height: 12),
 
               //---------------------------------------------------
               // REQUEST LIST OR NO REQUEST MESSAGE
@@ -227,7 +236,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-                              color: Colors.white, // Full-width row like Outlook
+                              color: Colors.white,
                               child: Row(
                                 children: [
                                   // LEFT SIDE (group + requester)
