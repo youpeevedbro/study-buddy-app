@@ -270,7 +270,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 ),
               ),
 
-              const SizedBox(height: 100),
+              const SizedBox(height: 50),
 
               // Delete Account
               InkWell(

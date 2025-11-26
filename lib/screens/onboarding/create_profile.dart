@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:study_buddy/services/auth_service.dart';
+import '../../components/grad_button.dart';
 
 import '../../services/user_service.dart';
 
@@ -97,7 +98,18 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Create Your Profile"),
+        //title: const Text("Create Your Profile"),
+        toolbarHeight: 100,
+        title: const Text("Study Buddy"),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        titleTextStyle: const TextStyle(
+          fontFamily: 'BrittanySignature',
+          fontSize: 40,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -106,6 +118,7 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const SizedBox(height: 30),
               const Text(
                 "Welcome to Study Buddy 👋",
                 style: TextStyle(
@@ -174,9 +187,18 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
               // BUTTON
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submit,
-                  child: const Text("Continue"),
+                child: GradientButton(
+                  height: 50,
+                  borderRadius:
+                  BorderRadius.circular(12.0),
+                  onPressed: () => _submit(),
+                  child: const Text(
+                    'Create Profile',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18.0,
+                    ),
+                  ),
                 ),
               ),
             ],
