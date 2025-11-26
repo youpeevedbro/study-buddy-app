@@ -12,6 +12,7 @@ class Room(BaseModel):
     end: str             # e.g. "16:00"
     lockedReports: int = 0          # total unique-user reports
     userHasReported: bool = False   # did *this* user already report?
+    currentCheckins: int = 0   # 👈 NEW
 
 
 class RoomsResponse(BaseModel):

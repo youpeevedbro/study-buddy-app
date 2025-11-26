@@ -9,6 +9,7 @@ class Room {
   final String end;       // can be "" if missing
   final int lockedReports;
   final bool userHasReported; // did THIS user already report this slot?
+  int currentCheckins;
 
   Room({
     required this.id,
@@ -19,6 +20,7 @@ class Room {
     required this.end,
     required this.lockedReports,
     this.userHasReported = false,
+    required this.currentCheckins,
   });
 
   factory Room.fromJson(Map<String, dynamic> j) {
@@ -48,6 +50,9 @@ class Room {
       end: (j['end'] ?? '').toString(),
       lockedReports: lockedReports,
       userHasReported: userHasReported,
+      currentCheckins: (j['currentCheckins'] is int)                     // 👈 NEW
+        ? j['currentCheckins'] as int
+        : int.tryParse(j['currentCheckins']?.toString() ?? '0') ?? 0
     );
   }
 }

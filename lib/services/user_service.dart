@@ -16,6 +16,16 @@ class UserService {
   CollectionReference<Map<String, dynamic>> get _usersCol =>
       _firestore.collection('users');
 
+  CollectionReference<Map<String, dynamic>> get _slotsCol =>
+    _firestore.collection('availabilitySlots');
+
+  Future<void> _bumpSlotCheckins(String slotId, int delta) async {
+    if (slotId.isEmpty) return;
+    await _slotsCol.doc(slotId).update({
+      'currentCheckins': FieldValue.increment(delta),
+    });
+  }
+
   /// Compute when this slot ends as a DateTime, or null if parsing fails.
   DateTime? _computeCheckedInEnd(Room room) {
     try {
@@ -48,15 +58,39 @@ class UserService {
     final uid = user.uid;
     final end = _computeCheckedInEnd(room);
 
+    // Read current user doc so we can decrement previous slot if needed
+    final userDoc = await _usersCol.doc(uid).get();
+    final data = userDoc.data();
+    final bool wasCheckedIn = data?['checkedIn'] as bool? ?? false;
+    final String? prevSlotId = data?['checkedInRoomId'] as String?;
+
+    // 🔒 Guard: if they're already checked into THIS slot, do nothing
+    if (wasCheckedIn && prevSlotId == room.id) {
+      // Optional: you *could* refresh checkedInEnd here if you ever wanted
+      // to extend/repair the end time, but for now it's a no-op.
+      return;
+    }
+
+    // Update user doc for the NEW check-in
     await _usersCol.doc(uid).update({
       'checkedIn': true,
       'checkedInRoomId': room.id,
-      'checkedInRoomLabel':
-          '${room.buildingCode}-${room.roomNumber}', // e.g. "ECS-407"
+      'checkedInRoomLabel': '${room.buildingCode}-${room.roomNumber}',
       'checkedInEnd': end != null ? Timestamp.fromDate(end) : null,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Bump counters
+    if (wasCheckedIn &&
+        prevSlotId != null &&
+        prevSlotId.isNotEmpty &&
+        prevSlotId != room.id) {
+      await _bumpSlotCheckins(prevSlotId, -1);
+    }
+    await _bumpSlotCheckins(room.id, 1);
   }
+
+
 
   /// Check the current user out of whatever room they're in.
   Future<void> checkOutFromRoom() async {
@@ -67,6 +101,12 @@ class UserService {
 
     final uid = user.uid;
 
+    // Grab current slot id BEFORE we clear it
+    final userDoc = await _usersCol.doc(uid).get();
+    final data = userDoc.data();
+    final String? slotId = data?['checkedInRoomId'] as String?;
+
+    // Clear user check-in state
     await _usersCol.doc(uid).update({
       'checkedIn': false,
       'checkedInRoomId': null,
@@ -74,7 +114,13 @@ class UserService {
       'checkedInEnd': null,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    // Decrement slot count if we had one
+    if (slotId != null && slotId.isNotEmpty) {
+      await _bumpSlotCheckins(slotId, -1);
+    }
   }
+
 
   /// Check if the current logged-in user already has a profile doc.
   Future<bool> currentUserProfileExists() async {

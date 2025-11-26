@@ -1,6 +1,5 @@
 import json
 import os
-from pathlib import Path
 
 MIN_FREE_MINUTES = 30  # keep only intervals >= 30 min
 
@@ -28,6 +27,7 @@ def generate_slots():
                 "floor": obj["floor"],
                 "campusZone": obj["campusZone"],
                 "date": obj["date"],
+                "currentCheckins": 0,  # default value
             }
             for iv in obj["free"]:
                 s, e = iv["start"], iv["end"]

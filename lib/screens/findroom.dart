@@ -32,7 +32,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
       final month = int.parse(dateParts[1]);
       final day = int.parse(dateParts[2]);
 
-      final timeParts = r.end.split(':');   // "08:30"
+      final timeParts = r.end.split(':'); // "08:30"
       if (timeParts.length != 2) return null;
       final hour = int.parse(timeParts[0]);
       final minute = int.parse(timeParts[1]);
@@ -44,7 +44,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
   }
 
   DateTime _now() => DevConfig.now();
-  
+
   int _hhmmToMinutes(String hhmm) {
     if (hhmm.isEmpty) return -1;
     final parts = hhmm.split(':');
@@ -242,10 +242,13 @@ class _FindRoomPageState extends State<FindRoomPage> {
       // 1) Update Firestore user doc
       await UserService.instance.checkInToRoom(r);
 
-      // 2) Update local in-memory check-in state
+      // 2) Optimistic bump of local count
+      r.currentCheckins = (r.currentCheckins) + 1;
+
+      // 3) Update local in-memory check-in state
       CheckInService.instance.checkIn(room: r);
 
-      // 3) Start countdown timer for the remaining duration of this slot
+      // 4) Start countdown timer for the remaining duration of this slot
       final end = _slotEndDateTime(r);
       final now = _now(); // uses DevConfig.now() (real or fake)
       if (end != null) {
@@ -276,11 +279,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
       );
     } finally {
       if (mounted) {
-        setState(() {}); // refresh buttons if needed
+        setState(() {}); // refresh buttons + counts if needed
       }
     }
   }
-
 
   Future<void> _checkOut(Room r) async {
     if (!CheckInService.instance.isCurrentRoom(r)) return;
@@ -289,7 +291,12 @@ class _FindRoomPageState extends State<FindRoomPage> {
       // 1) Update Firestore user doc
       await UserService.instance.checkOutFromRoom();
 
-      // 2) Update in-memory state + stop timer
+      // 2) Optimistic decrement of local count
+      if (r.currentCheckins > 0) {
+        r.currentCheckins = r.currentCheckins - 1;
+      }
+
+      // 3) Update in-memory state + stop timer
       CheckInService.instance.checkOut();
 
       if (!mounted) return;
@@ -309,11 +316,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
       );
     } finally {
       if (mounted) {
-        setState(() {});
+        setState(() {}); // refresh buttons + counts
       }
     }
   }
-
 
   // Pagination controls
   void _goNext() {
@@ -590,9 +596,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                   children: [
                                     ...slots.map((r) {
                                       final isActiveNow = _isSlotActiveNow(r);
-                                      final isCurrent =
-                                          CheckInService.instance
-                                              .isCurrentRoom(r);
+                                      final isCurrent = CheckInService.instance
+                                          .isCurrentRoom(r);
                                       final key = _slotKey(r);
 
                                       final isReported = r.userHasReported ||
@@ -671,9 +676,16 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                         ),
                                       );
 
+                                      // === Check-in count label ===
+                                      final checkins = r.currentCheckins;
+                                      final checkinsLabel =
+                                          checkins == 0
+                                              ? 'No one checked in yet'
+                                              : '$checkins student${checkins == 1 ? '' : 's'} checked in';
+
                                       return Container(
-                                        margin:
-                                            const EdgeInsets.only(bottom: 10),
+                                        margin: const EdgeInsets.only(
+                                            bottom: 10),
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
@@ -731,6 +743,15 @@ class _FindRoomPageState extends State<FindRoomPage> {
                                                 ),
                                                 checkInOutButton,
                                               ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              checkinsLabel,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black54,
+                                                fontStyle: FontStyle.italic,
+                                              ),
                                             ),
                                           ],
                                         ),

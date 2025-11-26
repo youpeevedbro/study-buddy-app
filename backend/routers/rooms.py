@@ -36,8 +36,9 @@ def _doc_to_room(doc, user_has_reported: bool = False) -> Room:
         start=d.get("start", ""),
         end=d.get("end", ""),
         # Firestore field stored as "locked_reports"
-        lockedReports=int(d.get("locked_reports", 0)),
+        lockedReports = int(d.get("locked_reports", 0) or 0),
         userHasReported=user_has_reported,
+        currentCheckins=int(d.get("currentCheckins", 0) or 0),
     )
 
 

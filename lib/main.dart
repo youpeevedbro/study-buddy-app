@@ -40,6 +40,16 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // // ---------------------------------------
+  // // ENABLE FAKE TIME FOR TESTING
+  // // ---------------------------------------
+  // DevConfig.setFakeTime(
+  //   DateTime(2025, 11, 26, 18, 45),  // <-- pick any time you need
+  // );
+  // // DevConfig.useRealTime(); // turn off later
+  // DevConfig.printDebugInfo();
+  // // ---------------------------------------
+
   runApp(const StudyBuddyApp());
 }
 
