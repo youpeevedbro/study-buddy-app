@@ -64,9 +64,9 @@ class Api {
     int limit = 50,
     String? pageToken,
     String? building,
-    String? startTime, // "HH:mm", optional (backend currently ignores them)
-    String? endTime,   // "HH:mm", optional
-    String? date,      // "YYYY-MM-DD"
+    String? startTime, // "HH:mm" (optional)
+    String? endTime,   // "HH:mm" (optional)
+    String? date,      // "YYYY-MM-DD" (optional)
   }) async {
     final qp = <String, String>{'limit': '$limit'};
     if (pageToken != null) qp['pageToken'] = pageToken;
@@ -121,7 +121,8 @@ class Api {
 
     if (resp.statusCode != 200) {
       throw Exception(
-          "Rooms request failed: ${resp.statusCode} ${resp.body}");
+        "Rooms request failed: ${resp.statusCode} ${resp.body}",
+      );
     }
 
     // Save first page without time filters to cache

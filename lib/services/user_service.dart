@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/user_profile.dart';
 import '../models/room.dart';
+import '../services/api_client.dart'; // for apiGet / apiPost
 
 class UserService {
   UserService._();
@@ -236,8 +237,9 @@ class UserService {
 
   /// Permanently delete the current user's account.
   /// This will:
-  ///   1. Delete Firestore users/{uid}
-  ///   2. Delete the Firebase Auth user
+  ///   1. Ask the backend to clean up study groups
+  ///   2. Delete Firestore users/{uid}
+  ///   3. Delete the Firebase Auth user
   Future<void> deleteCurrentUserAccount() async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -246,14 +248,20 @@ class UserService {
 
     final uid = user.uid;
 
-    // 1) Delete Firestore profile document
+    // 1) Tell backend to clean up their study groups
+    final resp = await apiPost('/group/cleanupCurrentUser', {});
+    print('cleanupCurrentUser: ${resp.statusCode} ${resp.body}');
+    if (resp.statusCode >= 400) {
+      throw Exception('Failed to clean up study groups before account deletion.');
+    }
+
+    // 2) Delete Firestore profile document
     await _usersCol.doc(uid).delete();
 
-    // 2) Delete the Firebase Auth user
+    // 3) Delete the Firebase Auth user
     try {
       await user.delete();
     } on FirebaseAuthException catch (e) {
-      // Firebase can require recent login for sensitive actions like delete().
       if (e.code == 'requires-recent-login') {
         throw Exception(
           'For security reasons, please sign out and log in again before deleting your account.',
@@ -262,6 +270,8 @@ class UserService {
       rethrow;
     }
   }
+
+
 
   /// Update both displayName and handle for the current user.
   Future<void> updateDisplayNameAndHandle({

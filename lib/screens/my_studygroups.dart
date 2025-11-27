@@ -1,24 +1,8 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart';
 import 'addgroup2.dart';
-
-class StudyGroup {
-  final String name;
-  final String location;
-  final String date;
-  final String startTime;
-  final String endTime;
-  final int max;
-
-  StudyGroup({
-    required this.name,
-    required this.location,
-    required this.date,
-    required this.startTime,
-    required this.endTime,
-    required this.max,
-  });
-}
+import '../models/group.dart';
+import '../services/group_service.dart';
 
 class MyStudyGroupsPage extends StatefulWidget {
   const MyStudyGroupsPage({super.key});
@@ -28,38 +12,20 @@ class MyStudyGroupsPage extends StatefulWidget {
 }
 
 class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
-  List<StudyGroup> _groups = [
-    StudyGroup(
-      name: "Math Review Group",
-      location: "ECS-302",
-      date: "11/05/2025",
-      startTime: "3:00 PM",
-      endTime: "5:00 PM",
-      max: 5,
-    ),
-    StudyGroup(
-      name: "CS Project Team",
-      location: "VEC-212",
-      date: "11/08/2025",
-      startTime: "10:00 AM",
-      endTime: "12:00 PM",
-      max: 6,
-    ),
-  ];
+  Key _key = UniqueKey(); // initial key
 
-  int _expandedIndex = -1;
+  void rebuildGroups() {
+    setState(() {
+      _key = UniqueKey(); // assign a new key to rebuild
+    });
+  }
 
   void _navigateToAddGroup() async {
-    // Wait for data from AddGroupPage
-    final newGroup = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const AddGroupPage()),
     );
-
-    // Add group if returned
-    if (newGroup != null && newGroup is StudyGroup) {
-      setState(() => _groups.add(newGroup));
-    }
+    rebuildGroups();
   }
 
   @override
@@ -129,12 +95,9 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                           fontSize: 18),
                     ),
                   ),
+                  /*
                   GradientButton(
-                    onPressed: () {
-                      if (_groups.isNotEmpty) {
-                        setState(() => _groups.removeLast());
-                      }
-                    },
+                    onPressed: () {}, 
                     borderRadius: BorderRadius.circular(12),
                     child: const Text(
                       "Remove",
@@ -144,6 +107,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                           fontSize: 18),
                     ),
                   ),
+                  */
                 ],
               ),
             ),
@@ -160,96 +124,496 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   padding: const EdgeInsets.all(10),
-                  child: SingleChildScrollView(
-                    child: ExpansionPanelList(
-                      elevation: 0,
-                      expandedHeaderPadding: EdgeInsets.zero,
-                      expansionCallback: (panelIndex, isExpanded) {
-                        setState(() {
-                          _expandedIndex =
-                              _expandedIndex == panelIndex ? -1 : panelIndex;
-                        });
-                      },
-                      children: _groups.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final group = entry.value;
-                        final isExpanded = _expandedIndex == index;
-
-                        return ExpansionPanel(
-                          canTapOnHeader: true,
-                          backgroundColor: const Color(0xFFFCF6DB),
-                          headerBuilder: (context, isExpanded) {
-                            return ListTile(
-                              title: Center(
-                                child: Text(
-                                  group.name,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: isExpanded
-                                        ? theme.primaryColor
-                                        : Colors.black,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          body: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Container(
-                              width: double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(20),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text("Location: ${group.location}",
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 6),
-                                  Text("Date: ${group.date}",
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                      "Time: ${group.startTime} - ${group.endTime}",
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600)),
-                                  const SizedBox(height: 6),
-                                  Text("Max Participants: ${group.max}",
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                            ),
-                          ),
-                          isExpanded: isExpanded,
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                  child: Groups(key: _key), 
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class Groups extends StatefulWidget {
+  const Groups({super.key});
+
+  @override
+  State<Groups> createState() => _GroupsState();
+}
+
+class _GroupsState extends State<Groups> {
+  final GroupService _service = const GroupService();
+  late Future<List<JoinedGroup>> _futureGroups;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureGroups = _service.listMyStudyGroups();
+  } 
+
+  
+  void _reloadData() {
+      setState(() {
+        _futureGroups = _service.listMyStudyGroups(); // Re-assign the Future to trigger reload
+      });
+    } 
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: FutureBuilder<List<JoinedGroup>>(
+        future: _futureGroups,
+        builder: (BuildContext context, AsyncSnapshot<List<JoinedGroup>> snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snap.hasError) {
+            return 
+              Text(
+                'Error: ${snap.error}',
+                style: const TextStyle(height: 1.3),
+              );
+      
+          }
+          final groups = snap.data ?? [];
+
+          if (groups.isEmpty) {
+            return const Padding(
+                padding: EdgeInsets.all(30),
+                child: Center(child: Text(
+                  'You have no current Study Groups.',
+                  style: TextStyle(
+                    fontSize: 18
+                  ))),
+              );
+          }
+
+          return GroupPanels(groups: groups, onReloadNeeded: _reloadData);
+        }
+      ),
+    );
+  }
+}
+
+
+class GroupPanels extends StatefulWidget {
+  final VoidCallback onReloadNeeded;
+  final List<JoinedGroup> groups;
+
+  const GroupPanels({super.key, required this.groups, required this.onReloadNeeded});
+
+  @override
+  State<GroupPanels> createState() => _GroupPanelsState();
+  }
+
+
+class _GroupPanelsState extends State<GroupPanels> {
+  bool _isDeleting = false;
+  bool _isLeaving = false;
+  bool _isEditing = false;
+  late List<JoinedGroup> _groups;  //only information from the 'joinedStudyGroups' field in User doc
+  late VoidCallback _onReloadNeeded;
+  final GroupService _service = const GroupService();
+
+   final _formKey = GlobalKey<FormState>();
+   final TextEditingController _groupNameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _groups = widget.groups;
+    _onReloadNeeded = widget.onReloadNeeded;
+  }
+  
+
+  
+  Future<void> _showDeleteConfirmationDialog(BuildContext context, String groupID) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Are you sure you want to delete this Study Group?'),
+          content: const Text('This Study Group will be permanently deleted and all members will be disbanded.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            ElevatedButton(
+              onPressed: _isDeleting ? null : () { 
+                _handleDelete(groupID);
+                },
+              child: _isDeleting
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                ),
+              ) : Text("Delete")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleDelete(String groupID) async {
+    setState(() {
+      _isDeleting = true;
+    });
+
+    try {
+      await _service.deleteStudyGroup(groupID);
+      _onReloadNeeded();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Study Group successfully deleted')),
+      );
+      if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+      }
+    } catch(e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDeleting = false);
+    }
+  }
+
+  Future<void> _showLeaveConfirmationDialog(BuildContext context, String groupID) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Are you sure you want to leave this Study Group?'),
+          content: const Text('After leaving, you will have to send another request if you wish to rejoin this group.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            ElevatedButton(
+              onPressed: _isLeaving ? null : () { 
+                _handleLeaving(groupID);
+                },
+              child: _isLeaving
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                ),
+              ) : Text("Leave")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleLeaving(String groupID) async {
+    setState(() {
+      _isLeaving = true;
+    });
+
+    try {
+      await _service.leaveStudyGroup(groupID); 
+      _onReloadNeeded();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully left Study Group')),
+      );
+      if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+      }
+    } catch(e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLeaving = false);
+    }
+  }
+
+  Future<void> _showEditConfirmationDialog(BuildContext context, StudyGroupResponse groupResp) async {
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Editing Study Group: \n${groupResp.name}"),
+          contentPadding: EdgeInsets.fromLTRB(22, 44.0, 22, 20.0),
+          content: Form(
+            key: _formKey,
+            child: TextFormField(
+              controller: _groupNameController,
+              decoration: InputDecoration(
+                labelText: 'Study Group name..',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16)
+                )
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter some text';
+                }
+                return null;
+              }
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            ElevatedButton(
+              onPressed: _isEditing ? null : () { 
+                if (_formKey.currentState!.validate()) {
+                  StudyGroupResponse groupUpdated = groupResp.copyWith(name: _groupNameController.text.trim());
+                  _handleUpdate(groupUpdated); 
+                }
+              },
+              child: _isEditing
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                ),
+              ) : Text("Submit")
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _handleUpdate(StudyGroupResponse groupUpdated) async {
+    setState(() {
+      _isEditing = true;
+    });
+
+    try {
+      await _service.updateStudyGroup(groupUpdated); 
+      _onReloadNeeded();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Successfully updated Study Group')),
+      );
+      if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+      }
+    } catch(e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isEditing = false);
+    }
+  }
+
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ExpansionPanelList(
+      expansionCallback: (int panelIndex, bool isExpanded) {
+        setState(() {
+          _groups[panelIndex].isExpanded = isExpanded;
+        });
+      },
+      children: _groups.map<ExpansionPanel>((JoinedGroup group) {
+        return ExpansionPanel(
+          canTapOnHeader: true,
+          backgroundColor: const Color(0xFFFCF6DB),
+          headerBuilder: (BuildContext context, bool isExpanded) {
+            return ListTile(
+              title: Text(
+                group.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isExpanded
+                    ? theme.primaryColor
+                    : Colors.black,
+                )
+              ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    group.date,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600
+                    )),
+                  Text('${group.startTime} - ${group.endTime}')
+                ],
+              )
+            );
+          },
+          body: group.isExpanded  //when expanded -> query for more study group information (queries study group collection)
+            ? FutureBuilder(
+            future: _service.getStudyGroup(group.id),
+            builder: (context, snap) {
+              if (snap.connectionState == ConnectionState.waiting) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snap.hasError) {
+                return 
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      '${snap.error}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600
+                      ),
+                    ),
+                  ); 
+              }
+
+              final groupResponse = snap.data!;
+              return Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(20),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Location: ${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text("Owner: ${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Text(
+                          "${groupResponse.quantity} members: ${groupResponse.members}",
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600)
+                      ),
+                      const SizedBox(height: 8),
+                    
+                      if (groupResponse.access == "owner")... [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              ElevatedButton(
+                                onPressed: () => _showEditConfirmationDialog(context, groupResponse), 
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                  foregroundColor: theme.colorScheme.onSurfaceVariant,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10), // Rounded corners
+                                  ),
+                                  maximumSize: Size(140,60)
+                                ),
+                                child: Text(
+                                  "Edit",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700
+                                  )
+                                ),
+                              ),
+                              SizedBox(width: 15),
+                              ElevatedButton(
+                                onPressed: () => _showDeleteConfirmationDialog(context, groupResponse.id), 
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.error,
+                                  foregroundColor: theme.colorScheme.onError,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10), // Rounded corners
+                                  ),
+                                  maximumSize: Size(140,60)
+                                ),
+                                child: Text(
+                                  "DELETE",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700
+                                  )
+                                ),
+                              ),
+                            ]
+                        ),
+                      ],
+
+                      if (groupResponse.access == "member")... [
+                        Align(
+                          alignment: Alignment.bottomRight,
+                          child: ElevatedButton(
+                            onPressed: () => _showLeaveConfirmationDialog(context, groupResponse.id), 
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error,
+                              foregroundColor: theme.colorScheme.onError,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10), // Rounded corners
+                              ),
+                              maximumSize: Size(140,60)
+                            ),
+                            child: Text(
+                              "LEAVE",
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700
+                              )
+                            ),
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
+                ),
+              );
+            }
+          )
+          : Container(),
+          isExpanded: group.isExpanded,  //whether panel is currently expanded or not
+        );
+      }).toList(),
     );
   }
 }

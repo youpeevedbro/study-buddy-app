@@ -67,11 +67,14 @@ def list_rooms(
     limit: int = Query(50, ge=1, le=200),
     pageToken: Optional[str] = Query(None, alias="pageToken"),
     building: Optional[str] = Query(None, description="buildingCode like AS, ECS, LA1"),
+    date: Optional[str] = Query(None, description="YYYY-MM-DD"), # ADDED DATE
     startTime: Optional[str] = Query(None, description="HH:mm (inclusive start of desired window)"),
     endTime: Optional[str] = Query(None, description="HH:mm (exclusive end of desired window)"),
     claims: dict = Depends(verify_firebase_token),
 ):
     """
+    UPDATED: Returns today's available room slots if no date is provided
+
     Returns ONLY today's available room slots (from `availabilitySlots`).
 
     Time filter semantics (overlap mode):
@@ -100,7 +103,9 @@ def list_rooms(
         today = now.strftime("%Y-%m-%d")
 
         # Base query: today only
-        q = col.where("date", "==", today)
+        # CHANGED TO: defaults to today if no date is specified
+        q_date = date if date else today
+        q = col.where("date", "==", q_date)
 
         # Optional: building
         if building:
