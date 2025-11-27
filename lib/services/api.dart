@@ -7,9 +7,6 @@ import '../config/app_config.dart';
 import '../models/room.dart';
 import 'rooms_cache.dart';
 
-import 'package:flutter/foundation.dart' show kIsWeb; //can remove later
-import 'dart:io' show Platform; //can remove later
-
 class Api {
   /// Base URL for the backend — resolved by AppConfig.init()
   static String get base => AppConfig.apiBase;
@@ -59,12 +56,6 @@ class Api {
     return list.cast<Map<String, dynamic>>().map(Room.fromJson).toList();
   }
 
-  static String localBase(){  // Can remove later
-    if (kIsWeb) return 'http://localhost:8000';
-    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
-    return 'http://localhost:8000';
-  }
-
   /// PAGINATED + OPTIONAL LOCAL CACHE
   ///
   /// Backend returns:
@@ -73,9 +64,9 @@ class Api {
     int limit = 50,
     String? pageToken,
     String? building,
-    String? startTime, // "HH:mm", optional (backend currently ignores them)
-    String? endTime,   // "HH:mm", optional
-    String? date,      // "YYYY-MM-DD"
+    String? startTime, // "HH:mm" (optional)
+    String? endTime,   // "HH:mm" (optional)
+    String? date,      // "YYYY-MM-DD" (optional)
   }) async {
     final qp = <String, String>{'limit': '$limit'};
     if (pageToken != null) qp['pageToken'] = pageToken;
@@ -124,14 +115,14 @@ class Api {
     }
 
     // ---- No cache hit OR we have time filters / later pages → backend call ----
-    //final uri = _u('/rooms/', qp);
-    final uri = Uri.parse("${localBase()}/rooms/").replace(queryParameters: qp);  //TEMPORARY TO TEST CHANGES TO rooms.py
+    final uri = _u('/rooms/', qp);
     final resp =
     await http.get(uri, headers: await _headers()).timeout(_timeout);
 
     if (resp.statusCode != 200) {
       throw Exception(
-          "Rooms request failed: ${resp.statusCode} ${resp.body}");
+        "Rooms request failed: ${resp.statusCode} ${resp.body}",
+      );
     }
 
     // Save first page without time filters to cache
