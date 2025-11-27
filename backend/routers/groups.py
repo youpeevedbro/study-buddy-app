@@ -1,3 +1,4 @@
+# backend/routers/groups.py
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Union
 from services.firestore_client import get_db, firestore
@@ -425,3 +426,64 @@ def delete_group(group_id: str, claims: dict = Depends(verify_firebase_token)):
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
+    
+@router.post("/cleanupCurrentUser")
+def cleanup_current_user_study_groups(
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Used when a user is about to delete their account.
+
+    It will:
+    1) Delete all study groups they OWN, and remove those groups from every
+       user's joinedStudyGroupIds / joinedStudyGroups.
+    2) Remove them from any study groups they JOINED (but do not own),
+       updating both the group.members and their user doc.
+    """
+    try:
+        db = get_db()
+        col = db.collection(COLLECTION)
+        users_col = db.collection(USER_COLLECTION)
+
+        uid = claims.get("uid") or claims.get("sub")
+
+        # 1) Delete all groups this user OWNS
+        owned_groups = col.where("ownerID", "==", uid).stream()
+
+        for g in owned_groups:
+            group_ref = col.document(g.id)
+
+            # All users who have this group in joinedStudyGroupIds
+            users_query = users_col.where(
+                filter=FieldFilter("joinedStudyGroupIds", "array_contains", g.id)
+            )
+
+            tx = db.transaction()
+            _delete_group_transaction(tx, group_ref, users_query)
+
+        # 2) Remove the user from groups they JOINED (but don't own)
+        joined_groups = col.where(
+            filter=FieldFilter("members", "array_contains", uid)
+        ).stream()
+
+        for g in joined_groups:
+            gdict = g.to_dict() or {}
+
+            # If they own it, it was already deleted above
+            if gdict.get("ownerID") == uid:
+                continue
+
+            group_ref = col.document(g.id)
+            user_ref = users_col.document(uid)
+
+            tx = db.transaction()
+            _delete_groupMember_transaction(tx, group_ref, user_ref)
+
+        # Nothing to return; caller just needs success status
+        return {"status": "ok"}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/groups cleanupCurrentUser failed: {type(e).__name__}: {e}",
+        )
