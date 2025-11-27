@@ -27,6 +27,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
 
   bool _submitting = false;
   bool _canEdit = true;
+  bool _canEditTime = false;
   final GroupService _service = const GroupService();
 
   SelectedGroupFields? _groupFields;
@@ -91,6 +92,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
       _startTimeController.text = _formatTime(_groupFields!.startTime!);
       _endTimeController.text = _formatTime(_groupFields!.endTime!);
       _canEdit = false;
+      _canEditTime = true;
     });
   }
 
@@ -136,6 +138,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
 
   // Controller-aware Cupertino time picker
   void _showCupertinoTimePickerFor(TextEditingController controller) { 
+    if (!_canEditTime) return;
     final date = _groupFields!.date!;         
     final start = _groupFields!.startTime!;  //contains start and end times from the availabilityslot chosen
     final end = _groupFields!.endTime!;
