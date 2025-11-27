@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:study_buddy/services/auth_service.dart';
 
-const String kApiBase = 'https://YOUR_API_BASE'; // replace with your backend URL
+const String kApiBase = 'https://studybuddy-backend-157338247439.us-central1.run.app'; // replace with your backend URL
 
 /// GET helper
 Future<http.Response> apiGet(String path) async {

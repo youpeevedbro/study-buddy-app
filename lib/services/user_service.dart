@@ -203,7 +203,8 @@ class UserService {
     final uid = user.uid;
 
     // 1) Tell backend to clean up their study groups
-    final resp = await apiPost('/groups/cleanupCurrentUser', {});
+    final resp = await apiPost('/group/cleanupCurrentUser', {});
+    print('cleanupCurrentUser: ${resp.statusCode} ${resp.body}');
     if (resp.statusCode >= 400) {
       throw Exception('Failed to clean up study groups before account deletion.');
     }

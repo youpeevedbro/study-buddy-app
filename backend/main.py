@@ -75,11 +75,11 @@ app.include_router(
     dependencies=[Depends(verify_firebase_token)],
 )
 
-app.include_router(
-    addgroup.router,
-    prefix="/groups",
-    tags=["groups"],
-)
+# app.include_router(
+#     addgroup.router,
+#     prefix="/groups",
+#     tags=["groups"],
+# )
 
 app.include_router(
     groups.router,
