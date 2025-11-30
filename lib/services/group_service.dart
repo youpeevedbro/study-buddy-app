@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../config/app_config.dart';
 import '../models/group.dart';
@@ -26,12 +27,12 @@ class GroupService {
   static Future<Map<String, String>> _headers() async {
     final user = FirebaseAuth.instance.currentUser;
     final token = await user?.getIdToken(true);
-
     return <String, String>{
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
+
 
   Future<void> createStudyGroup(SelectedGroupFields group) async {
     final uri = _u('/group/'); // Cloud Run / FastAPI endpoint
@@ -151,4 +152,114 @@ class GroupService {
       );
     }
   }
+  
+// ------------------------------------------------------------
+  // JOIN REQUESTS
+  // ------------------------------------------------------------
+
+  /// Current user sends a join request for a given group.
+  /// Backend: POST /group/{groupId}/requests/currentUser
+Future<void> sendJoinRequest(String groupId) async {
+  final uri = _u('/group/$groupId/requests/currentUser');
+  debugPrint('JOIN REQUEST URL = $uri');  // 👈 add this
+
+  final resp = await http
+      .post(
+        uri,
+        headers: await _headers(),
+        body: jsonEncode({}),
+      )
+      .timeout(_timeout);
+
+  if (resp.statusCode != 200 && resp.statusCode != 201) {
+    debugPrint('sendJoinRequest status: ${resp.statusCode}');
+    debugPrint('sendJoinRequest body: ${resp.body}');
+    throw Exception(
+      'Failed to send join request (${resp.statusCode}): ${resp.body}',
+    );
+  }
 }
+
+
+  /// For a study group that the current user owns, list incoming join requests.
+  /// Backend: GET /group/{groupId}/requests
+  Future<List<Map<String, dynamic>>> listIncomingRequests(String groupId) async {
+    final uri = _u('/group/$groupId/requests');
+    final resp =
+        await http.get(uri, headers: await _headers()).timeout(_timeout);
+
+    if (resp.statusCode != 200) {
+      debugPrint(
+          'listIncomingRequests error: ${resp.statusCode} ${resp.body}');
+      throw Exception(
+        'Failed to retrieve incoming requests (${resp.statusCode}): ${resp.body}',
+      );
+    }
+
+    final data = json.decode(resp.body);
+    final List<dynamic> items = data["items"] ?? [];
+
+    // map to the shape expected by MyActivitiesPage
+    return items.map<Map<String, dynamic>>((item) {
+      return {
+        "groupId": item['groupId'],
+        "groupName": item['groupName'],
+        "requesterId": item['requesterId'],
+        "requesterHandle": item['requesterHandle'],
+        "requesterName": item['requesterDisplayName'],
+      };
+    }).toList();
+  }
+
+  /// Owner accepts a join request → add user as member.
+  /// Backend: POST /group/{groupId}/members/{requesterId}
+  Future<void> acceptIncomingRequest({
+    required String groupId,
+    required String requesterId,
+  }) async {
+    final uri = _u('/group/$groupId/members/$requesterId');
+    final resp = await http
+        .post(
+          uri,
+          headers: await _headers(),
+          body: jsonEncode({}),
+        )
+        .timeout(_timeout);
+
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      debugPrint(
+          'acceptIncomingRequest error: ${resp.statusCode} ${resp.body}');
+      throw Exception(
+        'Failed to accept join request (${resp.statusCode}): ${resp.body}',
+      );
+    }
+  }
+
+  /// Owner declines a join request → delete incomingRequests/{requesterId}.
+  /// Backend: DELETE /group/{groupId}/requests/{requesterId}
+  Future<void> declineIncomingRequest({
+    required String groupId,
+    required String requesterId,
+  }) async {
+    final uri = _u('/group/$groupId/requests/$requesterId');
+    final resp = await http
+        .delete(
+          uri,
+          headers: await _headers(),
+        )
+        .timeout(_timeout);
+
+    if (resp.statusCode != 200 && resp.statusCode != 204) {
+      debugPrint(
+          'declineIncomingRequest error: ${resp.statusCode} ${resp.body}');
+      throw Exception(
+        'Failed to decline join request (${resp.statusCode}): ${resp.body}',
+      );
+    }
+  }
+
+}
+
+
+
+  

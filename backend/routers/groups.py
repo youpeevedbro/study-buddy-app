@@ -4,7 +4,7 @@ from typing import List, Union
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.field_path import FieldPath
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole, StudyGroupList
+from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole, StudyGroupList,SimpleJoinRequest,SimpleJoinRequestList
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from auth import verify_firebase_token
@@ -12,6 +12,7 @@ from auth import verify_firebase_token
 router = APIRouter()
 COLLECTION = "studyGroups"
 USER_COLLECTION = "users"
+JOIN_REQUEST_SUBCOLLECTION = "incomingRequests"
 
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
@@ -114,6 +115,8 @@ def _add_groupMember_transaction(transaction, groupRef, userRef):
     })
     # possibly ADD: INCREMENT projectedMembers in availabilitySlot doc
     # ADD: DELETE incoming_request doc associated with this user and studygroup
+    req_ref = groupRef.collection(JOIN_REQUEST_SUBCOLLECTION).document(userRef.id)
+    transaction.delete(req_ref)
 
 @firestore.transactional
 def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, usersQuery):
@@ -197,7 +200,8 @@ def add_group_member(group_id: str, user_id: str):
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
-    
+
+
 
 @router.get("/myStudyGroups")
 def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedStudyGroupResponse:
@@ -235,8 +239,6 @@ def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedSt
     except Exception as e:
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
-
-
 
 @router.get("/")
 def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupList:
@@ -486,4 +488,169 @@ def cleanup_current_user_study_groups(
         raise HTTPException(
             status_code=500,
             detail=f"/groups cleanupCurrentUser failed: {type(e).__name__}: {e}",
+        )
+
+
+
+@router.post("/{group_id}/requests/currentUser")
+def create_join_request_current_user(
+    group_id: str,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Current user requests to join the given study group.
+    Creates/overwrites studyGroups/{groupId}/incomingRequests/{userId}.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        users_col = db.collection(USER_COLLECTION)
+        groups_col = db.collection(COLLECTION)
+
+        # 1) Get user
+        user_doc = users_col.document(uid).get()
+        if not user_doc.exists:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_data = user_doc.to_dict() or {}
+
+        # 2) Get group
+        group_ref = groups_col.document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+        group_data = group_doc.to_dict() or {}
+
+        # 3) User must not already be owner or member
+        role = _get_user_groupRole(uid, group_data)
+        if role != UserGroupRole.PUBLIC:
+            raise HTTPException(
+                status_code=400,
+                detail="You are already a member or owner of this study group.",
+            )
+
+        # 4) Optional: block overlapping groups
+        _check_overlappingGroups(user_data, group_data)
+
+        # 5) Create / overwrite incoming request doc
+        req_ref = group_ref.collection(JOIN_REQUEST_SUBCOLLECTION).document(uid)
+        req_ref.set(
+            {
+                "requesterId": uid,
+                "requesterHandle": user_data.get("handle", ""),
+                "requesterDisplayName": user_data.get("displayName", ""),
+                "createdAt": datetime.now(timezone.utc),
+            }
+        )
+
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/requests/currentUser failed: {type(e).__name__}: {e}",
+        )
+
+@router.get("/{group_id}/requests", response_model=SimpleJoinRequestList)
+def list_incoming_requests(
+    group_id: str,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Owner lists incoming join requests for this study group.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        group_ref = db.collection(COLLECTION).document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+
+        group_data = group_doc.to_dict() or {}
+        role = _get_user_groupRole(uid, group_data)
+        if role != UserGroupRole.OWNER:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Study Group Owners can view join requests.",
+            )
+
+        group_name = group_data.get("name", "")
+
+        req_docs = group_ref.collection(JOIN_REQUEST_SUBCOLLECTION).stream()
+        users_col = db.collection(USER_COLLECTION)
+
+        items: list[SimpleJoinRequest] = []
+        for d in req_docs:
+            req_data = d.to_dict() or {}
+            requester_id = req_data.get("requesterId")
+            if not requester_id:
+                continue
+
+            user_doc = users_col.document(requester_id).get()
+            if not user_doc.exists:
+                continue
+            user_data = user_doc.to_dict() or {}
+
+            items.append(
+                SimpleJoinRequest(
+                    requesterId=requester_id,
+                    requesterHandle=user_data.get("handle", ""),
+                    requesterDisplayName=user_data.get("displayName", ""),
+                    groupId=group_id,
+                    groupName=group_name,
+                )
+            )
+
+        return SimpleJoinRequestList(items=items)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/requests failed: {type(e).__name__}: {e}",
+        )
+
+@router.delete("/{group_id}/requests/{user_id}")
+def decline_request(
+    group_id: str,
+    user_id: str,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Owner declines a join request: delete incomingRequests/{userId}.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        group_ref = db.collection(COLLECTION).document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+
+        group_data = group_doc.to_dict() or {}
+        role = _get_user_groupRole(uid, group_data)
+        if role != UserGroupRole.OWNER:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Study Group Owners can decline join requests.",
+            )
+
+        req_ref = group_ref.collection(JOIN_REQUEST_SUBCOLLECTION).document(user_id)
+        if req_ref.get().exists:
+            req_ref.delete()
+
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/requests/{user_id} failed: {type(e).__name__}: {e}",
         )

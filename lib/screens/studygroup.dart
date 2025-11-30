@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:study_buddy/models/group.dart';
 import '../services/group_service.dart';
 import '../services/api.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../components/grad_button.dart';
 
 class StudyGroupsPage extends StatefulWidget {
@@ -13,18 +16,6 @@ class StudyGroupsPage extends StatefulWidget {
 }
 
 class _StudyGroupsPageState extends State<StudyGroupsPage> {
-  
-  
-  /*
-  void _sendJoinRequest(int index) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Join request sent to ${_groups[index]["name"]}"),
-      ),
-    );
-    // TODO: Implement backend join request logic
-  }
-  */
 
   @override
   Widget build(BuildContext context) {
@@ -196,6 +187,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     _onReloadNeeded = widget.onReloadNeeded;
   }
 
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -298,23 +290,38 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                     ),
                     const SizedBox(height: 14),
                   
-                    if (group.access == "public")... [
-                      Align(
-                        alignment: Alignment.center,
-                        child: GradientButton(
-                          height: 35,
-                          borderRadius: BorderRadius.circular(12.0),
-                          onPressed: () {},
-                          child: const Text(
-                            "Send Join Request",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18.0,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ]
+                    if (group.access == "public") ...[
+  Align(
+    alignment: Alignment.center,
+    child: GradientButton(
+      height: 35,
+      borderRadius: BorderRadius.circular(12.0),
+      onPressed: () async {
+        try {
+          debugPrint("Sending Join Request for group ID: ${group.id}");
+          await _service.sendJoinRequest(group.id);   
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Join request sent!')),
+          );
+
+          _onReloadNeeded(); // optionally reload to show pending status
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to send join request: $e")),
+          );
+        }
+      },
+      child: const Text(
+        "Send Join Request",
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 18.0,
+        ),
+      ),
+    ),
+  ),
+]
+
                     else if (group.access == "owner" || group.access == "member")... [
                       Align(
                         alignment: Alignment.center,

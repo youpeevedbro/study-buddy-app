@@ -95,5 +95,12 @@ class StudyGroupList(BaseModel):
 
 
 
-    
+class SimpleJoinRequest(BaseModel):
+    requesterId: str
+    requesterHandle: str
+    requesterDisplayName: str
+    groupId: str
+    groupName: str
 
+class SimpleJoinRequestList(BaseModel):
+    items: List[SimpleJoinRequest]

@@ -8,3 +8,4 @@ class Group(BaseModel):
     building: str
     room: str
     creator_id: str | None = None
+

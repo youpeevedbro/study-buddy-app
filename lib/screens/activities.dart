@@ -1,5 +1,7 @@
 // lib/pages/myactivities.dart
 import 'package:flutter/material.dart';
+import '../services/group_service.dart';
+import '../models/group.dart';
 
 class MyActivitiesPage extends StatefulWidget {
   const MyActivitiesPage({super.key});
@@ -9,32 +11,110 @@ class MyActivitiesPage extends StatefulWidget {
 }
 
 class _MyActivitiesPageState extends State<MyActivitiesPage> {
-  // ----------------------------------------------------------
-  // DUMMY incoming requests (replace this later)
-  // ----------------------------------------------------------
-  List<Map<String, String>> incomingRequests = [
-    {
-      "groupName": "CPSC 331 Study Group",
-      "requester": "Alice Johnson"
-    },
-    {
-      "groupName": "CECS 378 Networking Group",
-      "requester": "Brian Lee"
-    },
-  ];
+  final GroupService _service = const GroupService();
 
   // ----------------------------------------------------------
-  // Placeholder accept/decline actions
+  // Loading state & incoming requests
   // ----------------------------------------------------------
-  void acceptRequest(int index) {
-    print("Accepted request from: ${incomingRequests[index]["requester"]}");
-    setState(() => incomingRequests.removeAt(index));
+  bool _loading = true;
+  List<Map<String, dynamic>> incomingRequests = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIncomingRequests();
   }
 
-  void declineRequest(int index) {
-    print("Declined request from: ${incomingRequests[index]["requester"]}");
-    setState(() => incomingRequests.removeAt(index));
+  // ----------------------------------------------------------
+  // Load incoming requests for groups where user is owner
+  // ----------------------------------------------------------
+  Future<void> _loadIncomingRequests() async {
+    try {
+      setState(() => _loading = true);
+
+      final userGroups = await _service.listAllStudyGroups();
+      List<Map<String, dynamic>> requests = [];
+
+      for (var group in userGroups) {
+        // Only fetch requests if current user is the owner
+        if (group.access == "owner") {
+          final groupRequests = await _service.listIncomingRequests(group.id);
+          for (var req in groupRequests) {
+            requests.add({
+              "groupId": group.id,
+              "groupName": group.name,
+              "requesterId": req['requesterId'],
+              "requesterHandle": req['requesterHandle'],
+              "requesterName": req['requesterName'],
+            });
+          }
+        }
+      }
+
+      setState(() {
+        incomingRequests = requests;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint("Failed to load incoming requests: $e");
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load requests: $e')),
+      );
+    }
   }
+
+  // ----------------------------------------------------------
+  // Accept / Decline
+  // ----------------------------------------------------------
+  Future<void> acceptRequest(int index) async {
+    final request = incomingRequests[index];
+
+    try {
+      await _service.acceptIncomingRequest(
+        groupId: request["groupId"],
+        requesterId: request["requesterId"],
+      );
+
+      setState(() {
+        incomingRequests.removeAt(index);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request accepted')),
+      );
+    } catch (e) {
+      debugPrint("Failed to accept request: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to accept request: $e')),
+      );
+    }
+  }
+
+  Future<void> declineRequest(int index) async {
+    final request = incomingRequests[index];
+
+    try {
+      await _service.declineIncomingRequest(
+        groupId: request["groupId"],
+        requesterId: request["requesterId"],
+      );
+
+      setState(() {
+        incomingRequests.removeAt(index);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Request declined')),
+      );
+    } catch (e) {
+      debugPrint("Failed to decline request: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to decline request: $e')),
+      );
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -61,17 +141,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
           color: Colors.black,
         ),
       ),
-
-      // ========================= BODY =========================
       body: SafeArea(
         child: Container(
           margin: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              //---------------------------------------------------
               // PAGE TITLE
-              //---------------------------------------------------
               const Text(
                 "My Activities",
                 style: TextStyle(
@@ -82,9 +158,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               const Divider(thickness: 1.5, color: Colors.black),
               const SizedBox(height: 20),
 
-              //---------------------------------------------------
               // MY STUDY GROUPS BUTTON
-              //---------------------------------------------------
               ElevatedButton(
                 onPressed: () => Navigator.pushNamed(context, '/mystudygroups'),
                 style: ElevatedButton.styleFrom(
@@ -104,9 +178,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
 
               const SizedBox(height: 70),
 
-              //---------------------------------------------------
               // INCOMING REQUESTS SECTION HEADER
-              //---------------------------------------------------
               const Text(
                 "Incoming Requests",
                 style: TextStyle(
@@ -127,158 +199,145 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               ),
               const SizedBox(height: 12),
 
-              //---------------------------------------------------
-              // REQUEST LIST OR NO REQUEST MESSAGE
-              //---------------------------------------------------
-              if (incomingRequests.isEmpty)
-                const Text(
-                  "No incoming requests",
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                )
-              else
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: incomingRequests.length,
-                    itemBuilder: (context, index) {
-                      final request = incomingRequests[index];
-                      return Dismissible(
-                        key: ValueKey(request["groupName"] ?? index),
-                        direction: DismissDirection.horizontal,
-                        background: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.check, color: Colors.white),
-                              SizedBox(width: 8),
-                              Text('Accept',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700)),
-                            ],
-                          ),
-                        ),
-                        secondaryBackground: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Text('Decline',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700)),
-                              SizedBox(width: 8),
-                              Icon(Icons.close, color: Colors.white),
-                            ],
-                          ),
-                        ),
-                        confirmDismiss: (direction) async {
-                          // Accept (swipe right) proceeds immediately without dialog
-                          if (direction == DismissDirection.startToEnd) {
-                            acceptRequest(index);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Accepted ${request["requester"] ?? ""}'),
-                                backgroundColor: Colors.green,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                            return true; // allow dismiss
-                          }
-
-                          // Decline (swipe left) shows confirmation dialog
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Decline Request'),
-                              content: Text(
-                                'Are you sure you want to decline this request from ${request["requester"]}?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                  ),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Decline'),
-                                ),
-                              ],
+              // REQUEST LIST / LOADING / EMPTY STATE
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : incomingRequests.isEmpty
+                        ? const Center(
+                            child: Text(
+                              "No incoming requests",
+                              style: TextStyle(fontSize: 16, color: Colors.grey),
                             ),
-                          );
-
-                          if (confirm == true) {
-                            declineRequest(index);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Declined ${request["requester"] ?? ""}'),
-                                backgroundColor: Colors.red,
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                            return true;
-                          }
-                          return false; // keep item
-                        },
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
-                              color: Colors.white,
-                              child: Row(
-                                children: [
-                                  // LEFT SIDE (group + requester)
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          request["groupName"] ?? "",
-                                          style: const TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                          )
+                        : ListView.builder(
+                            itemCount: incomingRequests.length,
+                            itemBuilder: (context, index) {
+                              final request = incomingRequests[index];
+                              return Dismissible(
+                                key: ValueKey('${request["groupId"]}_${request["requesterId"]}_$index'),
+                                direction: DismissDirection.horizontal,
+                                background: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  alignment: Alignment.centerLeft,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  child: const Row(
+                                    children: [
+                                      Icon(Icons.check, color: Colors.white),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Accept',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          "${request["requester"]} wants to join.",
-                                          style: const TextStyle(
-                                            fontSize: 15,
-                                            color: Colors.black87,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                secondaryBackground: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.red,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'Decline',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Icon(Icons.close, color: Colors.white),
+                                    ],
+                                  ),
+                                ),
+                                confirmDismiss: (direction) async {
+                                  if (direction == DismissDirection.startToEnd) {
+                                    await acceptRequest(index);
+                                    return true;
+                                  }
+
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Decline Request'),
+                                      content: Text(
+                                        'Are you sure you want to decline this request from ${request["requesterName"]}?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red,
                                           ),
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          child: const Text('Decline'),
                                         ),
                                       ],
                                     ),
-                                  ),
+                                  );
 
-                                  // HINT TEXT
-                                  const Text(
-                                    "Swipe →",
-                                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            const Divider(height: 1, thickness: 0.6, color: Colors.black12),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                                  if (confirm == true) {
+                                    await declineRequest(index);
+                                    return true;
+                                  }
+                                  return false;
+                                },
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+                                      color: Colors.white,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  request["groupName"] ?? "",
+                                                  style: const TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  "${request["requesterName"]} wants to join.",
+                                                  style: const TextStyle(
+                                                    fontSize: 15,
+                                                    color: Colors.black87,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const Text(
+                                            "← Swipe →",
+                                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Divider(height: 1, thickness: 0.6, color: Colors.black12),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+              ),
             ],
           ),
         ),
