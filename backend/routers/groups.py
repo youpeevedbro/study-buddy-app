@@ -210,6 +210,46 @@ def create_group(group: StudyGroupCreate, claims: dict = Depends(verify_firebase
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
 
+@router.get("/myInvites", response_model=IncomingGroupInviteList)
+def list_my_incoming_invites(
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Current user lists all incoming group invites.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
+            "inviteeId", "==", uid
+        )
+
+        items: list[IncomingGroupInvite] = []
+        for d in invite_query.stream():
+            inv = d.to_dict() or {}
+            items.append(
+                IncomingGroupInvite(
+                    inviteeId=inv.get("inviteeId", ""),
+                    groupId=inv.get("groupId", ""),
+                    groupName=inv.get("groupName", ""),
+                    ownerId=inv.get("ownerId", ""),
+                    ownerHandle=inv.get("ownerHandle", ""),
+                    ownerDisplayName=inv.get("ownerDisplayName", ""),
+                )
+            )
+
+        return IncomingGroupInviteList(items=items)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/groups/myInvites failed: {type(e).__name__}: {e}",
+        )
+
+
 # ADD dependency: User accepting request to join is Study Group Owner 
 #                    + ensure User being added is not already a member
 @router.post("/{group_id}/members/{user_id}")
@@ -486,6 +526,8 @@ def cleanup_current_user_study_groups(
        user's joinedStudyGroupIds / joinedStudyGroups.
     2) Remove them from any study groups they JOINED (but do not own),
        updating both the group.members and their user doc.
+    3) Delete any join requests this user has sent.
+    4) Delete any invites where this user is the invitee.
     """
     try:
         db = get_db()
@@ -527,22 +569,26 @@ def cleanup_current_user_study_groups(
             _delete_groupMember_transaction(tx, group_ref, user_ref)
 
         # 3) Delete any join requests this user has sent
-        #    (studyGroups/*/incomingRequests where requesterId == uid)
         req_query = db.collection_group(JOIN_REQUEST_SUBCOLLECTION).where(
             "requesterId", "==", uid
         )
         for req_doc in req_query.stream():
             req_doc.reference.delete()
-        
+
         # 4) Delete any invites where this user is the invitee
-        invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
-            "inviteeId", "==", uid
-        )
-        for inv_doc in invite_query.stream():
-            inv_doc.reference.delete()
-        
-        
-        # Nothing to return; caller just needs success status
+        try:
+            invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
+                "inviteeId", "==", uid
+            )
+            for inv_doc in invite_query.stream():
+                inv_doc.reference.delete()
+        except Exception as sub_e:
+            # Log but don't fail the entire cleanup if invite deletion has an issue
+            print(
+                f"[cleanupCurrentUser] Failed to delete some invites for {uid}: "
+                f"{type(sub_e).__name__}: {sub_e}"
+            )
+
         return {"status": "ok"}
 
     except Exception as e:
@@ -871,45 +917,7 @@ def invite_user_by_handle(
             detail=f"/group/{group_id}/inviteByHandle failed: {type(e).__name__}: {e}",
         )
 
-@router.get("/myInvites", response_model=IncomingGroupInviteList)
-def list_my_incoming_invites(
-    claims: dict = Depends(verify_firebase_token),
-):
-    """
-    Current user lists all incoming group invites.
-    """
-    try:
-        db = get_db()
-        uid = claims.get("uid") or claims.get("sub")
 
-        # collection_group query across all studyGroups/*/invites
-        invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
-            "inviteeId", "==", uid
-        )
-
-        items: list[IncomingGroupInvite] = []
-        for d in invite_query.stream():
-            inv = d.to_dict() or {}
-            items.append(
-                IncomingGroupInvite(
-                    inviteeId=inv.get("inviteeId", ""),
-                    groupId=inv.get("groupId", ""),
-                    groupName=inv.get("groupName", ""),
-                    ownerId=inv.get("ownerId", ""),
-                    ownerHandle=inv.get("ownerHandle", ""),
-                    ownerDisplayName=inv.get("ownerDisplayName", ""),
-                )
-            )
-
-        return IncomingGroupInviteList(items=items)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"/groups/myInvites failed: {type(e).__name__}: {e}",
-        )
 
 @router.post("/{group_id}/invites/{user_id}/accept")
 def accept_invite(
