@@ -123,6 +123,7 @@ def _create_group_transaction(transaction, userRef, newGroupRef, data):
 @firestore.transactional
 def _add_groupMember_transaction(transaction, groupRef, userRef):
     group_dict = groupRef.get(transaction=transaction).to_dict() or {}
+    
     transaction.update(groupRef, {"members": firestore.ArrayUnion([userRef.id]),
                                   "quantity": firestore.Increment(1)})
     transaction.update(userRef, {
@@ -134,9 +135,16 @@ def _add_groupMember_transaction(transaction, groupRef, userRef):
                                         
     })
     # possibly ADD: INCREMENT projectedMembers in availabilitySlot doc
-    # ADD: DELETE incoming_request doc associated with this user and studygroup
+
+    # Delete any pending join request from this user for this group
     req_ref = groupRef.collection(JOIN_REQUEST_SUBCOLLECTION).document(userRef.id)
     transaction.delete(req_ref)
+
+    # Delete any invite for this user for this group
+    invite_ref = groupRef.collection(INVITES_SUBCOLLECTION).document(userRef.id)
+    transaction.delete(invite_ref)
+
+
 
 @firestore.transactional
 def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, usersQuery):

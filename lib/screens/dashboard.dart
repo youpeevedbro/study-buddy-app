@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
+import '../services/group_service.dart';          // 👈 NEW
 import 'dart:async';
 import '../config/dev_config.dart';
 
@@ -17,6 +18,11 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
+  // 👇 NEW: for the My Activities badge
+  final GroupService _groupService = const GroupService();
+  bool _loadingActivities = false;
+  int _incomingActivityCount = 0; // join-requests (to my groups) + invites to me
+
   @override
   void initState() {
     super.initState();
@@ -42,7 +48,42 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
+  // 👇 NEW: compute how many incoming activities we have
+  Future<void> _refreshActivityBadge() async {
+    if (!mounted) return;
+    setState(() => _loadingActivities = true);
 
+    try {
+      int incoming = 0;
+
+      // 1) Get all study groups
+      final groups = await _groupService.listAllStudyGroups();
+
+      // For groups I own, count incoming join-requests
+      for (final g in groups) {
+        if (g.access == "owner") {
+          final reqs = await _groupService.listIncomingRequests(g.id);
+          incoming += reqs.length;
+        }
+      }
+
+      // 2) Add invites that were sent TO me
+      final myInvites = await _groupService.listMyIncomingInvites();
+      incoming += myInvites.length;
+
+      if (!mounted) return;
+      setState(() {
+        _incomingActivityCount = incoming;
+        _loadingActivities = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _loadingActivities = false;
+      // Optional: show a snack bar or log
+      // debugPrint('Failed to refresh activity badge: $e');
+      setState(() {});
+    }
+  }
 
   Future<void> _restoreCheckinFromProfile() async {
     final profile = await UserService.instance.getCurrentUserProfile();
@@ -82,7 +123,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     // 2) Restart the timer for the remaining duration
     TimerService.instance.start(Duration(seconds: remaining));
   }
-
 
   Future<void> _autoCheckout() async {
     try {
@@ -131,11 +171,14 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     } else {
       // After confirming login, restore check-in state if needed
       await _restoreCheckinFromProfile();
+
+      // 👇 NEW: once we know we are logged in, load activity badge
+      await _refreshActivityBadge();
+
       if (!mounted) return;
       setState(() {}); // ensure UI reflects restored state
     }
   }
-
 
   bool _checkingOut = false;
 
@@ -171,7 +214,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
-
   String _formatTime(int totalSeconds) {
     if (totalSeconds < 0) totalSeconds = 0;
 
@@ -184,12 +226,11 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
 
     if (hours > 0) {
       final hh = hours.toString().padLeft(2, '0');
-      return "$hh:$mm:$ss";    // e.g. 07:59:41
+      return "$hh:$mm:$ss"; // e.g. 07:59:41
     } else {
-      return "$mm:$ss";        // e.g. 59:41
+      return "$mm:$ss"; // e.g. 59:41
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +250,8 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -239,7 +281,8 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                     Expanded(
                       child: SquareButton(
                         text: "Account\nSettings",
-                        onPressed: () => Navigator.pushNamed(context, '/profile'),
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/profile'),
                         backgroundColor: const Color(0xFFf79f79),
                       ),
                     ),
@@ -247,7 +290,8 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                     Expanded(
                       child: SquareButton(
                         text: "Find Study\nGroup",
-                        onPressed: () => Navigator.pushNamed(context, '/studygroup'),
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/studygroup'),
                         backgroundColor: const Color(0xFFf7d08a),
                       ),
                     ),
@@ -261,16 +305,55 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                     Expanded(
                       child: SquareButton(
                         text: "Find\nRoom",
-                        onPressed: () => Navigator.pushNamed(context, '/rooms'),
+                        onPressed: () =>
+                            Navigator.pushNamed(context, '/rooms'),
                         backgroundColor: const Color(0xFFbfd7b5),
                       ),
                     ),
                     const SizedBox(width: 30),
                     Expanded(
-                      child: SquareButton(
-                        text: "My\nActivities",
-                        onPressed: () => Navigator.pushNamed(context, "/activities"),
-                        backgroundColor: const Color(0xFFffd6af),
+                      // 👇 wrap My Activities in a Stack so we can draw a badge
+                      child: Stack(
+                        children: [
+                          SquareButton(
+                            text: "My\nActivities",
+                            onPressed: () async {
+                              await Navigator.pushNamed(
+                                  context, "/activities");
+                              // Refresh the badge after returning
+                              await _refreshActivityBadge();
+                            },
+                            backgroundColor: const Color(0xFFffd6af),
+                          ),
+
+                          // red circular badge (only if there is activity)
+                          if (_incomingActivityCount > 0)
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(
+                                  minWidth: 20,
+                                  minHeight: 20,
+                                ),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _incomingActivityCount.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -282,7 +365,8 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                 if (checkedIn)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 15),
                     margin: const EdgeInsets.only(bottom: 15),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFDDD8),
@@ -303,7 +387,8 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                         ),
                         const Spacer(),
                         Text(
-                          _formatTime(TimerService.instance.secondsRemaining),
+                          _formatTime(
+                              TimerService.instance.secondsRemaining),
                           style: const TextStyle(
                             fontFamily: 'SuperLobster',
                             fontSize: 18,
@@ -327,40 +412,40 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                   ),
                   child: checkedIn
                       ? Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Text(
-                        roomLabel, // ECS-228B
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton(
-                        onPressed: _checkOutRoom,
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(
-                            fontSize: 18,
-                            fontFamily: "SuperLobster",
+                          children: [
+                            const SizedBox(width: 15),
+                            Text(
+                              roomLabel, // ECS-228B
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Spacer(),
+                            ElevatedButton(
+                              onPressed: _checkOutRoom,
+                              style: ElevatedButton.styleFrom(
+                                textStyle: const TextStyle(
+                                  fontSize: 18,
+                                  fontFamily: "SuperLobster",
+                                ),
+                              ),
+                              child: const Text("Check-out"),
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                        )
+                      : const Center(
+                          child: Text(
+                            "You are currently not checked into a room",
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontFamily: 'SuperLobster',
+                              color: Colors.black,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        child: const Text("Check-out"),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  )
-                      : const Center(
-                    child: Text(
-                      "You are currently not checked into a room",
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontFamily: 'SuperLobster',
-                        color: Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
                 ),
               ],
             ),
