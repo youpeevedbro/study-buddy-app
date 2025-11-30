@@ -224,11 +224,16 @@ def list_my_incoming_invites(
 ):
     """
     Current user lists all incoming group invites.
+    Owner handle/displayName are fetched live from the users collection,
+    so if the owner changes their profile, it is reflected here.
     """
     try:
         db = get_db()
         uid = claims.get("uid") or claims.get("sub")
 
+        users_col = db.collection(USER_COLLECTION)
+
+        # collection_group query across all studyGroups/*/invites
         invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
             "inviteeId", "==", uid
         )
@@ -236,14 +241,31 @@ def list_my_incoming_invites(
         items: list[IncomingGroupInvite] = []
         for d in invite_query.stream():
             inv = d.to_dict() or {}
+            group_id = inv.get("groupId", "")
+            group_name = inv.get("groupName", "")
+            owner_id = inv.get("ownerId", "")
+
+            if not owner_id or not group_id:
+                continue
+
+            # Refresh owner name/handle from users collection
+            owner_doc = users_col.document(owner_id).get()
+            if not owner_doc.exists:
+                # Owner account might have been deleted; skip or show with blanks
+                continue
+
+            owner_data = owner_doc.to_dict() or {}
+            owner_handle = owner_data.get("handle", "")
+            owner_display_name = owner_data.get("displayName", "")
+
             items.append(
                 IncomingGroupInvite(
-                    inviteeId=inv.get("inviteeId", ""),
-                    groupId=inv.get("groupId", ""),
-                    groupName=inv.get("groupName", ""),
-                    ownerId=inv.get("ownerId", ""),
-                    ownerHandle=inv.get("ownerHandle", ""),
-                    ownerDisplayName=inv.get("ownerDisplayName", ""),
+                    inviteeId=uid,
+                    groupId=group_id,
+                    groupName=group_name,
+                    ownerId=owner_id,
+                    ownerHandle=owner_handle,
+                    ownerDisplayName=owner_display_name,
                 )
             )
 
@@ -256,6 +278,7 @@ def list_my_incoming_invites(
             status_code=500,
             detail=f"/groups/myInvites failed: {type(e).__name__}: {e}",
         )
+
 
 
 # ADD dependency: User accepting request to join is Study Group Owner 
@@ -737,17 +760,24 @@ def list_outgoing_invites(
 ):
     """
     Owner lists outgoing invites for this study group.
+    Names/handles are refreshed from the latest user docs so changes
+    to a user's handle/displayName are reflected in the UI.
     """
     try:
         db = get_db()
         uid = claims.get("uid") or claims.get("sub")
 
-        group_ref = db.collection(COLLECTION).document(group_id)
+        groups_col = db.collection(COLLECTION)
+        users_col = db.collection(USER_COLLECTION)
+
+        group_ref = groups_col.document(group_id)
         group_doc = group_ref.get()
         if not group_doc.exists:
             raise HTTPException(status_code=404, detail="Study Group not found")
 
         group_data = group_doc.to_dict() or {}
+        group_name = group_data.get("name", "")
+
         role = _get_user_groupRole(uid, group_data)
         if role != UserGroupRole.OWNER:
             raise HTTPException(
@@ -757,19 +787,42 @@ def list_outgoing_invites(
 
         invite_docs = group_ref.collection(INVITES_SUBCOLLECTION).stream()
 
+        # Get latest owner info from users collection
+        owner_doc = users_col.document(uid).get()
+        owner_data = owner_doc.to_dict() or {}
+        owner_handle = owner_data.get("handle", "")
+        owner_display_name = owner_data.get("displayName", "")
+
         items: list[OutgoingGroupInvite] = []
+
         for d in invite_docs:
             inv = d.to_dict() or {}
+            invitee_id = inv.get("inviteeId", "")
+
+            if not invitee_id:
+                continue
+
+            # Refresh invitee's handle/name from users collection
+            invitee_doc = users_col.document(invitee_id).get()
+            if not invitee_doc.exists:
+                # If the user doc is gone (deleted account, etc.), you might
+                # skip this invite or still include it with blank fields.
+                continue
+
+            invitee_data = invitee_doc.to_dict() or {}
+            invitee_handle = invitee_data.get("handle", "")
+            invitee_display_name = invitee_data.get("displayName", "")
+
             items.append(
                 OutgoingGroupInvite(
-                    inviteeId=inv.get("inviteeId", ""),
-                    inviteeHandle=inv.get("inviteeHandle", ""),
-                    inviteeDisplayName=inv.get("inviteeDisplayName", ""),
-                    groupId=inv.get("groupId", group_id),
-                    groupName=inv.get("groupName", group_data.get("name", "")),
-                    ownerId=inv.get("ownerId", ""),
-                    ownerHandle=inv.get("ownerHandle", ""),
-                    ownerDisplayName=inv.get("ownerDisplayName", ""),
+                    inviteeId=invitee_id,
+                    inviteeHandle=invitee_handle,
+                    inviteeDisplayName=invitee_display_name,
+                    groupId=group_id,
+                    groupName=group_name,
+                    ownerId=uid,
+                    ownerHandle=owner_handle,
+                    ownerDisplayName=owner_display_name,
                 )
             )
 
@@ -782,6 +835,7 @@ def list_outgoing_invites(
             status_code=500,
             detail=f"/group/{group_id}/invites failed: {type(e).__name__}: {e}",
         )
+
 
 @router.delete("/{group_id}/requests/{user_id}")
 def decline_request(

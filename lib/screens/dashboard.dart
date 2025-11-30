@@ -6,9 +6,11 @@ import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
-import '../services/group_service.dart';          // 👈 NEW
 import 'dart:async';
 import '../config/dev_config.dart';
+
+// 👇 NEW: import the badge widget
+import '../widgets/activity_badge.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -18,11 +20,6 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
-  // 👇 NEW: for the My Activities badge
-  final GroupService _groupService = const GroupService();
-  bool _loadingActivities = false;
-  int _incomingActivityCount = 0; // join-requests (to my groups) + invites to me
-
   @override
   void initState() {
     super.initState();
@@ -45,43 +42,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
         if (!mounted) return;
         setState(() {}); // just to be extra sure UI redraws
       });
-    }
-  }
-
-  // 👇 NEW: compute how many incoming activities we have
-  Future<void> _refreshActivityBadge() async {
-    if (!mounted) return;
-    setState(() => _loadingActivities = true);
-
-    try {
-      int incoming = 0;
-
-      // 1) Get all study groups
-      final groups = await _groupService.listAllStudyGroups();
-
-      // For groups I own, count incoming join-requests
-      for (final g in groups) {
-        if (g.access == "owner") {
-          final reqs = await _groupService.listIncomingRequests(g.id);
-          incoming += reqs.length;
-        }
-      }
-
-      // 2) Add invites that were sent TO me
-      final myInvites = await _groupService.listMyIncomingInvites();
-      incoming += myInvites.length;
-
-      if (!mounted) return;
-      setState(() {
-        _incomingActivityCount = incoming;
-        _loadingActivities = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      _loadingActivities = false;
-      // Optional: show a snack bar or log
-      // debugPrint('Failed to refresh activity badge: $e');
-      setState(() {});
     }
   }
 
@@ -171,10 +131,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     } else {
       // After confirming login, restore check-in state if needed
       await _restoreCheckinFromProfile();
-
-      // 👇 NEW: once we know we are logged in, load activity badge
-      await _refreshActivityBadge();
-
       if (!mounted) return;
       setState(() {}); // ensure UI reflects restored state
     }
@@ -312,47 +268,21 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                     ),
                     const SizedBox(width: 30),
                     Expanded(
-                      // 👇 wrap My Activities in a Stack so we can draw a badge
                       child: Stack(
+                        clipBehavior: Clip.none,
                         children: [
                           SquareButton(
                             text: "My\nActivities",
-                            onPressed: () async {
-                              await Navigator.pushNamed(
-                                  context, "/activities");
-                              // Refresh the badge after returning
-                              await _refreshActivityBadge();
-                            },
+                            onPressed: () =>
+                                Navigator.pushNamed(context, "/activities"),
                             backgroundColor: const Color(0xFFffd6af),
                           ),
-
-                          // red circular badge (only if there is activity)
-                          if (_incomingActivityCount > 0)
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                constraints: const BoxConstraints(
-                                  minWidth: 20,
-                                  minHeight: 20,
-                                ),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _incomingActivityCount.toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                          // 👇 Badge in the top-right corner of the square
+                          const Positioned(
+                            top: -6,
+                            right: -6,
+                            child: ActivityBadge(),
+                          ),
                         ],
                       ),
                     ),
