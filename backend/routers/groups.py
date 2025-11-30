@@ -4,7 +4,23 @@ from typing import List, Union
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.field_path import FieldPath
-from models.group import StudyGroupCreate, StudyGroupPublicResponse, StudyGroupPrivateResponse, StudyGroupUpdate, JoinedStudyGroupResponse, JoinedStudyGroup, UserGroupRole, StudyGroupList,SimpleJoinRequest,SimpleJoinRequestList
+from models.group import (
+    StudyGroupCreate,
+    StudyGroupPublicResponse,
+    StudyGroupPrivateResponse,
+    StudyGroupUpdate,
+    JoinedStudyGroupResponse,
+    JoinedStudyGroup,
+    UserGroupRole,
+    StudyGroupList,
+    SimpleJoinRequest,
+    SimpleJoinRequestList,
+    InviteByHandle,
+    OutgoingGroupInvite,
+    OutgoingGroupInviteList,
+    IncomingGroupInvite,
+    IncomingGroupInviteList,
+)
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from auth import verify_firebase_token
@@ -13,6 +29,8 @@ router = APIRouter()
 COLLECTION = "studyGroups"
 USER_COLLECTION = "users"
 JOIN_REQUEST_SUBCOLLECTION = "incomingRequests"
+INVITES_SUBCOLLECTION = "invites"
+
 
 def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt = datetime.strptime(f"{date} {time}" , "%Y-%m-%d %H:%M")
@@ -20,7 +38,7 @@ def convert_to_utc_datetime(date: str, time: str) -> datetime:
     dt_la = dt.replace(tzinfo=la_tz)
     return dt_la.astimezone(timezone.utc) 
 
-def _doc_to_publicStudyGroup(doc, owner_doc) -> StudyGroupPublicResponse: 
+def _doc_to_publicStudyGroup(doc, owner_doc, has_pending: bool = False) -> StudyGroupPublicResponse: 
     d = doc.to_dict()
     o = owner_doc.to_dict()
     return StudyGroupPublicResponse(
@@ -36,10 +54,11 @@ def _doc_to_publicStudyGroup(doc, owner_doc) -> StudyGroupPublicResponse:
         ownerID=owner_doc.id,
         ownerHandle=o.get("handle", ""),
         ownerDisplayName=o.get("displayName", ""),
-        availabilitySlotDocument=d.get("availabilitySlotDocument", "")
+        availabilitySlotDocument=d.get("availabilitySlotDocument", ""),
+        hasPendingRequest=has_pending,
     )
 
-def _doc_to_privateStudyGroup(doc, owner_doc, members: list[str], access: UserGroupRole) -> StudyGroupPrivateResponse: 
+def _doc_to_privateStudyGroup(doc, owner_doc, members: list[str], access: UserGroupRole, has_pending: bool = False,) -> StudyGroupPrivateResponse: 
     d = doc.to_dict()
     o = owner_doc.to_dict()
     return StudyGroupPrivateResponse(
@@ -56,7 +75,8 @@ def _doc_to_privateStudyGroup(doc, owner_doc, members: list[str], access: UserGr
         ownerHandle=o.get("handle", ""),
         ownerDisplayName=o.get("displayName", ""),
         members=members,
-        availabilitySlotDocument=d.get("availabilitySlotDocument", "")
+        availabilitySlotDocument=d.get("availabilitySlotDocument", ""),
+        hasPendingRequest=has_pending,
     )
 
 def _check_overlappingGroups(userData: dict, groupData: dict):
@@ -150,7 +170,10 @@ def _delete_group_transaction(transaction, groupRef, usersQuery):
         transaction.update(doc.reference, {
             "joinedStudyGroupIds": firestore.ArrayRemove([groupRef.id]),
             f"joinedStudyGroups.{groupRef.id}": firestore.DELETE_FIELD})
-    # ADD: DELETE all applicable incoming_requests docs associated with study group (collection group query)
+    # Explicitly delete incomingRequests subcollection for this group
+    reqs = groupRef.collection(JOIN_REQUEST_SUBCOLLECTION).stream()
+    for r in reqs:
+        transaction.delete(r.reference)
     # possibly ADD: DECREMENT studygroup count in availabilitySlot doc
     transaction.delete(groupRef)
 
@@ -240,6 +263,7 @@ def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedSt
         # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
 
+
 @router.get("/")
 def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupList:
     """"
@@ -253,6 +277,16 @@ def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupL
         items: List[StudyGroupPublicResponse] = []
 
         uid = claims.get("uid") or claims.get("sub")
+        
+        # 0) Find all groups where this user has a pending join request
+        pending_query = db.collection_group(JOIN_REQUEST_SUBCOLLECTION).where(
+            "requesterId", "==", uid
+        )
+        pending_group_ids = {
+            d.reference.parent.parent.id  # parent = incomingRequests, parent.parent = group doc
+            for d in pending_query.stream()
+        }
+
 
         docs = col.stream()
         for doc in docs:
@@ -267,19 +301,23 @@ def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupL
             
             doc_dict = doc.to_dict()
             user_role = _get_user_groupRole(uid, doc_dict)
-            if user_role == UserGroupRole.MEMBER or user_role == UserGroupRole.OWNER:
 
+            has_pending = doc.id in pending_group_ids
+
+            if user_role == UserGroupRole.MEMBER or user_role == UserGroupRole.OWNER:
                 members = []
                 member_ids = doc_dict.get("members", [])
                 member_docs = db.collection(USER_COLLECTION).where(FieldPath.document_id(), "in", member_ids).get() #only up to 30 members
                 for user_doc in member_docs:
                     members.append(user_doc.to_dict().get("displayName", ""))
             
-                items.append(_doc_to_privateStudyGroup(doc, owner_doc, members, user_role))
+                # Build private response with has_pending
+                item = _doc_to_privateStudyGroup(doc, owner_doc, members, user_role, has_pending)
+                items.append(item)
             
             else: # user role is public access
-                items.append(_doc_to_publicStudyGroup(doc, owner_doc))
-
+                item = _doc_to_publicStudyGroup(doc, owner_doc, has_pending)
+                items.append(item)
         
         items.sort(key=lambda item: convert_to_utc_datetime(item.date, item.startTime))
         return StudyGroupList(items=items)
@@ -481,6 +519,13 @@ def cleanup_current_user_study_groups(
             tx = db.transaction()
             _delete_groupMember_transaction(tx, group_ref, user_ref)
 
+        # 3) Delete any join requests this user has sent
+        #    (studyGroups/*/incomingRequests where requesterId == uid)
+        req_query = db.collection_group(JOIN_REQUEST_SUBCOLLECTION).where(
+            "requesterId", "==", uid
+        )
+        for req_doc in req_query.stream():
+            req_doc.reference.delete()
         # Nothing to return; caller just needs success status
         return {"status": "ok"}
 
@@ -615,6 +660,59 @@ def list_incoming_requests(
             detail=f"/group/{group_id}/requests failed: {type(e).__name__}: {e}",
         )
 
+@router.get("/{group_id}/invites", response_model=OutgoingGroupInviteList)
+def list_outgoing_invites(
+    group_id: str,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Owner lists outgoing invites for this study group.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        group_ref = db.collection(COLLECTION).document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+
+        group_data = group_doc.to_dict() or {}
+        role = _get_user_groupRole(uid, group_data)
+        if role != UserGroupRole.OWNER:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Study Group Owners can view outgoing invites.",
+            )
+
+        invite_docs = group_ref.collection(INVITES_SUBCOLLECTION).stream()
+
+        items: list[OutgoingGroupInvite] = []
+        for d in invite_docs:
+            inv = d.to_dict() or {}
+            items.append(
+                OutgoingGroupInvite(
+                    inviteeId=inv.get("inviteeId", ""),
+                    inviteeHandle=inv.get("inviteeHandle", ""),
+                    inviteeDisplayName=inv.get("inviteeDisplayName", ""),
+                    groupId=inv.get("groupId", group_id),
+                    groupName=inv.get("groupName", group_data.get("name", "")),
+                    ownerId=inv.get("ownerId", ""),
+                    ownerHandle=inv.get("ownerHandle", ""),
+                    ownerDisplayName=inv.get("ownerDisplayName", ""),
+                )
+            )
+
+        return OutgoingGroupInviteList(items=items)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/invites failed: {type(e).__name__}: {e}",
+        )
+
 @router.delete("/{group_id}/requests/{user_id}")
 def decline_request(
     group_id: str,
@@ -635,10 +733,14 @@ def decline_request(
 
         group_data = group_doc.to_dict() or {}
         role = _get_user_groupRole(uid, group_data)
-        if role != UserGroupRole.OWNER:
+
+        # Allow if:
+        #   - requester = uid == user_id
+        #   - OR group owner
+        if uid != user_id and role != UserGroupRole.OWNER:
             raise HTTPException(
                 status_code=403,
-                detail="Only Study Group Owners can decline join requests.",
+                detail="Only Study Group Owners or the requester can cancel join requests.",
             )
 
         req_ref = group_ref.collection(JOIN_REQUEST_SUBCOLLECTION).document(user_id)
@@ -653,4 +755,256 @@ def decline_request(
         raise HTTPException(
             status_code=500,
             detail=f"/group/{group_id}/requests/{user_id} failed: {type(e).__name__}: {e}",
+        )
+
+
+@router.post("/{group_id}/inviteByHandle")
+def invite_user_by_handle(
+    group_id: str,
+    payload: InviteByHandle,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Study group owner invites a user by their handle.
+
+    This creates a pending invite:
+      studyGroups/{groupId}/invites/{inviteeUserId}
+
+    The user must later ACCEPT to become a member.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        groups_col = db.collection(COLLECTION)
+        users_col = db.collection(USER_COLLECTION)
+
+        group_ref = groups_col.document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+
+        group_data = group_doc.to_dict() or {}
+        group_name = group_data.get("name", "")
+
+        # 1) Ensure caller is the owner
+        role = _get_user_groupRole(uid, group_data)
+        if role != UserGroupRole.OWNER:
+            raise HTTPException(
+                status_code=403,
+                detail="Only Study Group Owners can invite users.",
+            )
+
+        # 2) Get owner user data (for ownerHandle / ownerDisplayName)
+        owner_doc = users_col.document(uid).get()
+        if not owner_doc.exists:
+            raise HTTPException(status_code=404, detail="Owner user doc not found")
+        owner_data = owner_doc.to_dict() or {}
+
+        # 3) Look up the user by handle
+        handle = payload.handle
+        user_query = users_col.where("handle", "==", handle).limit(1).stream()
+        user_docs = list(user_query)
+        if not user_docs:
+            raise HTTPException(status_code=404, detail="User with that handle not found")
+
+        user_doc = user_docs[0]
+        invited_user_id = user_doc.id
+        invited_user_data = user_doc.to_dict() or {}
+
+        # 4) Do not invite yourself
+        if invited_user_id == uid:
+            raise HTTPException(
+                status_code=400,
+                detail="You cannot invite yourself.",
+            )
+
+        # 5) Optional: check overlapping groups for the invited user
+        _check_overlappingGroups(invited_user_data, group_data)
+
+        # 6) Make sure they’re not already member/owner
+        if invited_user_id == group_data.get("ownerID") or invited_user_id in group_data.get("members", []):
+            raise HTTPException(
+                status_code=400,
+                detail="User is already in this study group.",
+            )
+
+        # 7) Create/overwrite invite doc: studyGroups/{groupId}/invites/{inviteeUserId}
+        invite_ref = group_ref.collection(INVITES_SUBCOLLECTION).document(invited_user_id)
+        invite_ref.set(
+            {
+                "inviteeId": invited_user_id,
+                "inviteeHandle": invited_user_data.get("handle", ""),
+                "inviteeDisplayName": invited_user_data.get("displayName", ""),
+                "ownerId": uid,
+                "ownerHandle": owner_data.get("handle", ""),
+                "ownerDisplayName": owner_data.get("displayName", ""),
+                "groupId": group_id,
+                "groupName": group_name,
+                "createdAt": datetime.now(timezone.utc),
+            }
+        )
+
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/inviteByHandle failed: {type(e).__name__}: {e}",
+        )
+
+@router.get("/myInvites", response_model=IncomingGroupInviteList)
+def list_my_incoming_invites(
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Current user lists all incoming group invites.
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        # collection_group query across all studyGroups/*/invites
+        invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
+            "inviteeId", "==", uid
+        )
+
+        items: list[IncomingGroupInvite] = []
+        for d in invite_query.stream():
+            inv = d.to_dict() or {}
+            items.append(
+                IncomingGroupInvite(
+                    inviteeId=inv.get("inviteeId", ""),
+                    groupId=inv.get("groupId", ""),
+                    groupName=inv.get("groupName", ""),
+                    ownerId=inv.get("ownerId", ""),
+                    ownerHandle=inv.get("ownerHandle", ""),
+                    ownerDisplayName=inv.get("ownerDisplayName", ""),
+                )
+            )
+
+        return IncomingGroupInviteList(items=items)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/groups/myInvites failed: {type(e).__name__}: {e}",
+        )
+
+@router.post("/{group_id}/invites/{user_id}/accept")
+def accept_invite(
+    group_id: str,
+    user_id: str,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Invited user accepts an invite to join the study group.
+
+    This:
+      1) Verifies that the current user == user_id
+      2) Adds them as a member using _add_groupMember_transaction
+      3) Deletes the invite doc
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        if uid != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You can only accept invites addressed to yourself.",
+            )
+
+        groups_col = db.collection(COLLECTION)
+        users_col = db.collection(USER_COLLECTION)
+
+        group_ref = groups_col.document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+        group_data = group_doc.to_dict() or {}
+
+        # Check they are not already member/owner
+        role = _get_user_groupRole(uid, group_data)
+        if role != UserGroupRole.PUBLIC:
+            # Already in group; just delete invite if exists
+            invite_ref = group_ref.collection(INVITES_SUBCOLLECTION).document(uid)
+            if invite_ref.get().exists:
+                invite_ref.delete()
+            return {"status": "already_member"}
+
+        # Verify invite exists
+        invite_ref = group_ref.collection(INVITES_SUBCOLLECTION).document(uid)
+        if not invite_ref.get().exists:
+            raise HTTPException(status_code=404, detail="Invite not found")
+
+        user_ref = users_col.document(uid)
+
+        # Use same transaction helper as join approval
+        tx = db.transaction()
+        _add_groupMember_transaction(tx, group_ref, user_ref)
+
+        # Delete invite (now consumed)
+        invite_ref.delete()
+
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/invites/{user_id}/accept failed: {type(e).__name__}: {e}",
+        )
+
+@router.delete("/{group_id}/invites/{user_id}")
+def decline_invite(
+    group_id: str,
+    user_id: str,
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Invited user declines an invite, or owner cancels an invite.
+
+    Allowed if:
+      - current user == invitee (decline)
+      - OR current user is the group owner (cancel)
+    """
+    try:
+        db = get_db()
+        uid = claims.get("uid") or claims.get("sub")
+
+        group_ref = db.collection(COLLECTION).document(group_id)
+        group_doc = group_ref.get()
+        if not group_doc.exists:
+            raise HTTPException(status_code=404, detail="Study Group not found")
+
+        group_data = group_doc.to_dict() or {}
+        role = _get_user_groupRole(uid, group_data)
+
+        # Okay if:
+        #   - invitee themselves (uid == user_id)
+        #   - OR group owner
+        if uid != user_id and role != UserGroupRole.OWNER:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the invitee or the Study Group Owner can delete invites.",
+            )
+
+        invite_ref = group_ref.collection(INVITES_SUBCOLLECTION).document(user_id)
+        if invite_ref.get().exists:
+            invite_ref.delete()
+
+        return {"status": "ok"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"/group/{group_id}/invites/{user_id} failed: {type(e).__name__}: {e}",
         )

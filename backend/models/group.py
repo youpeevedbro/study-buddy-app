@@ -50,6 +50,7 @@ class StudyGroupPublicResponse(BaseModel):
     ownerHandle: str
     ownerDisplayName: str
     availabilitySlotDocument: str
+    hasPendingRequest: bool = False
 
 # Response model for getting a Study Group (where user is a member)
 class StudyGroupPrivateResponse(BaseModel):
@@ -67,6 +68,7 @@ class StudyGroupPrivateResponse(BaseModel):
     ownerDisplayName: str
     members: List[str]  #List of Member Display Names
     availabilitySlotDocument: str
+    hasPendingRequest: bool = False
 
 # Request model for updating a Study Group
 class StudyGroupUpdate(BaseModel):
@@ -104,3 +106,34 @@ class SimpleJoinRequest(BaseModel):
 
 class SimpleJoinRequestList(BaseModel):
     items: List[SimpleJoinRequest]
+
+
+class InviteByHandle(BaseModel):
+    handle: str
+
+class OutgoingGroupInvite(BaseModel):
+    inviteeId: str
+    inviteeHandle: str
+    inviteeDisplayName: str
+    groupId: str
+    groupName: str
+    ownerId: str
+    ownerHandle: str
+    ownerDisplayName: str
+
+
+class OutgoingGroupInviteList(BaseModel):
+    items: List[OutgoingGroupInvite]
+
+
+class IncomingGroupInvite(BaseModel):
+    inviteeId: str          # the invited user (current user when viewing myInvites)
+    groupId: str
+    groupName: str
+    ownerId: str
+    ownerHandle: str
+    ownerDisplayName: str
+
+
+class IncomingGroupInviteList(BaseModel):
+    items: List[IncomingGroupInvite]

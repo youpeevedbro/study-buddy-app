@@ -2,9 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:study_buddy/models/group.dart';
 import '../services/group_service.dart';
-import '../services/api.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 
 import '../components/grad_button.dart';
 
@@ -16,7 +14,6 @@ class StudyGroupsPage extends StatefulWidget {
 }
 
 class _StudyGroupsPageState extends State<StudyGroupsPage> {
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -113,15 +110,14 @@ class _AllGroupsState extends State<AllGroups> {
   @override
   void initState() {
     super.initState();
-    _futureGroups = _service.listAllStudyGroups();  //returns StudyGroupResponses with appropriate access ('owner', 'member', or 'public')
-  } 
+    _futureGroups = _service.listAllStudyGroups(); // returns StudyGroupResponses with appropriate access
+  }
 
-  
   void _reloadData() {
-      setState(() {
-        _futureGroups = _service.listAllStudyGroups(); // Re-assign the Future to trigger reload
-      });
-    } 
+    setState(() {
+      _futureGroups = _service.listAllStudyGroups(); // Re-assign the Future to trigger reload
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,50 +132,54 @@ class _AllGroupsState extends State<AllGroups> {
             );
           }
           if (snap.hasError) {
-            return 
-              Text(
-                'Error: ${snap.error}',
-                style: const TextStyle(height: 1.3),
-              );
-      
+            return Text(
+              'Error: ${snap.error}',
+              style: const TextStyle(height: 1.3),
+            );
           }
           final groups = snap.data ?? [];
 
           if (groups.isEmpty) {
             return const Padding(
-                padding: EdgeInsets.all(30),
-                child: Center(child: Text(
+              padding: EdgeInsets.all(30),
+              child: Center(
+                child: Text(
                   'There are currently no active study groups.',
-                  style: TextStyle(
-                    fontSize: 18
-                  ))),
-              );
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            );
           }
 
           return AllGroupPanels(groups: groups, onReloadNeeded: _reloadData);
-        }
+        },
       ),
     );
   }
 }
 
-
 class AllGroupPanels extends StatefulWidget {
   final VoidCallback onReloadNeeded;
   final List<StudyGroupResponse> groups;
 
-  const AllGroupPanels({super.key, required this.groups, required this.onReloadNeeded});
+  const AllGroupPanels({
+    super.key,
+    required this.groups,
+    required this.onReloadNeeded,
+  });
 
   @override
   State<AllGroupPanels> createState() => _AllGroupPanelsState();
-  }
-
+}
 
 class _AllGroupPanelsState extends State<AllGroupPanels> {
   late List<StudyGroupResponse> _groups;
   late VoidCallback _onReloadNeeded;
   final GroupService _service = const GroupService();
-  
+
+  // Single text controller for "invite handle" (simple approach)
+  final TextEditingController _inviteHandleController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -187,6 +187,11 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     _onReloadNeeded = widget.onReloadNeeded;
   }
 
+  @override
+  void dispose() {
+    _inviteHandleController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -212,21 +217,16 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                       fontSize: 18,
                       fontStyle: FontStyle.italic,
                       fontWeight: FontWeight.w500,
-                      color: isExpanded
-                        ? theme.primaryColor
-                        : Colors.black,
-                    )
+                      color: isExpanded ? theme.primaryColor : Colors.black,
+                    ),
                   ),
                   Text(
                     "Owned by: \n${group.ownerDisplayName}",
-                    //textAlign: TextAlign.left,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color: isExpanded
-                        ? theme.primaryColor
-                        : Colors.black,
-                    )
+                      color: isExpanded ? theme.primaryColor : Colors.black,
+                    ),
                   ),
                   Text(
                     group.ownerHandle,
@@ -234,110 +234,168 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       color: isExpanded
-                        ? theme.primaryColor
-                        : theme.colorScheme.outline,
-                    )
-                  )
+                          ? theme.primaryColor
+                          : theme.colorScheme.outline,
+                    ),
+                  ),
                 ],
               ),
-              trailing: 
-                SizedBox(
-                  width: 50,
-                  child: Text(
-                    group.date,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600
-                    )
+              trailing: SizedBox(
+                width: 50,
+                child: Text(
+                  group.date,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
+              ),
             );
           },
           body: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(20),
-                      blurRadius: 6,
-                      offset: const Offset(0, 3),
+            padding: const EdgeInsets.all(12.0),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(20),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Location: ${group.buildingCode} - ${group.roomNumber}",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Location: ${group.buildingCode} - ${group.roomNumber}",
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Text("Time: ${group.startTime} - ${group.endTime}",
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Text(
-                        "Number of members: ${group.quantity}",
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600)
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Time: ${group.startTime} - ${group.endTime}",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(height: 14),
-                  
-                    if (group.access == "public") ...[
-  Align(
-    alignment: Alignment.center,
-    child: GradientButton(
-      height: 35,
-      borderRadius: BorderRadius.circular(12.0),
-      onPressed: () async {
-        try {
-          debugPrint("Sending Join Request for group ID: ${group.id}");
-          await _service.sendJoinRequest(group.id);   
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Join request sent!')),
-          );
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Number of members: ${group.quantity}",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
-          _onReloadNeeded(); // optionally reload to show pending status
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to send join request: $e")),
-          );
-        }
-      },
-      child: const Text(
-        "Send Join Request",
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 18.0,
+                  // --- PUBLIC VIEW (join request / pending) ---
+                  if (group.access == "public") ...[
+                    Align(
+                      alignment: Alignment.center,
+                      child: IgnorePointer(
+                        ignoring: group.hasPendingRequest,
+                        child: Opacity(
+                          opacity: group.hasPendingRequest ? 0.5 : 1.0,
+                          child: GradientButton(
+                            height: 35,
+                            borderRadius: BorderRadius.circular(12.0),
+                            onPressed: () async {
+                              if (group.hasPendingRequest) return;
+
+                              try {
+                                debugPrint(
+                                    "Sending Join Request for group ID: ${group.id}");
+                                await _service.sendJoinRequest(group.id);
+
+                                // immediately mark as pending in UI
+                                setState(() {
+                                  group.hasPendingRequest = true;
+                                });
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Join request sent!')),
+                                );
+
+                                // optional full reload:
+                                // _onReloadNeeded();
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                        "Failed to send join request: $e"),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Text(
+                              group.hasPendingRequest
+                                  ? "Pending"
+                                  : "Send Join Request",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]
+
+                  // --- OWNER VIEW (already in group + invite by handle) ---
+                  else if (group.access == "owner") ...[
+  Align(
+    alignment: Alignment.centerLeft,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "You are the owner of this study group.",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
+        const SizedBox(height: 4),
+        Text(
+          "Members: ${group.members}",
+          style: const TextStyle(
+            fontSize: 14,
+          ),
+        ),
+      ],
     ),
   ),
 ]
 
-                    else if (group.access == "owner" || group.access == "member")... [
-                      Align(
-                        alignment: Alignment.center,
-                        child: Column(
-                          children: [
-                            Text("You are already part of this study group"),
-                            Text("Members: ${group.members}")
-                          ],
-                        )
+
+                  // --- MEMBER VIEW (already in group) ---
+                  else if (group.access == "member") ...[
+                    Align(
+                      alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          const Text(
+                              "You are already part of this study group"),
+                          Text("Members: ${group.members}"),
+                        ],
                       ),
-                    ]
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
-          isExpanded: group.isExpanded,  //keeps panel expanded when isExpanded field is true
+          ),
+          isExpanded: group.isExpanded, // keeps panel expanded when true
         );
       }).toList(),
     );

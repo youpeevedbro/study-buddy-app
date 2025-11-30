@@ -58,6 +58,7 @@ class StudyGroupResponse {  //holds public or private response data for study gr
   final List<String>? members;  //currently holds displayNames
   final String availabilitySlotDoc;
   bool isExpanded; // manages state of its expansion panel in studygroups.dart
+  bool hasPendingRequest;
 
   StudyGroupResponse({
     required this.id,
@@ -74,7 +75,8 @@ class StudyGroupResponse {  //holds public or private response data for study gr
     required this.ownerDisplayName,
     this.members,
     required this.availabilitySlotDoc,
-    this.isExpanded = false
+    this.isExpanded = false,
+    this.hasPendingRequest = false,
   });
 
   StudyGroupResponse copyWith({
@@ -84,7 +86,9 @@ class StudyGroupResponse {  //holds public or private response data for study gr
     String? startTime,
     String? endTime,
     String? name,
-    String? availabilitySlotDoc
+    String? availabilitySlotDoc,
+    bool? isExpanded,
+    bool? hasPendingRequest,
   }) {
     return StudyGroupResponse(
       id: this.id,
@@ -101,13 +105,15 @@ class StudyGroupResponse {  //holds public or private response data for study gr
       ownerDisplayName: this.ownerDisplayName,
       members: this.members,
       availabilitySlotDoc: availabilitySlotDoc ?? this.availabilitySlotDoc,
-      isExpanded: this.isExpanded
+       isExpanded: isExpanded ?? this.isExpanded,
+      hasPendingRequest: hasPendingRequest ?? this.hasPendingRequest,
     );
   }
 
   
 
   factory StudyGroupResponse.fromJson(Map<String, dynamic> json) {
+    final bool pending = (json['hasPendingRequest'] ?? false) as bool;
     if (json.containsKey('members')) {
       final List<dynamic> list = json["members"];
       final List<String> memberslist = list.cast<String>();
@@ -127,6 +133,7 @@ class StudyGroupResponse {  //holds public or private response data for study gr
       ownerDisplayName: json['ownerDisplayName'] as String,
       members: memberslist,
       availabilitySlotDoc: json['availabilitySlotDocument'] as String,
+      hasPendingRequest: pending,
     );
     }
     return StudyGroupResponse(    // does not include members field
@@ -143,6 +150,7 @@ class StudyGroupResponse {  //holds public or private response data for study gr
       ownerHandle: json['ownerHandle'] as String,
       ownerDisplayName: json['ownerDisplayName'] as String,
       availabilitySlotDoc: json['availabilitySlotDocument'] as String,
+      hasPendingRequest: pending,
     );
   }
 
