@@ -170,10 +170,17 @@ def _delete_group_transaction(transaction, groupRef, usersQuery):
         transaction.update(doc.reference, {
             "joinedStudyGroupIds": firestore.ArrayRemove([groupRef.id]),
             f"joinedStudyGroups.{groupRef.id}": firestore.DELETE_FIELD})
+    
     # Explicitly delete incomingRequests subcollection for this group
     reqs = groupRef.collection(JOIN_REQUEST_SUBCOLLECTION).stream()
     for r in reqs:
         transaction.delete(r.reference)
+    
+    # delete invites subcollection
+    invs = groupRef.collection(INVITES_SUBCOLLECTION).stream()
+    for inv in invs:
+        transaction.delete(inv.reference)
+
     # possibly ADD: DECREMENT studygroup count in availabilitySlot doc
     transaction.delete(groupRef)
 
@@ -526,6 +533,15 @@ def cleanup_current_user_study_groups(
         )
         for req_doc in req_query.stream():
             req_doc.reference.delete()
+        
+        # 4) Delete any invites where this user is the invitee
+        invite_query = db.collection_group(INVITES_SUBCOLLECTION).where(
+            "inviteeId", "==", uid
+        )
+        for inv_doc in invite_query.stream():
+            inv_doc.reference.delete()
+        
+        
         # Nothing to return; caller just needs success status
         return {"status": "ok"}
 

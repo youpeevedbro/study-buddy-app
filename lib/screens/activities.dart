@@ -15,27 +15,21 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
 
   bool _loading = true;
 
-  /// Mixed list of:
-  ///  - join requests for groups I OWN  (kind = "joinRequest")
-  ///  - group invites that OTHERS sent TO ME (kind = "invite")
-  ///
-  /// Common keys:
-  ///  - "kind": "joinRequest" | "invite"
-  ///  - "groupId"
-  ///  - "groupName"
-  ///  - "userId"        -> other person's uid
-  ///  - "userHandle"    -> other person's handle
-  ///  - "userName"      -> other person's display name
-  ///  - "inviteeId"     -> for invites (so decline knows who the invitee is)
+  // Incoming:
+  //  - join requests for groups I own
+  //  - invites sent TO me
+  //
+  // Each map has:
+  //  kind: "joinRequest" | "invite"
+  //  groupId, groupName
+  //  userId, userName, userHandle  (requester or owner)
+  //  inviteeId (only for invites; the invited user, normally me)
   List<Map<String, dynamic>> incomingRequests = [];
 
-  /// Outgoing join requests *I* have sent (public user → owner).
-  List<StudyGroupResponse> outgoingJoinRequests = [];
-
-  /// Outgoing invites that I (as owner) have sent to others.
-  /// Each map:
-  ///  - "groupId", "groupName"
-  ///  - "inviteeId", "inviteeHandle", "inviteeName"
+  // Outgoing:
+  //  - join requests I have sent (StudyGroupResponse with hasPendingRequest == true)
+  //  - invites I have sent as owner
+  List<StudyGroupResponse> outgoingRequests = [];
   List<Map<String, dynamic>> outgoingInvites = [];
 
   // 0 = Incoming, 1 = Outgoing
@@ -44,111 +38,126 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   @override
   void initState() {
     super.initState();
-    _loadAllRequests();
+    _loadActivities();
   }
 
-  // ----------------------------------------------------------
-  // Load incoming + outgoing (join requests + invites)
-  // ----------------------------------------------------------
-  Future<void> _loadAllRequests() async {
+  LinearGradient get _brandGradient => const LinearGradient(
+        colors: [
+          Color(0xFFFFDE59),
+          Color(0xFFFF914D),
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      );
+
+  // ---------------------------------------------------------------------------
+  // Load incoming + outgoing activity
+  // ---------------------------------------------------------------------------
+  Future<void> _loadActivities() async {
     if (!mounted) return;
     try {
       setState(() => _loading = true);
 
-      // 1) All current groups (public/member/owner + hasPendingRequest)
       final userGroups = await _service.listAllStudyGroups();
-
-      // 2) Invites that were sent TO ME
       final myInvites = await _service.listMyIncomingInvites();
 
-      final List<Map<String, dynamic>> incoming = [];
-      final List<StudyGroupResponse> outgoingJoin = [];
-      final List<Map<String, dynamic>> outgoingInv = [];
+      List<Map<String, dynamic>> incoming = [];
+      List<StudyGroupResponse> outgoingJoin = [];
+      List<Map<String, dynamic>> outgoingInv = [];
 
-      // ---- A. Join requests + outgoing invites for groups I OWN ----
-      for (var group in userGroups) {
-        // A1) Incoming join requests (other users asking to join my group)
+      // For every active group
+      for (final group in userGroups) {
+        // 1) If I'm the owner, I might have:
+        //    - incoming join requests
+        //    - outgoing invites to others
         if (group.access == "owner") {
-          final groupRequests = await _service.listIncomingRequests(group.id);
+          // Incoming join requests for this group
+          final groupRequests =
+              await _service.listIncomingRequests(group.id); // join requests
           for (var req in groupRequests) {
             incoming.add({
               "kind": "joinRequest",
               "groupId": group.id,
               "groupName": group.name,
               "userId": req['requesterId'],
-              "userHandle": req['requesterHandle'],
               "userName": req['requesterName'],
+              "userHandle": req['requesterHandle'],
             });
           }
 
-          // A2) Outgoing invites I (owner) sent to others
-          final groupInvites = await _service.listOutgoingInvites(group.id);
+          // Outgoing invites I (as owner) have sent for this group
+          final groupInvites =
+              await _service.listOutgoingInvites(group.id); // invites I sent
           for (var inv in groupInvites) {
             outgoingInv.add({
-              "groupId": inv["groupId"],
-              "groupName": inv["groupName"],
-              "inviteeId": inv["inviteeId"],
-              "inviteeHandle": inv["inviteeHandle"],
-              "inviteeName": inv["inviteeDisplayName"],
+              "groupId": inv['groupId'],
+              "groupName": inv['groupName'],
+              "inviteeId": inv['inviteeId'],
+              "inviteeHandle": inv['inviteeHandle'],
+              "inviteeDisplayName": inv['inviteeDisplayName'],
+              "ownerId": inv['ownerId'],
+              "ownerHandle": inv['ownerHandle'],
+              "ownerDisplayName": inv['ownerDisplayName'],
             });
           }
         }
 
-        // B) Outgoing join requests I have sent as a public user
+        // 2) If I have a pending join-request TO some group
         if (group.hasPendingRequest == true) {
           outgoingJoin.add(group);
         }
       }
 
-      // ---- C. Invites that were sent TO ME (I am the invitee) ----
+      // 3) Invites that were sent TO ME
       for (var inv in myInvites) {
         incoming.add({
           "kind": "invite",
-          "groupId": inv["groupId"],
-          "groupName": inv["groupName"],
-          "userId": inv["ownerId"],          // owner (who invited me)
-          "userHandle": inv["ownerHandle"],
-          "userName": inv["ownerDisplayName"],
-          "inviteeId": inv["inviteeId"],     // me
+          "groupId": inv['groupId'],
+          "groupName": inv['groupName'],
+          "userId": inv['ownerId'], // who invited me
+          "userName": inv['ownerDisplayName'],
+          "userHandle": inv['ownerHandle'],
+          "inviteeId": inv['inviteeId'], // me
         });
       }
 
       if (!mounted) return;
       setState(() {
         incomingRequests = incoming;
-        outgoingJoinRequests = outgoingJoin;
+        outgoingRequests = outgoingJoin;
         outgoingInvites = outgoingInv;
         _loading = false;
       });
     } catch (e) {
-      debugPrint("Failed to load requests/invites: $e");
+      debugPrint("Failed to load activities: $e");
       if (!mounted) return;
       setState(() => _loading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load requests: $e')),
+        SnackBar(content: Text('Failed to load activities: $e')),
       );
     }
   }
 
-  // ----------------------------------------------------------
-  // Accept / Decline (handles both join requests & invites)
-  // ----------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Accept / Decline (Incoming)
+  // ---------------------------------------------------------------------------
   Future<void> acceptRequest(int index) async {
     final request = incomingRequests[index];
     final kind = request["kind"] as String? ?? "joinRequest";
     final groupId = request["groupId"] as String;
+    final userId = request["userId"] as String; // requester or owner
+    final inviteeId = request["inviteeId"] as String?;
 
     try {
       if (kind == "joinRequest") {
-        // Owner accepting someone else's join request
-        final requesterId = request["userId"] as String;
+        // I'm the owner; accept someone's join request
         await _service.acceptIncomingRequest(
           groupId: groupId,
-          requesterId: requesterId,
+          requesterId: userId,
         );
       } else if (kind == "invite") {
-        // Invitee accepting an owner's invite
+        // I'm the invitee; accept the invite
         await _service.acceptGroupInvite(groupId);
       }
 
@@ -157,7 +166,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Request processed')),
+        const SnackBar(content: Text('Request accepted')),
       );
     } catch (e) {
       debugPrint("Failed to accept request: $e");
@@ -171,19 +180,22 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
     final request = incomingRequests[index];
     final kind = request["kind"] as String? ?? "joinRequest";
     final groupId = request["groupId"] as String;
+    final userId = request["userId"] as String; // requester or owner
+    final inviteeId = request["inviteeId"] as String?;
 
     try {
       if (kind == "joinRequest") {
-        // Owner declining a join request
-        final requesterId = request["userId"] as String;
+        // I'm the owner; decline someone's join request
         await _service.declineIncomingRequest(
           groupId: groupId,
-          requesterId: requesterId,
+          requesterId: userId,
         );
       } else if (kind == "invite") {
-        // Invitee declining an invite
-        final inviteeId = request["inviteeId"] as String;
-        await _service.declineOrCancelGroupInvite(groupId, inviteeId);
+        // I'm the invitee; decline my invite
+        await _service.declineOrCancelGroupInvite(
+          groupId,
+          inviteeId ?? userId,
+        );
       }
 
       setState(() {
@@ -201,40 +213,35 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
     }
   }
 
-  // ----------------------------------------------------------
-  // Cancel outgoing JOIN request (public → owner)
-  // ----------------------------------------------------------
-  Future<void> cancelOutgoingJoinRequest(String groupId) async {
+  // ---------------------------------------------------------------------------
+  // Cancel outgoing
+  // ---------------------------------------------------------------------------
+  Future<void> cancelOutgoingRequest(String groupId) async {
     try {
       await _service.cancelMyJoinRequest(groupId);
 
       setState(() {
-        outgoingJoinRequests.removeWhere((g) => g.id == groupId);
+        outgoingRequests.removeWhere((g) => g.id == groupId);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Join request cancelled")),
+        const SnackBar(content: Text("Request cancelled")),
       );
     } catch (e) {
-      debugPrint("Failed to cancel join request: $e");
+      debugPrint("Failed to cancel request: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to cancel request: $e")),
       );
     }
   }
 
-  // ----------------------------------------------------------
-  // Cancel/decline outgoing INVITE (owner → invitee)
-  // ----------------------------------------------------------
-  Future<void> cancelOutgoingInvite(int index) async {
-    final inv = outgoingInvites[index];
-    final groupId = inv["groupId"] as String;
-    final inviteeId = inv["inviteeId"] as String;
-
+  Future<void> cancelOutgoingInvite(String groupId, String inviteeId) async {
     try {
       await _service.declineOrCancelGroupInvite(groupId, inviteeId);
+
       setState(() {
-        outgoingInvites.removeAt(index);
+        outgoingInvites.removeWhere((inv) =>
+            inv['groupId'] == groupId && inv['inviteeId'] == inviteeId);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -248,18 +255,9 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
     }
   }
 
-  // ----------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // UI helpers
-  // ----------------------------------------------------------
-  LinearGradient get _brandGradient => const LinearGradient(
-        colors: [
-          Color(0xFFFFDE59),
-          Color(0xFFFF914D),
-        ],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-      );
-
+  // ---------------------------------------------------------------------------
   Widget _buildIncomingList() {
     return Column(
       key: const ValueKey('incoming'),
@@ -279,7 +277,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                 padding: EdgeInsets.symmetric(vertical: 8.0),
                 child: Center(
                   child: Text(
-                    "No incoming requests or invites",
+                    "No incoming activity",
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.grey,
@@ -294,13 +292,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                 itemBuilder: (context, index) {
                   final request = incomingRequests[index];
                   final kind = request["kind"] as String? ?? "joinRequest";
-
-                  final userName = request["userName"] ?? "";
                   final groupName = request["groupName"] ?? "";
+                  final userName = request["userName"] ?? "";
+                  final userHandle = request["userHandle"] ?? "";
 
-                  final subtitleText = (kind == "joinRequest")
-                      ? "$userName wants to join."
-                      : "$userName invited you to join.";
+                  final subtitleText = (kind == "invite")
+                      ? "$userName ($userHandle) invited you."
+                      : "$userName ($userHandle) wants to join.";
 
                   return Dismissible(
                     key: ValueKey(
@@ -360,7 +358,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                         builder: (ctx) => AlertDialog(
                           title: const Text('Decline'),
                           content: Text(
-                            'Are you sure you want to decline this?',
+                            'Are you sure you want to decline this ${kind == "invite" ? "invite" : "request"} from $userName?',
                           ),
                           actions: [
                             TextButton(
@@ -452,255 +450,263 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   }
 
   Widget _buildOutgoingList() {
+    final hasAny =
+        outgoingRequests.isNotEmpty || outgoingInvites.isNotEmpty;
+
+    if (!hasAny) {
+      return const Center(
+        child: Text(
+          "No outgoing activity",
+          style: TextStyle(
+            fontSize: 16,
+            color: Colors.grey,
+          ),
+        ),
+      );
+    }
+
     return Column(
       key: const ValueKey('outgoing'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (outgoingInvites.isEmpty && outgoingJoinRequests.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8.0),
-            child: Center(
-              child: Text(
-                "No outgoing requests or invites",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+        if (outgoingRequests.isNotEmpty) ...[
+          const Text(
+            "Join Requests",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: outgoingRequests.length,
+            itemBuilder: (context, index) {
+              final group = outgoingRequests[index];
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          )
-        else ...[
-          if (outgoingInvites.isNotEmpty) ...[
-            const Text(
-              "Invites you've sent",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: outgoingInvites.length,
-              itemBuilder: (context, index) {
-                final inv = outgoingInvites[index];
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 12,
+                ),
+                child: Row(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(right: 12.0),
+                      child: Icon(
+                        Icons.schedule,
+                        color: Colors.orange,
+                        size: 24,
                       ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 14,
-                    horizontal: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(right: 12.0),
-                        child: Icon(
-                          Icons.outgoing_mail,
-                          color: Colors.orange,
-                          size: 24,
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              inv["groupName"] ?? "",
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Invited: ${inv["inviteeName"]} (${inv["inviteeHandle"]})",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: () => cancelOutgoingInvite(index),
-                        borderRadius: BorderRadius.circular(50),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: _brandGradient,
-                            borderRadius: BorderRadius.circular(50),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            "Cancel",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (outgoingJoinRequests.isNotEmpty) ...[
-            const Text(
-              "Join requests you've sent",
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: outgoingJoinRequests.length,
-              itemBuilder: (context, index) {
-                final group = outgoingJoinRequests[index];
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 16,
-                    horizontal: 12,
-                  ),
-                  child: Row(
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(right: 12.0),
-                        child: Icon(
-                          Icons.schedule,
-                          color: Colors.orange,
-                          size: 24,
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              group.name,
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Owner: ${group.ownerDisplayName}",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "${group.date} • ${group.startTime} - ${group.endTime}",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            "Status: Pending",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.orange,
+                          Text(
+                            group.name,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          InkWell(
-                            onTap: () => cancelOutgoingJoinRequest(group.id),
-                            borderRadius: BorderRadius.circular(50),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 6,
-                                horizontal: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                gradient: _brandGradient,
-                                borderRadius: BorderRadius.circular(50),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.12),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: const Text(
-                                "Cancel",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Owner: ${group.ownerDisplayName}",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "${group.date} • ${group.startTime} - ${group.endTime}",
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black54,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              },
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          "Status: Pending",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        InkWell(
+                          onTap: () => cancelOutgoingRequest(group.id),
+                          borderRadius: BorderRadius.circular(50),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 6,
+                              horizontal: 14,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: _brandGradient,
+                              borderRadius: BorderRadius.circular(50),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.12),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            child: const Text(
+                              "Cancel",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+        ],
+
+        if (outgoingInvites.isNotEmpty) ...[
+          const Text(
+            "Invitations",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
+          const SizedBox(height: 8),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: outgoingInvites.length,
+            itemBuilder: (context, index) {
+              final inv = outgoingInvites[index];
+              final groupName = inv['groupName'] ?? '';
+              final inviteeName = inv['inviteeDisplayName'] ?? '';
+              final inviteeHandle = inv['inviteeHandle'] ?? '';
+
+              return Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 12,
+                ),
+                child: Row(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(right: 12.0),
+                      child: Icon(
+                        Icons.send,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            groupName,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Invited: $inviteeName ($inviteeHandle)",
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => cancelOutgoingInvite(
+                        inv['groupId'],
+                        inv['inviteeId'],
+                      ),
+                      borderRadius: BorderRadius.circular(50),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 6,
+                          horizontal: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: _brandGradient,
+                          borderRadius: BorderRadius.circular(50),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.12),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ],
     );
   }
 
-  // ----------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Build
-  // ----------------------------------------------------------
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -742,7 +748,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               const Divider(thickness: 1.5, color: Colors.black),
               const SizedBox(height: 20),
 
-              // MY STUDY GROUPS BUTTON
+              // My Study Groups button
               GestureDetector(
                 onTap: () => Navigator.pushNamed(context, '/mystudygroups'),
                 child: Container(
@@ -772,7 +778,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
 
               const SizedBox(height: 30),
 
-              // INCOMING / OUTGOING TOGGLE
+              // Incoming / Outgoing toggle
               Container(
                 decoration: BoxDecoration(
                   gradient: _brandGradient,
@@ -847,7 +853,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                               height: 44,
                               child: Center(
                                 child: Text(
-                                  "Outgoing (${outgoingInvites.length + outgoingJoinRequests.length})",
+                                  "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: _selectedTab == 1
@@ -870,16 +876,20 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
 
               const SizedBox(height: 20),
 
+              // Lists / loading / refresh
               Expanded(
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : RefreshIndicator(
-                        onRefresh: _loadAllRequests,
+                        onRefresh: _loadActivities,
                         child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
+                          physics:
+                              const AlwaysScrollableScrollPhysics(),
                           child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            transitionBuilder: (child, animation) {
+                            duration:
+                                const Duration(milliseconds: 250),
+                            transitionBuilder:
+                                (child, animation) {
                               return FadeTransition(
                                 opacity: animation,
                                 child: child,

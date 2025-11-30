@@ -529,7 +529,7 @@ class _GroupPanelsState extends State<GroupPanels> {
                                     fontWeight: FontWeight.w600)),
                             const SizedBox(height: 8),
 
-                            // ⭐ NEW: OWNER VIEW – add "Invite by handle" here
+                            //OWNER VIEW – add "Invite by handle" here
                             if (groupResponse.access == "owner") ...[
                               const SizedBox(height: 12),
                               const Text(
@@ -546,7 +546,8 @@ class _GroupPanelsState extends State<GroupPanels> {
                                     child: TextField(
                                       controller: _inviteHandleController,
                                       decoration: const InputDecoration(
-                                        hintText: "@student123",
+                                        prefixText: '@', 
+                                        hintText: "student123",
                                         border: OutlineInputBorder(),
                                         isDense: true,
                                         contentPadding: EdgeInsets.symmetric(
