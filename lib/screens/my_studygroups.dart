@@ -90,9 +90,10 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
                     child: const Text(
                       "Add",
                       style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 18),
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -141,8 +142,7 @@ class _GroupsState extends State<Groups> {
 
   void _reloadData() {
     setState(() {
-      _futureGroups =
-          _service.listMyStudyGroups(); // Re-assign the Future to trigger reload
+      _futureGroups = _service.listMyStudyGroups();
     });
   }
 
@@ -150,34 +150,38 @@ class _GroupsState extends State<Groups> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: FutureBuilder<List<JoinedGroup>>(
-          future: _futureGroups,
-          builder:
-              (BuildContext context, AsyncSnapshot<List<JoinedGroup>> snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snap.hasError) {
-              return Text(
-                'Error: ${snap.error}',
-                style: const TextStyle(height: 1.3),
-              );
-            }
-            final groups = snap.data ?? [];
+        future: _futureGroups,
+        builder:
+            (BuildContext context, AsyncSnapshot<List<JoinedGroup>> snap) {
+          if (snap.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snap.hasError) {
+            return Text(
+              'Error: ${snap.error}',
+              style: const TextStyle(height: 1.3),
+            );
+          }
+          final groups = snap.data ?? [];
 
-            if (groups.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(30),
-                child: Center(
-                    child: Text('You have no current Study Groups.',
-                        style: TextStyle(fontSize: 18))),
-              );
-            }
+          if (groups.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(30),
+              child: Center(
+                child: Text(
+                  'You have no current Study Groups.',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            );
+          }
 
-            return GroupPanels(groups: groups, onReloadNeeded: _reloadData);
-          }),
+          return GroupPanels(groups: groups, onReloadNeeded: _reloadData);
+        },
+      ),
     );
   }
 }
@@ -186,8 +190,11 @@ class GroupPanels extends StatefulWidget {
   final VoidCallback onReloadNeeded;
   final List<JoinedGroup> groups;
 
-  const GroupPanels(
-      {super.key, required this.groups, required this.onReloadNeeded});
+  const GroupPanels({
+    super.key,
+    required this.groups,
+    required this.onReloadNeeded,
+  });
 
   @override
   State<GroupPanels> createState() => _GroupPanelsState();
@@ -250,162 +257,107 @@ class _GroupPanelsState extends State<GroupPanels> {
     );
   }
 
-Widget _buildMembersList(List<dynamic>? rawMembers) {
-  final List<String> members =
-      (rawMembers ?? []).map((e) => e.toString()).toList();
+  // NEW: Inline membership section (same content as the dialog, but in-card)
+  Widget _buildMembershipSection(StudyGroupResponse groupResponse) {
+    final bool isOwner = groupResponse.access == "owner";
+    final List membersRaw = groupResponse.members ?? [];
+    final List<String> memberNames =
+        membersRaw.map((m) => m.toString()).toList();
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const Text(
-        "Members",
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      const SizedBox(height: 6),
-      if (members.isEmpty)
+    // Filter out the owner from the "other members" list
+    final List<String> others =
+        memberNames.where((m) => m != groupResponse.ownerDisplayName).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         const Text(
-          "No other members yet.",
+          "Membership Information",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        Text(
+          isOwner
+              ? "You are the owner of this study group."
+              : "You are a member of this study group.",
+          style: const TextStyle(fontSize: 14),
+        ),
+        const SizedBox(height: 12),
+
+        const Text(
+          "Owner:",
           style: TextStyle(
             fontSize: 14,
-            color: Colors.black54,
-          ),
-        )
-      else
-        ...members.map(
-          (m) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("•  ", style: TextStyle(fontSize: 14)),
-                Expanded(
-                  child: Text(
-                    m,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
+            fontWeight: FontWeight.w600,
           ),
         ),
-    ],
-  );
-}
-
-Future<void> _showMembershipPopup({
-  required bool isOwner,
-  required String ownerName,
-  required List<String> members,
-}) async {
-  final List<String> others =
-      members.where((m) => m != ownerName).toList();
-  await showDialog(
-    context: context,
-    builder: (_) {
-      return AlertDialog(
-        title: const Text(
-          "Membership Information",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        const SizedBox(height: 4),
+        Row(
           children: [
-            Text(
-              isOwner
-                  ? "You are the owner of this study group."
-                  : "You are a member of this study group.",
+            const Icon(
+              Icons.workspace_premium,
+              color: Colors.amber,
+              size: 20,
             ),
-            const SizedBox(height: 16),
-
-            // Owner Section
-            const Text(
-              "Owner:",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-
-           Row(
-  children: [
-    const Icon(
-      Icons.workspace_premium,     
-      color: Colors.amber,
-      size: 20,
-    ),
-    const SizedBox(width: 6),
-    Expanded(
-      child: Text(
-        ownerName,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ),
-  ],
-),
-
-
-            const SizedBox(height: 16),
-
-            // Members Section
-            const Text(
-              "Members:",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-
-            if (others.isEmpty)
-              const Text(
-                "No other members.",
-                style: TextStyle(color: Colors.black54),
-              )
-            else
-              ...others.map(
-                (m) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person, size: 18, color: Colors.grey),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          m,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                "${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            child: const Text("OK"),
-            onPressed: () => Navigator.pop(context),
+
+        const SizedBox(height: 16),
+
+        const Text(
+          "Members:",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-        ],
-      );
-    },
-  );
-}
+        ),
+        const SizedBox(height: 4),
 
-
-
+        if (others.isEmpty)
+          const Text(
+            "No other members.",
+            style: TextStyle(color: Colors.black54),
+          )
+        else
+          ...others.map(
+            (m) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const Icon(Icons.person, size: 18, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      m,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
   Future<void> _showDeleteConfirmationDialog(
-      BuildContext context, String groupID) async {
+    BuildContext context,
+    String groupID,
+  ) async {
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -413,7 +365,8 @@ Future<void> _showMembershipPopup({
           title:
               const Text('Are you sure you want to delete this Study Group?'),
           content: const Text(
-              'This Study Group will be permanently deleted and all members will be disbanded.'),
+            'This Study Group will be permanently deleted and all members will be disbanded.',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -422,21 +375,22 @@ Future<void> _showMembershipPopup({
               },
             ),
             ElevatedButton(
-                onPressed: _isDeleting
-                    ? null
-                    : () {
-                        _handleDelete(groupID);
-                      },
-                child: _isDeleting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text("Delete")),
+              onPressed: _isDeleting
+                  ? null
+                  : () {
+                      _handleDelete(groupID);
+                    },
+              child: _isDeleting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text("Delete"),
+            ),
           ],
         );
       },
@@ -468,7 +422,9 @@ Future<void> _showMembershipPopup({
   }
 
   Future<void> _showLeaveConfirmationDialog(
-      BuildContext context, String groupID) async {
+    BuildContext context,
+    String groupID,
+  ) async {
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -476,7 +432,8 @@ Future<void> _showMembershipPopup({
           title:
               const Text('Are you sure you want to leave this Study Group?'),
           content: const Text(
-              'After leaving, you will have to send another request if you wish to rejoin this group.'),
+            'After leaving, you will have to send another request if you wish to rejoin this group.',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -485,21 +442,22 @@ Future<void> _showMembershipPopup({
               },
             ),
             ElevatedButton(
-                onPressed: _isLeaving
-                    ? null
-                    : () {
-                        _handleLeaving(groupID);
-                      },
-                child: _isLeaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text("Leave")),
+              onPressed: _isLeaving
+                  ? null
+                  : () {
+                      _handleLeaving(groupID);
+                    },
+              child: _isLeaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text("Leave"),
+            ),
           ],
         );
       },
@@ -531,7 +489,9 @@ Future<void> _showMembershipPopup({
   }
 
   Future<void> _showEditConfirmationDialog(
-      BuildContext context, StudyGroupResponse groupResp) async {
+    BuildContext context,
+    StudyGroupResponse groupResp,
+  ) async {
     _groupNameController.text = groupResp.name; // optional: prefill
     return showDialog<void>(
       context: context,
@@ -542,17 +502,20 @@ Future<void> _showMembershipPopup({
           content: Form(
             key: _formKey,
             child: TextFormField(
-                controller: _groupNameController,
-                decoration: InputDecoration(
-                    labelText: 'Study Group name..',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16))),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter some text';
-                  }
-                  return null;
-                }),
+              controller: _groupNameController,
+              decoration: InputDecoration(
+                labelText: 'Study Group name..',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter some text';
+                }
+                return null;
+              },
+            ),
           ),
           actions: <Widget>[
             TextButton(
@@ -562,26 +525,27 @@ Future<void> _showMembershipPopup({
               },
             ),
             ElevatedButton(
-                onPressed: _isEditing
-                    ? null
-                    : () {
-                        if (_formKey.currentState!.validate()) {
-                          StudyGroupResponse groupUpdated =
-                              groupResp.copyWith(
-                                  name: _groupNameController.text.trim());
-                          _handleUpdate(groupUpdated);
-                        }
-                      },
-                child: _isEditing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text("Submit")),
+              onPressed: _isEditing
+                  ? null
+                  : () {
+                      if (_formKey.currentState!.validate()) {
+                        StudyGroupResponse groupUpdated = groupResp.copyWith(
+                          name: _groupNameController.text.trim(),
+                        );
+                        _handleUpdate(groupUpdated);
+                      }
+                    },
+              child: _isEditing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text("Submit"),
+            ),
           ],
         );
       },
@@ -627,22 +591,29 @@ Future<void> _showMembershipPopup({
           backgroundColor: const Color(0xFFFCF6DB),
           headerBuilder: (BuildContext context, bool isExpanded) {
             return ListTile(
-                title: Text(group.name,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: isExpanded ? theme.primaryColor : Colors.black,
-                    )),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Text(group.date,
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text('${group.startTime} - ${group.endTime}')
-                  ],
-                ));
+              title: Text(
+                group.name,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isExpanded ? theme.primaryColor : Colors.black,
+                ),
+              ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  Text(
+                    group.date,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text('${group.startTime} - ${group.endTime}'),
+                ],
+              ),
+            );
           },
           body: group.isExpanded
               ? FutureBuilder(
@@ -660,7 +631,9 @@ Future<void> _showMembershipPopup({
                         child: Text(
                           '${snap.error}',
                           style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       );
                     }
@@ -686,42 +659,21 @@ Future<void> _showMembershipPopup({
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                                "Location: ${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 6),
-                            Text(
-                                "Owner: ${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 6),
-                            ElevatedButton.icon(
-  icon: const Icon(Icons.group_outlined),
-  label: const Text("View Members"),
-  style: ElevatedButton.styleFrom(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-  ),
-onPressed: () async {
-    final List membersRaw = groupResponse.members ?? [];
-    final memberNames = membersRaw.map((m) => m.toString()).toList();
+                              "Location: ${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 15),
 
-    await _showMembershipPopup(
-      isOwner: groupResponse.access == "owner",
-      ownerName: groupResponse.ownerDisplayName,
-      members: memberNames,
-    );
-  },
-),
+                            // 👇 New inline membership section (no extra tap)
+                            _buildMembershipSection(groupResponse),
 
-const SizedBox(height: 8),
+                            const SizedBox(height: 16),
 
-
-                            // OWNER VIEW – add "Invite by handle" here
+                            // OWNER VIEW – Invite / Edit / Delete
                             if (groupResponse.access == "owner") ...[
-                              const SizedBox(height: 12),
                               const Text(
                                 "Invite by handle",
                                 style: TextStyle(
@@ -740,7 +692,8 @@ const SizedBox(height: 8),
                                         hintText: "student123",
                                         border: OutlineInputBorder(),
                                         isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
+                                        contentPadding:
+                                            EdgeInsets.symmetric(
                                           vertical: 10,
                                           horizontal: 12,
                                         ),
@@ -750,171 +703,156 @@ const SizedBox(height: 8),
                                   const SizedBox(width: 8),
                                   ElevatedButton(
                                     onPressed: () async {
-                                      final handle = _inviteHandleController
-                                          .text
-                                          .trim();
+                                      final handle =
+                                          _inviteHandleController.text.trim();
                                       if (handle.isEmpty) return;
 
                                       try {
                                         await _service.inviteByHandle(
-                                            groupResponse.id, handle);
+                                          groupResponse.id,
+                                          handle,
+                                        );
                                         if (!mounted) return;
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                                'Invited @$handle to this group'),
+                                              'Invited @$handle to this group',
+                                            ),
                                           ),
                                         );
                                         _inviteHandleController.clear();
                                         _onReloadNeeded();
-} catch (e) {
-  if (!mounted) return;
+                                      } catch (e) {
+                                        if (!mounted) return;
 
-  // Clean the backend error (remove "Exception:" if present)
-  final String cleaned =
-      e.toString().replaceFirst("Exception: ", "").trim();
+                                        // Clean the backend error
+                                        final String cleaned = e
+                                            .toString()
+                                            .replaceFirst(
+                                              "Exception: ",
+                                              "",
+                                            )
+                                            .trim();
 
-await _showErrorPopup(
-  'Unable to send invite.\nThis user already has a study group at that time.',
-);
-
-}
-
+                                        await _showErrorPopup(
+                                          'Unable to send invite.\nThis user already has a study group at that time.',
+                                        );
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 10,
                                       ),
                                     ),
-                                    child: const Text("Invite"),
+                                    child: const Text("Invite",
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                        ),
+                                      ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 16),
 
-                              // Existing Edit / Delete buttons
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
                                   ElevatedButton(
                                     onPressed: () =>
                                         _showEditConfirmationDialog(
-                                            context, groupResponse),
+                                      context,
+                                      groupResponse,
+                                    ),
                                     style: ElevatedButton.styleFrom(
-                                        backgroundColor: theme.colorScheme
-                                            .surfaceContainerHighest,
-                                        foregroundColor:
-                                            theme.colorScheme.onSurfaceVariant,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        maximumSize: const Size(140, 60)),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      maximumSize: const Size(140, 60),
+                                    ),
                                     child: const Text(
                                       "Edit",
                                       style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 15),
                                   ElevatedButton(
                                     onPressed: () =>
                                         _showDeleteConfirmationDialog(
-                                            context, groupResponse.id),
+                                      context,
+                                      groupResponse.id,
+                                    ),
                                     style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            theme.colorScheme.error,
-                                        foregroundColor:
-                                            theme.colorScheme.onError,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        maximumSize: const Size(140, 60)),
+                                      backgroundColor:
+                                          theme.colorScheme.error,
+                                      foregroundColor:
+                                          theme.colorScheme.onError,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      maximumSize: const Size(140, 60),
+                                    ),
                                     child: const Text(
                                       "DELETE",
                                       style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ],
-if (groupResponse.access == "member") ...[
-  const SizedBox(height: 12),
 
-  // MEMBERSHIP INFORMATION BUTTON
-  Align(
-    alignment: Alignment.centerLeft,
-    child: ElevatedButton.icon(
-      icon: const Icon(Icons.info_outline),
-      label: const Text(
-        "Membership Information",
-        style: TextStyle(fontSize: 14),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueGrey.shade50,
-        foregroundColor: Colors.black87,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-      onPressed: () async {
-        final List membersRaw = groupResponse.members ?? [];
-        final memberNames = membersRaw.map((m) => m.toString()).toList();
-
-        await _showMembershipPopup(
-          isOwner: false,
-          ownerName: groupResponse.ownerDisplayName,
-        	members: memberNames,
-        );
-      },
-    ),
-  ),
-
-  const SizedBox(height: 12),
-
-  // existing members list under the button
-  _buildMembersList(groupResponse.members),
-
-  const SizedBox(height: 16),
-
-  // LEAVE button
-  Align(
-    alignment: Alignment.bottomRight,
-    child: ElevatedButton(
-      onPressed: () =>
-          _showLeaveConfirmationDialog(context, groupResponse.id),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: theme.colorScheme.error,
-        foregroundColor: theme.colorScheme.onError,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        maximumSize: const Size(140, 60),
-      ),
-      child: const Text(
-        "LEAVE",
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ),
-  ),
-],
-
-
+                            // MEMBER VIEW – just LEAVE button now;
+                            // membership info is shown inline above
+                            if (groupResponse.access == "member") ...[
+                              const SizedBox(height: 16),
+                              Align(
+                                alignment: Alignment.bottomRight,
+                                child: ElevatedButton(
+                                  onPressed: () =>
+                                      _showLeaveConfirmationDialog(
+                                    context,
+                                    groupResponse.id,
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        theme.colorScheme.error,
+                                    foregroundColor:
+                                        theme.colorScheme.onError,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(10),
+                                    ),
+                                    maximumSize: const Size(140, 60),
+                                  ),
+                                  child: const Text(
+                                    "LEAVE",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     );
-                  })
+                  },
+                )
               : Container(),
           isExpanded: group.isExpanded,
         );

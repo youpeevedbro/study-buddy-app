@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:study_buddy/models/group.dart';
 import '../services/group_service.dart';
-
 import '../components/grad_button.dart';
 
 class StudyGroupsPage extends StatefulWidget {
@@ -40,53 +39,47 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
         ),
       ),
       body: SafeArea(
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Header
-                const SizedBox(height: 20),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 25.0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Study Groups",
-                      style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 25.0),
-                  child: const Divider(
+            // Header
+            const SizedBox(height: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 25.0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  "Study Groups",
+                  style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
                     color: Colors.black,
-                    thickness: 2,
                   ),
                 ),
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 25.0),
+              child: const Divider(
+                color: Colors.black,
+                thickness: 2,
+              ),
+            ),
+            const SizedBox(height: 10),
 
-                const SizedBox(height: 10),
-
-                // Expandable group list
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFADA7A),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.all(10),
-                      child: const AllGroups(),
-                    ),
+            // Expandable group list
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFADA7A),
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  padding: const EdgeInsets.all(10),
+                  child: const AllGroups(),
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -109,8 +102,8 @@ class _AllGroupsState extends State<AllGroups> {
   @override
   void initState() {
     super.initState();
-    _futureGroups =
-        _service.listAllStudyGroups(); // returns StudyGroupResponses with appropriate access
+    _futureGroups = _service
+        .listAllStudyGroups(); // returns StudyGroupResponses with appropriate access
   }
 
   void _reloadData() {
@@ -179,21 +172,11 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
   late VoidCallback _onReloadNeeded;
   final GroupService _service = const GroupService();
 
-  // Single text controller for "invite handle" (simple approach)
-  final TextEditingController _inviteHandleController =
-      TextEditingController();
-
   @override
   void initState() {
     super.initState();
     _groups = widget.groups;
     _onReloadNeeded = widget.onReloadNeeded;
-  }
-
-  @override
-  void dispose() {
-    _inviteHandleController.dispose();
-    super.dispose();
   }
 
   // ---------------------------------------------------------------------------
@@ -241,38 +224,89 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     );
   }
 
-  Widget _buildMembersList(List<dynamic>? rawMembers) {
-    final List<String> members =
-        (rawMembers ?? []).map((e) => e.toString()).toList();
+  // Inline membership info (like My Study Groups)
+  Widget _buildMembershipSection(StudyGroupResponse group) {
+    final bool isOwner = group.access == "owner";
+    final List<dynamic> membersRaw = group.members ?? [];
+    final List<String> memberNames =
+        membersRaw.map((m) => m.toString()).toList();
+
+    final String ownerName = group.ownerDisplayName;
+    final List<String> others =
+        memberNames.where((m) => m != ownerName).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
       children: [
         const Text(
-          "Members",
+          "Membership Information",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        Text(
+          isOwner
+              ? "You are the owner of this study group."
+              : "You are a member of this study group.",
+          style: const TextStyle(fontSize: 14),
+        ),
+        const SizedBox(height: 12),
+
+        const Text(
+          "Owner:",
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 6),
-        if (members.isEmpty)
-          const Text(
-            "No other members yet.",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const Icon(
+              Icons.workspace_premium,
+              color: Colors.amber,
+              size: 20,
             ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                "${group.ownerDisplayName} (${group.ownerHandle})",
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
+        const Text(
+          "Members:",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+
+        if (others.isEmpty)
+          const Text(
+            "No other members.",
+            style: TextStyle(color: Colors.black54),
           )
         else
-          ...members.map(
+          ...others.map(
             (m) => Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("•  ", style: TextStyle(fontSize: 14)),
+                  const Icon(Icons.person, size: 18, color: Colors.grey),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       m,
@@ -312,25 +346,16 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                     group.name,
                     style: TextStyle(
                       fontSize: 18,
-                      fontStyle: FontStyle.italic,
                       fontWeight: FontWeight.w500,
                       color: isExpanded ? theme.primaryColor : Colors.black,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    "Owned by: \n${group.ownerDisplayName}",
+                    "Owner: ${group.ownerDisplayName} (${group.ownerHandle})",
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
-                      color:
-                          isExpanded ? theme.primaryColor : Colors.black,
-                    ),
-                  ),
-                  Text(
-                    group.ownerHandle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
                       color: isExpanded
                           ? theme.primaryColor
                           : theme.colorScheme.outline,
@@ -339,9 +364,10 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                 ],
               ),
               trailing: SizedBox(
-                width: 50,
+                width: 60,
                 child: Text(
                   group.date,
+                  textAlign: TextAlign.right,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -372,7 +398,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                   Text(
                     "Location: ${group.buildingCode} - ${group.roomNumber}",
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -385,6 +411,12 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                     ),
                   ),
                   const SizedBox(height: 6),
+                  // OWNER / MEMBER VIEW: inline membership block
+                  if (group.access == "owner" || group.access == "member") ...[
+                    const SizedBox(height: 10),
+                    _buildMembershipSection(group),
+                  ],
+                  const SizedBox(height: 6),
                   Text(
                     "Number of members: ${group.quantity}",
                     style: const TextStyle(
@@ -392,13 +424,10 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 15),
 
-                  // -------------------------------
-                  // ACCESS-BASED CONTROLS
-                  // -------------------------------
+                  // PUBLIC VIEW: join request button
                   if (group.access == "public") ...[
-                    // PUBLIC VIEW
                     Align(
                       alignment: Alignment.center,
                       child: IgnorePointer(
@@ -451,295 +480,13 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                         ),
                       ),
                     ),
-                  ] else if (group.access == "owner") ...[
-                    // -------------------------------
-                    // OWNER VIEW → POPUP
-                    // -------------------------------
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text(
-                          "View membership info",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final List<dynamic> membersRaw =
-                              group.members ?? [];
-                          final List<String> memberNames = membersRaw
-                              .map((m) => m.toString())
-                              .toList();
-
-                          final String ownerName =
-                              group.ownerDisplayName;
-
-                          final List<String> others =
-                              memberNames.where((m) => m != ownerName).toList();
-
-                          await showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text(
-                                "Membership Information",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "You are the owner of this study group.",
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 16),
-
-                                  // OWNER SECTION
-                                  const Text(
-                                    "Owner:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.workspace_premium,
-                                        color: Colors.amber,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          ownerName,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight:
-                                                FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // MEMBERS SECTION
-                                  const Text(
-                                    "Members:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-
-                                  if (others.isEmpty)
-                                    const Text(
-                                      "No other members.",
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                      ),
-                                    )
-                                  else
-                                    ...others.map(
-                                      (m) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(
-                                                bottom: 4),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.person,
-                                              size: 18,
-                                              color: Colors.grey,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                m,
-                                                style:
-                                                    const TextStyle(
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  child: const Text("OK"),
-                                  onPressed: () =>
-                                      Navigator.pop(context),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ] else if (group.access == "member") ...[
-                    // -------------------------------
-                    // MEMBER VIEW → POPUP
-                    // -------------------------------
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text(
-                          "View my membership",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final List<dynamic> membersRaw =
-                              group.members ?? [];
-                          final List<String> memberNames = membersRaw
-                              .map((m) => m.toString())
-                              .toList();
-
-                          final String ownerName =
-                              group.ownerDisplayName;
-
-                          final List<String> others =
-                              memberNames.where((m) => m != ownerName).toList();
-
-                          await showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text(
-                                "Membership Information",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "You are already part of this study group.",
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 16),
-
-                                  // OWNER SECTION
-                                  const Text(
-                                    "Owner:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.workspace_premium,
-                                        color: Colors.amber,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          ownerName,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight:
-                                                FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // MEMBERS SECTION
-                                  const Text(
-                                    "Members:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-
-                                  if (others.isEmpty)
-                                    const Text(
-                                      "No other members.",
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                      ),
-                                    )
-                                  else
-                                    ...others.map(
-                                      (m) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(
-                                                bottom: 4),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.person,
-                                              size: 18,
-                                              color: Colors.grey,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                m,
-                                                style:
-                                                    const TextStyle(
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  child: const Text("OK"),
-                                  onPressed: () =>
-                                      Navigator.pop(context),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
                   ],
+
+                  // // OWNER / MEMBER VIEW: inline membership block
+                  // if (group.access == "owner" || group.access == "member") ...[
+                  //   const SizedBox(height: 10),
+                  //   _buildMembershipSection(group),
+                  // ],
                 ],
               ),
             ),
