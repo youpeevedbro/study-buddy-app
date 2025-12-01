@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
 import '../components/grad_button.dart';
 import 'addgroup2.dart';
 import '../models/group.dart';
@@ -12,11 +14,11 @@ class MyStudyGroupsPage extends StatefulWidget {
 }
 
 class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
-  Key _key = UniqueKey(); // initial key
+  Key _key = UniqueKey(); // forces Groups to rebuild
 
   void rebuildGroups() {
     setState(() {
-      _key = UniqueKey(); // assign a new key to rebuild
+      _key = UniqueKey();
     });
   }
 
@@ -47,6 +49,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
         centerTitle: true,
         backgroundColor: theme.scaffoldBackgroundColor,
         foregroundColor: Colors.black,
+        elevation: 0,
         titleTextStyle: const TextStyle(
           fontFamily: 'BrittanySignature',
           fontSize: 40,
@@ -54,73 +57,92 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
           color: Colors.black,
         ),
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 25.0),
-              child: Align(
-                alignment: Alignment.centerLeft,
+      body: Container(
+        // soft gradient like My Activities
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+
+              // Title
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.0),
                 child: Text(
                   "My Study Groups",
                   style: TextStyle(
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 0.2,
+                    fontFamily: 'SuperLobster',
                   ),
                 ),
               ),
-            ),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 25.0),
-              child: const Divider(color: Colors.black, thickness: 2),
-            ),
-            const SizedBox(height: 10),
+              const SizedBox(height: 8),
 
-            // Add button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 25.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GradientButton(
-                    onPressed: _navigateToAddGroup,
-                    borderRadius: BorderRadius.circular(12),
-                    child: const Text(
-                      "Add",
-                      style: TextStyle(
+              // Divider
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Container(
+                  height: 2,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Add Study Group button – pill gradient
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: GradientButton(
+                  borderRadius: BorderRadius.circular(14),
+                  height: 44,
+                  onPressed: _navigateToAddGroup,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.add, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        "Add Study Group",
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w800,
-                          fontSize: 18),
-                    ),
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 15),
+              const SizedBox(height: 16),
 
-            // Expandable group list
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFADA7A),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.all(10),
+              // Groups list
+              Expanded(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
                   child: Groups(key: _key),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// GROUPS FUTURE WRAPPER
+// ---------------------------------------------------------------------------
 
 class Groups extends StatefulWidget {
   const Groups({super.key});
@@ -141,46 +163,61 @@ class _GroupsState extends State<Groups> {
 
   void _reloadData() {
     setState(() {
-      _futureGroups =
-          _service.listMyStudyGroups(); // Re-assign the Future to trigger reload
+      _futureGroups = _service.listMyStudyGroups();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: FutureBuilder<List<JoinedGroup>>(
-          future: _futureGroups,
-          builder:
-              (BuildContext context, AsyncSnapshot<List<JoinedGroup>> snap) {
-            if (snap.connectionState == ConnectionState.waiting) {
-              return const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            if (snap.hasError) {
-              return Text(
-                'Error: ${snap.error}',
-                style: const TextStyle(height: 1.3),
-              );
-            }
-            final groups = snap.data ?? [];
+    return FutureBuilder<List<JoinedGroup>>(
+      future: _futureGroups,
+      builder: (BuildContext context, AsyncSnapshot<List<JoinedGroup>> snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
 
-            if (groups.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(30),
-                child: Center(
-                    child: Text('You have no current Study Groups.',
-                        style: TextStyle(fontSize: 18))),
-              );
-            }
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              'Error: ${snap.error}',
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          );
+        }
 
-            return GroupPanels(groups: groups, onReloadNeeded: _reloadData);
-          }),
+        final groups = snap.data ?? [];
+
+        if (groups.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(30),
+            child: Center(
+              child: Text(
+                'You have no current Study Groups.',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          );
+        }
+
+        return GroupPanels(
+          groups: groups,
+          onReloadNeeded: _reloadData,
+        );
+      },
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// GROUP PANELS
+// ---------------------------------------------------------------------------
 
 class GroupPanels extends StatefulWidget {
   final VoidCallback onReloadNeeded;
@@ -198,14 +235,12 @@ class _GroupPanelsState extends State<GroupPanels> {
   bool _isLeaving = false;
   bool _isEditing = false;
 
-  late List<JoinedGroup> _groups; // only info from joinedStudyGroups
+  late List<JoinedGroup> _groups;
   late VoidCallback _onReloadNeeded;
   final GroupService _service = const GroupService();
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _groupNameController = TextEditingController();
-
-  // controller for invite handle
   final TextEditingController _inviteHandleController =
       TextEditingController();
 
@@ -224,25 +259,43 @@ class _GroupPanelsState extends State<GroupPanels> {
   }
 
   // ---------------------------------------------------------------------------
-  //  popup messages (error) + helper for dialog
+  // POPUPS + FORMAT HELPERS
   // ---------------------------------------------------------------------------
+
   Future<void> _showErrorPopup(String message) async {
+    if (!mounted) return;
+
     await showDialog<void>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: const Color(0xFFF4E9D8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+          title: Row(
+            children: const [
+              Icon(
+                Icons.error_outline,
+                color: Colors.red,
+              ),
+              SizedBox(width: 8),
+              Text(
+                "Error",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
           ),
           content: Text(
             message,
-            style: const TextStyle(fontSize: 16),
+            style: const TextStyle(fontSize: 14),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text("Ok"),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text(
+                "OK",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
             ),
           ],
         );
@@ -250,159 +303,164 @@ class _GroupPanelsState extends State<GroupPanels> {
     );
   }
 
-Widget _buildMembersList(List<dynamic>? rawMembers) {
-  final List<String> members =
-      (rawMembers ?? []).map((e) => e.toString()).toList();
+  Future<void> _showSuccessPopup(String message) async {
+    if (!mounted) return;
 
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const Text(
-        "Members",
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      const SizedBox(height: 6),
-      if (members.isEmpty)
-        const Text(
-          "No other members yet.",
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.black54,
-          ),
-        )
-      else
-        ...members.map(
-          (m) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("•  ", style: TextStyle(fontSize: 14)),
-                Expanded(
-                  child: Text(
-                    m,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-    ],
-  );
-}
-
-Future<void> _showMembershipPopup({
-  required bool isOwner,
-  required String ownerName,
-  required List<String> members,
-}) async {
-  final List<String> others =
-      members.where((m) => m != ownerName).toList();
-  await showDialog(
-    context: context,
-    builder: (_) {
-      return AlertDialog(
-        title: const Text(
-          "Membership Information",
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isOwner
-                  ? "You are the owner of this study group."
-                  : "You are a member of this study group.",
-            ),
-            const SizedBox(height: 16),
-
-            // Owner Section
-            const Text(
-              "Owner:",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Row(
+            children: const [
+              Icon(
+                Icons.check_circle_outline,
+                color: Colors.green,
               ),
-            ),
-            const SizedBox(height: 4),
-
-           Row(
-  children: [
-    const Icon(
-      Icons.workspace_premium,     
-      color: Colors.amber,
-      size: 20,
-    ),
-    const SizedBox(width: 6),
-    Expanded(
-      child: Text(
-        ownerName,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ),
-  ],
-),
-
-
-            const SizedBox(height: 16),
-
-            // Members Section
-            const Text(
-              "Members:",
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-
-            if (others.isEmpty)
-              const Text(
-                "No other members.",
-                style: TextStyle(color: Colors.black54),
-              )
-            else
-              ...others.map(
-                (m) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person, size: 18, color: Colors.grey),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          m,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
+              SizedBox(width: 8),
+              Text(
+                "Success",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
                 ),
               ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text(
+                "OK",
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
           ],
-        ),
-        actions: [
-          TextButton(
-            child: const Text("OK"),
-            onPressed: () => Navigator.pop(context),
+        );
+      },
+    );
+  }
+
+  String formatTo12Hour(String time24h) {
+    try {
+      final parsed = DateTime.parse("2020-01-01 $time24h:00");
+      return DateFormat("h:mm a").format(parsed);
+    } catch (_) {
+      return time24h;
+    }
+  }
+
+  String formatDate(String yyyymmdd) {
+    try {
+      final parsed = DateTime.parse(yyyymmdd);
+      return DateFormat("MMM d, yyyy").format(parsed);
+    } catch (_) {
+      return yyyymmdd;
+    }
+  }
+
+  Future<void> _showMembershipPopup({
+    required bool isOwner,
+    required String ownerName,
+    required List<String> members,
+  }) async {
+    final List<String> others = members.where((m) => m != ownerName).toList();
+    await showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text(
+            "Membership Information",
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
-        ],
-      );
-    },
-  );
-}
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isOwner
+                    ? "You are the owner of this study group."
+                    : "You are a member of this study group.",
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Owner:",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.workspace_premium,
+                    color: Colors.amber,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      ownerName,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Members:",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (others.isEmpty)
+                const Text(
+                  "No other members.",
+                  style: TextStyle(color: Colors.black54),
+                )
+              else
+                ...others.map(
+                  (m) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person, size: 18, color: Colors.grey),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            m,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text("OK"),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-
-
+  // ---------------------------------------------------------------------------
+  // DELETE / LEAVE / EDIT LOGIC (unchanged)
+  // ---------------------------------------------------------------------------
 
   Future<void> _showDeleteConfirmationDialog(
       BuildContext context, String groupID) async {
@@ -418,25 +476,22 @@ Future<void> _showMembershipPopup({
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
             ),
             ElevatedButton(
-                onPressed: _isDeleting
-                    ? null
-                    : () {
-                        _handleDelete(groupID);
-                      },
-                child: _isDeleting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text("Delete")),
+              onPressed: _isDeleting ? null : () => _handleDelete(groupID),
+              child: _isDeleting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text("Delete"),
+            ),
           ],
         );
       },
@@ -444,28 +499,45 @@ Future<void> _showMembershipPopup({
   }
 
   Future<void> _handleDelete(String groupID) async {
-    setState(() {
-      _isDeleting = true;
-    });
+  setState(() => _isDeleting = true);
 
-    try {
-      await _service.deleteStudyGroup(groupID);
-      _onReloadNeeded();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Study Group successfully deleted')),
-      );
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        await _showErrorPopup('Failed to delete study group: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _isDeleting = false);
+  try {
+    await _service.deleteStudyGroup(groupID);
+    _onReloadNeeded();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Study Group successfully deleted',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: const Color(0xFF81C784), // <-- THEME COLOR
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
+  } catch (e) {
+    if (mounted) {
+      await _showErrorPopup('Failed to delete study group: $e');
+    }
+  } finally {
+    if (mounted) setState(() => _isDeleting = false);
   }
+}
+
 
   Future<void> _showLeaveConfirmationDialog(
       BuildContext context, String groupID) async {
@@ -481,58 +553,72 @@ Future<void> _showMembershipPopup({
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
             ),
             ElevatedButton(
-                onPressed: _isLeaving
-                    ? null
-                    : () {
-                        _handleLeaving(groupID);
-                      },
-                child: _isLeaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text("Leave")),
+              onPressed: _isLeaving ? null : () => _handleLeaving(groupID),
+              child: _isLeaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text("Leave"),
+            ),
           ],
         );
       },
     );
   }
 
-  Future<void> _handleLeaving(String groupID) async {
-    setState(() {
-      _isLeaving = true;
-    });
+Future<void> _handleLeaving(String groupID) async {
+  setState(() => _isLeaving = true);
 
-    try {
-      await _service.leaveStudyGroup(groupID);
-      _onReloadNeeded();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Successfully left Study Group')),
-      );
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        await _showErrorPopup('Failed to leave study group: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _isLeaving = false);
+  try {
+    await _service.leaveStudyGroup(groupID);
+    _onReloadNeeded();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Successfully left Study Group',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: const Color(0xFF81C784), // SAME THEME COLOR
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
+  } catch (e) {
+    if (mounted) {
+      await _showErrorPopup('Failed to leave study group: $e');
+    }
+  } finally {
+    if (mounted) setState(() => _isLeaving = false);
   }
+}
+
 
   Future<void> _showEditConfirmationDialog(
       BuildContext context, StudyGroupResponse groupResp) async {
-    _groupNameController.text = groupResp.name; // optional: prefill
+    _groupNameController.text = groupResp.name;
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -542,46 +628,50 @@ Future<void> _showMembershipPopup({
           content: Form(
             key: _formKey,
             child: TextFormField(
-                controller: _groupNameController,
-                decoration: InputDecoration(
-                    labelText: 'Study Group name..',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16))),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter some text';
-                  }
-                  return null;
-                }),
+              controller: _groupNameController,
+              decoration: InputDecoration(
+                labelText: 'Study Group name..',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter some text';
+                }
+                return null;
+              },
+            ),
           ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
             ),
             ElevatedButton(
-                onPressed: _isEditing
-                    ? null
-                    : () {
-                        if (_formKey.currentState!.validate()) {
-                          StudyGroupResponse groupUpdated =
-                              groupResp.copyWith(
-                                  name: _groupNameController.text.trim());
-                          _handleUpdate(groupUpdated);
-                        }
-                      },
-                child: _isEditing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text("Submit")),
+              onPressed: _isEditing
+                  ? null
+                  : () {
+                      if (_formKey.currentState!.validate()) {
+                        final groupUpdated =
+                            groupResp.copyWith(name: _groupNameController.text
+                                .trim());
+                        _handleUpdate(groupUpdated);
+                      }
+                    },
+              child: _isEditing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text("Submit"),
+            ),
           ],
         );
       },
@@ -589,138 +679,236 @@ Future<void> _showMembershipPopup({
   }
 
   Future<void> _handleUpdate(StudyGroupResponse groupUpdated) async {
-    setState(() {
-      _isEditing = true;
-    });
+  setState(() => _isEditing = true);
 
-    try {
-      await _service.updateStudyGroup(groupUpdated);
-      _onReloadNeeded();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Successfully updated Study Group')),
-      );
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        await _showErrorPopup('Failed to update study group: $e');
-      }
-    } finally {
-      if (mounted) setState(() => _isEditing = false);
+  try {
+    await _service.updateStudyGroup(groupUpdated);
+    _onReloadNeeded();
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Successfully updated Study Group',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: const Color(0xFF81C784), // same theme color
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
+  } catch (e) {
+    if (mounted) {
+      await _showErrorPopup('Failed to update study group: $e');
+    }
+  } finally {
+    if (mounted) setState(() => _isEditing = false);
   }
+}
+
+
+  // ---------------------------------------------------------------------------
+  // MAIN BUILD – CARD + EXPANSIONTILE
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ExpansionPanelList(
-      expansionCallback: (int panelIndex, bool isExpanded) {
-        setState(() {
-          _groups[panelIndex].isExpanded = isExpanded;
-        });
-      },
-      children: _groups.map<ExpansionPanel>((JoinedGroup group) {
-        return ExpansionPanel(
-          canTapOnHeader: true,
-          backgroundColor: const Color(0xFFFCF6DB),
-          headerBuilder: (BuildContext context, bool isExpanded) {
-            return ListTile(
-                title: Text(group.name,
-                    textAlign: TextAlign.center,
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      physics: const BouncingScrollPhysics(),
+      itemCount: _groups.length,
+      itemBuilder: (context, index) {
+        final group = _groups[index];
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
+          child: Card(
+            elevation: 0,
+            color: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF6EC),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.20),
+                    blurRadius: 16,
+                    spreadRadius: 1, 
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                ),
+                child: ExpansionTile(
+                  initiallyExpanded: group.isExpanded,
+                  onExpansionChanged: (expanded) {
+                    setState(() {
+                      group.isExpanded = expanded;
+                    });
+                  },
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  childrenPadding:
+                      const EdgeInsets.fromLTRB(16, 0, 16, 16),
+
+                  // ===== HEADER =====
+                  title: Text(
+                    group.name,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: isExpanded ? theme.primaryColor : Colors.black,
-                    )),
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Text(group.date,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        formatDate(group.date),
                         style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                    Text('${group.startTime} - ${group.endTime}')
-                  ],
-                ));
-          },
-          body: group.isExpanded
-              ? FutureBuilder(
-                  future: _service.getStudyGroup(group.id),
-                  builder: (context, snap) {
-                    if (snap.connectionState == ConnectionState.waiting) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Center(child: CircularProgressIndicator()),
-                      );
-                    }
-                    if (snap.hasError) {
-                      return Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Text(
-                          '${snap.error}',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
-                      );
-                    }
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${formatTo12Hour(group.startTime)} - ${formatTo12Hour(group.endTime)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ),
 
-                    final groupResponse = snap.data!;
-                    return Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(20),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
+                  // ===== BODY =====
+                  children: [
+                    FutureBuilder(
+                      future: _service.getStudyGroup(group.id),
+                      builder: (context, snap) {
+                        if (snap.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24),
+                            child:
+                                Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        if (snap.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Text(
+                              '${snap.error}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
+                          );
+                        }
+
+                        final groupResponse = snap.data!;
+                        final bool isOwner =
+                            groupResponse.access == "owner";
+                        final bool isMember =
+                            groupResponse.access == "member";
+
+                        return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                                "Location: ${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
-                                style: const TextStyle(
+                            const SizedBox(height: 8),
+
+                            // Building name lookup
+                            FutureBuilder(
+                              future: _service
+                                  .getBuildingName(groupResponse.buildingCode),
+                              builder: (context, buildingSnap) {
+                                if (buildingSnap.connectionState ==
+                                    ConnectionState.waiting) {
+                                  return const Text("Location: ...");
+                                }
+
+                                final buildingName =
+                                    buildingSnap.data ??
+                                        groupResponse.buildingCode;
+
+                                return Text(
+                                  "Location: $buildingName - ${groupResponse.roomNumber}",
+                                  style: const TextStyle(
                                     fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                );
+                              },
+                            ),
+
                             const SizedBox(height: 6),
                             Text(
-                                "Owner: ${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 6),
-                            ElevatedButton.icon(
-  icon: const Icon(Icons.group_outlined),
-  label: const Text("View Members"),
-  style: ElevatedButton.styleFrom(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-  ),
-onPressed: () async {
-    final List membersRaw = groupResponse.members ?? [];
-    final memberNames = membersRaw.map((m) => m.toString()).toList();
+                              "Owner: ${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
 
-    await _showMembershipPopup(
-      isOwner: groupResponse.access == "owner",
-      ownerName: groupResponse.ownerDisplayName,
-      members: memberNames,
-    );
-  },
-),
+                            // ===== OWNER VIEW =====
+                            if (isOwner) ...[
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: ElevatedButton.icon(
+                                  icon: const Icon(Icons.group_outlined,
+                                      size: 18),
+                                  label: const Text("View Members"),
+                                  style: ElevatedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 10,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  onPressed: () async {
+                                    final membersRaw =
+                                        groupResponse.members ?? [];
+                                    final memberNames = membersRaw
+                                        .map((m) => m.toString())
+                                        .toList();
 
-const SizedBox(height: 8),
-
-
-                            // OWNER VIEW – add "Invite by handle" here
-                            if (groupResponse.access == "owner") ...[
+                                    await _showMembershipPopup(
+                                      isOwner: true,
+                                      ownerName:
+                                          groupResponse.ownerDisplayName,
+                                      members: memberNames,
+                                    );
+                                  },
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               const Text(
                                 "Invite by handle",
@@ -740,7 +928,8 @@ const SizedBox(height: 8),
                                         hintText: "student123",
                                         border: OutlineInputBorder(),
                                         isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
+                                        contentPadding:
+                                            EdgeInsets.symmetric(
                                           vertical: 10,
                                           horizontal: 12,
                                         ),
@@ -750,40 +939,63 @@ const SizedBox(height: 8),
                                   const SizedBox(width: 8),
                                   ElevatedButton(
                                     onPressed: () async {
-                                      final handle = _inviteHandleController
-                                          .text
-                                          .trim();
+                                      final handle =
+                                          _inviteHandleController.text
+                                              .trim();
                                       if (handle.isEmpty) return;
 
                                       try {
                                         await _service.inviteByHandle(
                                             groupResponse.id, handle);
                                         if (!mounted) return;
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                'Invited @$handle to this group'),
-                                          ),
+
+                                        await _showSuccessPopup(
+                                          'Invite sent to @$handle.\nPlease wait for approval.',
                                         );
+
                                         _inviteHandleController.clear();
                                         _onReloadNeeded();
-} catch (e) {
-  if (!mounted) return;
+                                      } catch (e) {
+                                        if (!mounted) return;
 
-  // Clean the backend error (remove "Exception:" if present)
-  final String cleaned =
-      e.toString().replaceFirst("Exception: ", "").trim();
+                                        final String cleaned = e
+                                            .toString()
+                                            .replaceFirst(
+                                                "Exception: ", "")
+                                            .trim();
+                                        debugPrint(
+                                            'inviteByHandle error: $cleaned');
 
-await _showErrorPopup(
-  'Unable to send invite.\nThis user already has a study group at that time.',
-);
+                                        String userMessage;
+                                        final lower =
+                                            cleaned.toLowerCase();
 
-}
+                                        if (lower
+                                            .contains('time overlap')) {
+                                          userMessage =
+                                              'Unable to send invite.\nThis user already has a study group at that time.';
+                                        } else if (lower.contains(
+                                                'handle not found') ||
+                                            lower.contains(
+                                                'user not found') ||
+                                            lower.contains(
+                                                'no user found') ||
+                                            lower.contains(
+                                                'unknown handle')) {
+                                          userMessage =
+                                              'Unable to send invite.\nThat handle could not be found. Please check the spelling and try again.';
+                                        } else {
+                                          userMessage =
+                                              'Unable to send invite.\n$cleaned';
+                                        }
 
+                                        await _showErrorPopup(
+                                            userMessage);
+                                      }
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
+                                      padding:
+                                          const EdgeInsets.symmetric(
                                         horizontal: 16,
                                         vertical: 10,
                                       ),
@@ -793,132 +1005,153 @@ await _showErrorPopup(
                                 ],
                               ),
                               const SizedBox(height: 16),
+Row(
+  mainAxisAlignment: MainAxisAlignment.end,
+  children: [
+    // EDIT – soft beige, brown text, outlined
+    SizedBox(
+      height: 40,
+      child: OutlinedButton(
+        onPressed: () => _showEditConfirmationDialog(context, groupResponse),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Color(0xFFB58A3A)), // warm brown
+          backgroundColor: const Color(0xFFFFF7E0),          // soft cream
+          foregroundColor: const Color(0xFF8B6D41),          // brown text
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: const Text(
+          "Edit",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    ),
 
-                              // Existing Edit / Delete buttons
+    const SizedBox(width: 12),
+// DELETE – still stands out, but softer & rounded
+    SizedBox(
+      height: 40,
+      child: ElevatedButton(
+        onPressed: () =>
+            _showDeleteConfirmationDialog(context, groupResponse.id),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFE35B5B),          // softer red
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 3,
+        ),
+        child: const Text(
+          "DELETE",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    ),
+  ],
+),
+],
+
+                            // ===== MEMBER VIEW =====
+                            if (isMember) ...[
+                              const SizedBox(height: 16),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _showEditConfirmationDialog(
-                                            context, groupResponse),
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: theme.colorScheme
-                                            .surfaceContainerHighest,
-                                        foregroundColor:
-                                            theme.colorScheme.onSurfaceVariant,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        maximumSize: const Size(140, 60)),
-                                    child: const Text(
-                                      "Edit",
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700),
+                                  ElevatedButton.icon(
+                                    icon: const Icon(
+                                      Icons.group_outlined,
+                                      size: 18,
                                     ),
-                                  ),
-                                  const SizedBox(width: 15),
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _showDeleteConfirmationDialog(
-                                            context, groupResponse.id),
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor:
-                                            theme.colorScheme.error,
-                                        foregroundColor:
-                                            theme.colorScheme.onError,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                        ),
-                                        maximumSize: const Size(140, 60)),
-                                    child: const Text(
-                                      "DELETE",
-                                      style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700),
+                                    label: const Text(
+                                      "View Members",
+                                      style: TextStyle(fontSize: 14),
                                     ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor:
+                                          const Color(0xFFF4E8C2),
+                                      foregroundColor: Colors.brown,
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                        vertical: 10,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      final membersRaw =
+                                          groupResponse.members ?? [];
+                                      final memberNames = membersRaw
+                                          .map((m) => m.toString())
+                                          .toList();
+
+                                      await _showMembershipPopup(
+                                        isOwner: false,
+                                        ownerName: groupResponse
+                                            .ownerDisplayName,
+                                        members: memberNames,
+                                      );
+                                    },
                                   ),
-                                ],
+                                  const SizedBox(width: 12),
+
+         SizedBox(
+        height: 40,
+        child: ElevatedButton(
+          onPressed: () => _showLeaveConfirmationDialog(
+            context,
+            groupResponse.id,
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFE35B5B),   // same soft red
+            foregroundColor: Colors.white,              // white text
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 10,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),   // same radius
+            ),
+            elevation: 3,                                 // same elevation
+          ),
+          child: const Text(
+            "LEAVE",
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    
+  
+],
+                                
                               ),
                             ],
-if (groupResponse.access == "member") ...[
-  const SizedBox(height: 12),
-
-  // MEMBERSHIP INFORMATION BUTTON
-  Align(
-    alignment: Alignment.centerLeft,
-    child: ElevatedButton.icon(
-      icon: const Icon(Icons.info_outline),
-      label: const Text(
-        "Membership Information",
-        style: TextStyle(fontSize: 14),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blueGrey.shade50,
-        foregroundColor: Colors.black87,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-      ),
-      onPressed: () async {
-        final List membersRaw = groupResponse.members ?? [];
-        final memberNames = membersRaw.map((m) => m.toString()).toList();
-
-        await _showMembershipPopup(
-          isOwner: false,
-          ownerName: groupResponse.ownerDisplayName,
-        	members: memberNames,
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         );
       },
-    ),
-  ),
-
-  const SizedBox(height: 12),
-
-  // existing members list under the button
-  _buildMembersList(groupResponse.members),
-
-  const SizedBox(height: 16),
-
-  // LEAVE button
-  Align(
-    alignment: Alignment.bottomRight,
-    child: ElevatedButton(
-      onPressed: () =>
-          _showLeaveConfirmationDialog(context, groupResponse.id),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: theme.colorScheme.error,
-        foregroundColor: theme.colorScheme.onError,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
-        maximumSize: const Size(140, 60),
-      ),
-      child: const Text(
-        "LEAVE",
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ),
-  ),
-],
-
-
-                          ],
-                        ),
-                      ),
-                    );
-                  })
-              : Container(),
-          isExpanded: group.isExpanded,
-        );
-      }).toList(),
     );
   }
 }

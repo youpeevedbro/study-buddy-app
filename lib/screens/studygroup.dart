@@ -428,15 +428,39 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                                   message:
                                       "Join request sent — please wait for approval.",
                                 );
-                              } catch (e) {
-                                if (!mounted) return;
-                                await _showPopup(
-                                  title: "Error",
-                                  message:
-                                      "You cannot invite yourself.",
-                                  isError: true,
-                                );
-                              }
+                              }  catch (e) {
+  if (!mounted) return;
+
+  final String cleaned =
+      e.toString().replaceFirst("Exception: ", "").trim();
+  debugPrint('sendJoinRequest error: $cleaned');
+
+  final lower = cleaned.toLowerCase();
+  String message;
+
+  if (lower.contains('time overlap')) {
+    // e.g. "Time overlap exists with joined Study Groups"
+    message =
+        'You cannot join this study group because its time overlaps with one of your existing study groups.';
+  } else if (lower.contains('cannot invite yourself') ||
+             lower.contains('cannot join your own') ||
+             lower.contains('own study group')) {
+    message =
+        'You cannot send a join request to your own study group.';
+  } else {
+    // Fallback: show backend text
+    message = cleaned.isEmpty
+        ? 'Something went wrong while sending your join request.'
+        : cleaned;
+  }
+
+  await _showPopup(
+    title: "Error",
+    message: message,
+    isError: true,
+  );
+}
+
                             },
                             child: Text(
                               group.hasPendingRequest
@@ -460,7 +484,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.info_outline),
                         label: const Text(
-                          "View membership info",
+                          "View Members",
                           style: TextStyle(fontSize: 14),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -604,7 +628,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.info_outline),
                         label: const Text(
-                          "View my membership",
+                          "View Members",
                           style: TextStyle(fontSize: 14),
                         ),
                         style: ElevatedButton.styleFrom(
@@ -644,7 +668,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                                     CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    "You are already part of this study group.",
+                                    "You are a member of this study group.",
                                     style: TextStyle(fontSize: 14),
                                   ),
                                   const SizedBox(height: 16),

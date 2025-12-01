@@ -260,47 +260,133 @@ class _AddGroupPageState extends State<AddGroupPage> {
       availabilitySlotDoc: _groupFields!.availabilitySlotDoc
     );
 
-    setState(() => _submitting = true);
-    try {
-      await _service.createStudyGroup(group);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Successfully created Study Group')),
-      );
-      if (Navigator.of(context).canPop()) {
-          Navigator.of(context).pop();
-      }
+setState(() => _submitting = true);
 
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
+try {
+  await _service.createStudyGroup(group);
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: const Text(
+        'Successfully created Study Group',
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      backgroundColor:const Color(0xFF81C784), 
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+
+  if (Navigator.of(context).canPop()) {
+    Navigator.of(context).pop();
   }
-
-  Future<void> _showOverlappedGroupDialog(BuildContext context, JoinedGroup group) async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Cannot create study group.\nTime overlap with the following joined group:'),
-          content: Text('${group.name} \nDate: ${group.date} \nTime: ${group.startTime}-${group.endTime}'),
-          actions: <Widget>[
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-              child: Text("Ok")
-            ),
-          ],
-        );
-      },
+} catch (e) {
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Error: $e',
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: const Color(0xFFE53935), 
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
+} finally {
+  if (mounted) setState(() => _submitting = false);
+}
+
+  }
+
+
+String formatDate(String yyyymmdd) {
+  try {
+    final parsed = DateTime.parse(yyyymmdd);
+    return DateFormat("MMM d, yyyy").format(parsed);
+  } catch (_) {
+    return yyyymmdd;
+  }
+}
+
+String formatTo12Hour(String time24h) {
+  try {
+    final parsed = DateTime.parse("2020-01-01 $time24h:00");
+    return DateFormat("h:mm a").format(parsed);
+  } catch (_) {
+    return time24h;
+  }
+}
+
+Future<void> _showOverlappedGroupDialog(
+    BuildContext context,
+    JoinedGroup group,
+  ) async {
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        backgroundColor: const Color(0xFFF4E9D8), // same beige tone
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+
+        // ----- ERROR HEADER (icon + red text) -----
+        title: Row(
+          children: const [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text(
+              "Error",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+
+        // ----- MESSAGE -----
+        content: Text(
+          "Cannot create study group.\n"
+          "Time overlap with the following joined group: "
+          "${group.name}\n\n"
+          "Date: ${formatDate(group.date)}\n"
+          "Time: ${formatTo12Hour(group.startTime)} - ${formatTo12Hour(group.endTime)}",
+          style: const TextStyle(fontSize: 14),
+        ),
+
+        // ----- OK BUTTON -----
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              "OK",
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.brown, // matches your other popups
+              ),
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   @override
   void dispose() {
@@ -319,6 +405,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: Transform.translate(
@@ -339,183 +426,196 @@ class _AddGroupPageState extends State<AddGroupPage> {
           color: Colors.black,
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKeyForGroupCreation,
-          child: ListView(
-            children: [
-              const SizedBox(height: 10),
-              
-            const SizedBox(height: 10),
-              // Group Name
-              TextFormField(
-                controller: _groupNameController,
-                decoration: InputDecoration(
-                  labelText: 'Group Name',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)
-                  )
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'You must enter a group name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 15),
+      
+      body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+           Color(0xFFFFFCF8),  // very light cream (almost white)
+           Color(0xFFFFF0C9),  // soft light yellow
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Form(
+            key: _formKeyForGroupCreation,
+            child: ListView(
+              children: [
+                const SizedBox(height: 10),
 
-              // Date (Calendar)
-              TextFormField(
-                key: _dateFieldKey,
-                controller: _dateController,
-                readOnly: true,
-                enableInteractiveSelection: false,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'You must enter a date to see time slots';
-                  }
-                  return null;
-                },
-                decoration: InputDecoration(
-                  labelText: 'Date (MM/DD/YYYY)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)
+                // Group Name
+                TextFormField(
+                  controller: _groupNameController,
+                  decoration: InputDecoration(
+                    labelText: 'Group Name',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  suffixIcon: Icon(Icons.calendar_today),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'You must enter a group name';
+                    }
+                    return null;
+                  },
                 ),
-                //onTap: () => _selectDate(context),
-                onTap: (){
-                  if (_canEdit  == true){
-                    _selectDate(context);
-                  }
-                }
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 15),
 
-              GradientButton(
-                //onPressed: _submitting ? null : _createGroup,
-                onPressed: () => _navigateToFindRoomForGroup(),
-                borderRadius: BorderRadius.circular(12),
-                height: 40,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Find time slots',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                        ),
-                      ),
-              ),
-              SizedBox(height: 30),
-              
-              // Building
-              TextFormField(
-                controller: _buildingController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Find Time Slots to set a building';
-                  }
-                  return null;
-                },
-                readOnly: true,
-                enableInteractiveSelection: false,
-                decoration: const InputDecoration(
-                  labelText: 'Building',
+                // Date (Calendar)
+                TextFormField(
+                  key: _dateFieldKey,
+                  controller: _dateController,
+                  readOnly: true,
+                  enableInteractiveSelection: false,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'You must enter a date to see time slots';
+                    }
+                    return null;
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Date (MM/DD/YYYY)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    suffixIcon: const Icon(Icons.calendar_today),
+                  ),
+                  onTap: () {
+                    if (_canEdit == true) {
+                      _selectDate(context);
+                    }
+                  },
                 ),
-              ),
-              const SizedBox(height: 15),
+                const SizedBox(height: 20),
 
-              // Room Number
-              TextFormField(
-                controller: _roomController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Find Time Slots to set a room';
-                  }
-                  return null;
-                },
-                enableInteractiveSelection: false,
-                readOnly: true,
-                decoration: const InputDecoration(labelText: 'Room Number'),
-              ),
-              const SizedBox(height: 15),
-
-              // Start Time
-              TextFormField(
-                controller: _startTimeController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Find Time Slots to set a start time';
-                  }
-                  return null;
-                },
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'Start Time',
-                  suffixIcon: Icon(Icons.access_time),
-                ),
-                onTap: () => _showCupertinoTimePickerFor(_startTimeController),
-              ),
-              const SizedBox(height: 15),
-
-              // End Time
-              TextFormField(
-                controller: _endTimeController,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Find Time Slots to set an end time';
-                  }
-                  return null;
-                },
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'End Time',
-                  suffixIcon: Icon(Icons.access_time),
-                ),
-                onTap: () => _showCupertinoTimePickerFor(_endTimeController),
-              ),
-              const SizedBox(height: 30),
-
-              GradientButton(
-                //onPressed: _submitting ? null : _createGroup,
-                onPressed: () => _createGroup(),
-                borderRadius: BorderRadius.circular(12),
-                height: 50,
-                child: _submitting
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                GradientButton(
+                  onPressed: () => _navigateToFindRoomForGroup(),
+                  borderRadius: BorderRadius.circular(12),
+                  height: 40,
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Find time slots',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                          ),
                         ),
-                      )
-                    : const Text(
-                        'Create Group',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 20,
-                        ),
-                      ),
-              ),
-              SizedBox(height: 30),
+                ),
+                const SizedBox(height: 30),
 
-            ],
+                // Building
+                TextFormField(
+                  controller: _buildingController,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Find Time Slots to set a building';
+                    }
+                    return null;
+                  },
+                  readOnly: true,
+                  enableInteractiveSelection: false,
+                  decoration: const InputDecoration(
+                    labelText: 'Building',
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                // Room Number
+                TextFormField(
+                  controller: _roomController,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Find Time Slots to set a room';
+                    }
+                    return null;
+                  },
+                  readOnly: true,
+                  enableInteractiveSelection: false,
+                  decoration:
+                      const InputDecoration(labelText: 'Room Number'),
+                ),
+                const SizedBox(height: 15),
+
+                // Start Time
+                TextFormField(
+                  controller: _startTimeController,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Find Time Slots to set a start time';
+                    }
+                    return null;
+                  },
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Start Time',
+                    suffixIcon: Icon(Icons.access_time),
+                  ),
+                  onTap: () =>
+                      _showCupertinoTimePickerFor(_startTimeController),
+                ),
+                const SizedBox(height: 15),
+
+                // End Time
+                TextFormField(
+                  controller: _endTimeController,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Find Time Slots to set an end time';
+                    }
+                    return null;
+                  },
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'End Time',
+                    suffixIcon: Icon(Icons.access_time),
+                  ),
+                  onTap: () =>
+                      _showCupertinoTimePickerFor(_endTimeController),
+                ),
+                const SizedBox(height: 30),
+
+                GradientButton(
+                  onPressed: () => _createGroup(),
+                  borderRadius: BorderRadius.circular(12),
+                  height: 50,
+                  child: _submitting
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Create Group',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 30),
+              ],
+            ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

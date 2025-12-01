@@ -198,11 +198,23 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
 
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
 
-    return FractionallySizedBox(
-      heightFactor: 0.7, 
+  return FractionallySizedBox(
+    heightFactor: 0.7,
+    child: Container(
+      // 🔸 vertical gradient background
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFFFF3D9), // same as my_studygroup.dart
+            Color(0xFFFFE2B8),
+          ],
+        ),
+      ),
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -232,7 +244,8 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
                 children: [
                   const Text(
                     "Filters",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    style:
+                        TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                   ),
                   TextButton(
                     onPressed: _clearFilters,
@@ -243,7 +256,8 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
               const Divider(),
 
               const Text("Date",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 10),
               // Date (Calendar)
               TextFormField(
@@ -259,7 +273,8 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
 
               // Building Dropdown
               const Text("Building",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 10),
               Container(
                 padding:
@@ -287,15 +302,13 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
               ),
               const SizedBox(height: 20),
 
-              // Time
-              // Time
               const Text(
                 "Free (at/between/until)",
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
               const SizedBox(height: 10),
 
-              if (_timeError != null)               // 👈 NEW
+              if (_timeError != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6.0),
                   child: Text(
@@ -322,40 +335,67 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
 
               const SizedBox(height: 30),
 
-              // Buttons
+              // Buttons with shadows
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: Text(
-                        "Cancel",
-                        style: TextStyle(
-                          color: theme.primaryColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          backgroundColor:
+                              Colors.white.withOpacity(0.9), // subtle fill
+                        ),
+                        child: Text(
+                          "Cancel",
+                          style: TextStyle(
+                            color: theme.primaryColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 15),
                   Expanded(
-                    child: GradientButton(
-                      width: double.infinity,
-                      height: 43,
-                      borderRadius: BorderRadius.circular(12.0),
-                      onPressed: () => _applyFilters(),
-                      child: const Text(
-                        'Apply Filters',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 19.0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.22),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: GradientButton(
+                        width: double.infinity,
+                        height: 43,
+                        borderRadius: BorderRadius.circular(12.0),
+                        onPressed: () => _applyFilters(),
+                        child: const Text(
+                          'Apply Filters',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19.0,
+                          ),
                         ),
                       ),
                     ),
@@ -367,8 +407,10 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   // ---------------- Helper ----------------
   Widget _buildTimeField(

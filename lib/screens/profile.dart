@@ -170,8 +170,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
           child: Column(
             children: [
               const CircleAvatar(
-                radius: 50,
-                child: Icon(Icons.person, size: 60),
+                radius: 115,
+                 backgroundColor: Colors.transparent,
+                  backgroundImage: const AssetImage("assets/images/elbee.png"),
               ),
               const SizedBox(height: 20),
 

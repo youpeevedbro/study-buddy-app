@@ -25,12 +25,28 @@ class GroupService {
 
   /// Common headers, inject Firebase ID token if available.
   static Future<Map<String, String>> _headers() async {
+  try {
     final user = FirebaseAuth.instance.currentUser;
-    final token = await user?.getIdToken(true);
-    return <String, String>{
+
+    final token = await user?.getIdToken(); // non-forced, safe
+
+    return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
+  } on FirebaseAuthException catch (e) {
+    debugPrint("FirebaseAuthException in _headers(): ${e.code} - ${e.message}");
+
+    // Return headers without token (backend will reject, but app won't crash)
+    return {
+      'Content-Type': 'application/json',
+    };
+  } catch (e) {
+    debugPrint("Unexpected error in _headers(): $e");
+    return {
+      'Content-Type': 'application/json',
+      };
+    }
   }
 
   /// Extracts a clean message (usually FastAPI's "detail") for UI popups.
@@ -412,4 +428,17 @@ class GroupService {
       throw Exception(msg);
     }
   }
+
+  //Look up building name 
+  Future<String?> getBuildingName(String code) async {
+  final snap = await FirebaseFirestore.instance
+      .collection('buildings')
+      .doc(code)
+      .get();
+
+  if (!snap.exists) return null;
+
+  return snap.data()?['name'] as String?;
+}
+
 }

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../services/group_service.dart';
 import '../models/group.dart';
+import 'package:intl/intl.dart';
 
 class MyActivitiesPage extends StatefulWidget {
   const MyActivitiesPage({super.key});
@@ -76,6 +77,31 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       },
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Time and Date 
+  // ---------------------------------------------------------------------------
+    // ----- date & time formatting helpers -----
+  String _formatDate(String yyyymmdd) {
+    try {
+      final parsed = DateTime.parse(yyyymmdd);
+      return DateFormat('MMM d, yyyy').format(parsed); // e.g. Nov 11, 2025
+    } catch (_) {
+      return yyyymmdd; // fallback
+    }
+  }
+
+  String _formatTime12(String time24h) {
+    try {
+      // assume "HH:mm"
+      final parsed = DateTime.parse('2000-01-01 $time24h:00');
+      return DateFormat('h:mm a').format(parsed); // e.g. 5:00 PM
+    } catch (_) {
+      return time24h; // fallback
+    }
+  }
+
+
 
   // ---------------------------------------------------------------------------
   // Load incoming + outgoing activity
@@ -415,7 +441,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFFFFF7EB), // ← match StudyGroups
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
@@ -517,12 +543,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFFFFF7EB), // ← match StudyGroups
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 14,
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 16,
+                      spreadRadius: 1,
                       offset: const Offset(0, 6),
                     ),
                   ],
@@ -562,7 +589,8 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            "${group.date} • ${group.startTime} - ${group.endTime}",
+                              "${_formatDate(group.date)} | "
+                              "${_formatTime12(group.startTime)} - ${_formatTime12(group.endTime)}",
                             style: const TextStyle(
                               fontSize: 13,
                               color: Colors.black54,
@@ -645,12 +673,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFFFFF7EB), // ← match StudyGroups
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 14,
+                      color: Colors.black.withOpacity(0.20),
+                      blurRadius: 16,
+                      spreadRadius: 1,
                       offset: const Offset(0, 6),
                     ),
                   ],
@@ -762,174 +791,186 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
           color: Colors.black,
         ),
       ),
-      body: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                "My Activities",
-                style: TextStyle(
-                  fontSize: 26.0,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const Divider(thickness: 1.5, color: Colors.black),
-              const SizedBox(height: 20),
-
-              // My Study Groups button
-              GestureDetector(
-                onTap: () => Navigator.pushNamed(context, '/mystudygroups'),
-                child: Container(
-                  height: 60,
-                  decoration: BoxDecoration(
-                    gradient: _brandGradient,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withOpacity(0.30),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    "My Study Groups",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
+      body: Container(
+        // ← vertical gradient to match MyStudyGroupsPage
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  "My Activities",
+                  style: TextStyle(
+                    fontSize: 32.0,
+                    fontWeight: FontWeight.w300,
+                    fontFamily: 'SuperLobster',
                   ),
                 ),
-              ),
+                const Divider(thickness: 1.5, color: Colors.black),
+                const SizedBox(height: 20),
 
-              const SizedBox(height: 30),
-
-              // Incoming / Outgoing toggle
-              Container(
-                decoration: BoxDecoration(
-                  gradient: _brandGradient,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(3),
-                child: Stack(
-                  children: [
-                    AnimatedAlign(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeInOut,
-                      alignment: _selectedTab == 0
-                          ? Alignment.centerLeft
-                          : Alignment.centerRight,
-                      child: Container(
-                        height: 44,
-                        width: MediaQuery.of(context).size.width / 2 - 28,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF7E0),
-                          borderRadius: BorderRadius.circular(26),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(26),
-                            onTap: () {
-                              setState(() => _selectedTab = 0);
-                            },
-                            child: SizedBox(
-                              height: 44,
-                              child: Center(
-                                child: Text(
-                                  "Incoming (${incomingRequests.length})",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: _selectedTab == 0
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: _selectedTab == 0
-                                        ? Colors.orange
-                                        : Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(26),
-                            onTap: () {
-                              setState(() => _selectedTab = 1);
-                            },
-                            child: SizedBox(
-                              height: 44,
-                              child: Center(
-                                child: Text(
-                                  "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: _selectedTab == 1
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    color: _selectedTab == 1
-                                        ? Colors.orange
-                                        : Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                // My Study Groups button
+                GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, '/mystudygroups'),
+                  child: Container(
+                    height: 60,
+                    decoration: BoxDecoration(
+                      gradient: _brandGradient,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.30),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
-                  ],
+                    alignment: Alignment.center,
+                    child: const Text(
+                      "My Study Groups",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 30),
 
-              // Lists / loading / refresh
-              Expanded(
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : RefreshIndicator(
-                        onRefresh: _loadActivities,
-                        child: SingleChildScrollView(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            transitionBuilder: (child, animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              );
-                            },
-                            child: _selectedTab == 0
-                                ? _buildIncomingList()
-                                : _buildOutgoingList(),
+                // Incoming / Outgoing toggle
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: _brandGradient,
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.all(3),
+                  child: Stack(
+                    children: [
+                      AnimatedAlign(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeInOut,
+                        alignment: _selectedTab == 0
+                            ? Alignment.centerLeft
+                            : Alignment.centerRight,
+                        child: Container(
+                          height: 44,
+                          width: MediaQuery.of(context).size.width / 2 - 28,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF7E0),
+                            borderRadius: BorderRadius.circular(26),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.20),
+                                blurRadius: 16,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-              ),
-            ],
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(26),
+                              onTap: () {
+                                setState(() => _selectedTab = 0);
+                              },
+                              child: SizedBox(
+                                height: 44,
+                                child: Center(
+                                  child: Text(
+                                    "Incoming (${incomingRequests.length})",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: _selectedTab == 0
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: _selectedTab == 0
+                                          ? Colors.orange
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(26),
+                              onTap: () {
+                                setState(() => _selectedTab = 1);
+                              },
+                              child: SizedBox(
+                                height: 44,
+                                child: Center(
+                                  child: Text(
+                                    "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: _selectedTab == 1
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: _selectedTab == 1
+                                          ? Colors.orange
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Lists / loading / refresh
+                Expanded(
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : RefreshIndicator(
+                          onRefresh: _loadActivities,
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 250),
+                              transitionBuilder: (child, animation) {
+                                return FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                );
+                              },
+                              child: _selectedTab == 0
+                                  ? _buildIncomingList()
+                                  : _buildOutgoingList(),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
