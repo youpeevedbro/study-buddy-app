@@ -51,6 +51,33 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       );
 
   // ---------------------------------------------------------------------------
+  // Shared error popup (matches your create-group style)
+  // ---------------------------------------------------------------------------
+  Future<void> _showErrorPopup(String message) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF4E9D8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Ok"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Load incoming + outgoing activity
   // ---------------------------------------------------------------------------
   Future<void> _loadActivities() async {
@@ -133,8 +160,9 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       if (!mounted) return;
       setState(() => _loading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load activities: $e')),
+      // ⬇️ show popup instead of raw SnackBar
+      await _showErrorPopup(
+        e.toString().replaceFirst('Exception: ', 'Failed to load activities: '),
       );
     }
   }
@@ -165,13 +193,14 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
         incomingRequests.removeAt(index);
       });
 
+      // Success can still use SnackBar
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Request accepted')),
       );
     } catch (e) {
       debugPrint("Failed to accept request: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to accept request: $e')),
+      await _showErrorPopup(
+        e.toString().replaceFirst('Exception: ', 'Failed to accept request: '),
       );
     }
   }
@@ -202,13 +231,14 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
         incomingRequests.removeAt(index);
       });
 
+      // Success can still use SnackBar
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Request declined')),
       );
     } catch (e) {
       debugPrint("Failed to decline request: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to decline request: $e')),
+      await _showErrorPopup(
+        e.toString().replaceFirst('Exception: ', 'Failed to decline request: '),
       );
     }
   }
@@ -229,8 +259,8 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       );
     } catch (e) {
       debugPrint("Failed to cancel request: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to cancel request: $e")),
+      await _showErrorPopup(
+        e.toString().replaceFirst('Exception: ', 'Failed to cancel request: '),
       );
     }
   }
@@ -240,8 +270,8 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       await _service.declineOrCancelGroupInvite(groupId, inviteeId);
 
       setState(() {
-        outgoingInvites.removeWhere((inv) =>
-            inv['groupId'] == groupId && inv['inviteeId'] == inviteeId);
+        outgoingInvites.removeWhere(
+            (inv) => inv['groupId'] == groupId && inv['inviteeId'] == inviteeId);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -249,8 +279,8 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       );
     } catch (e) {
       debugPrint("Failed to cancel invite: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to cancel invite: $e")),
+      await _showErrorPopup(
+        e.toString().replaceFirst('Exception: ', 'Failed to cancel invite: '),
       );
     }
   }
@@ -883,13 +913,10 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                     : RefreshIndicator(
                         onRefresh: _loadActivities,
                         child: SingleChildScrollView(
-                          physics:
-                              const AlwaysScrollableScrollPhysics(),
+                          physics: const AlwaysScrollableScrollPhysics(),
                           child: AnimatedSwitcher(
-                            duration:
-                                const Duration(milliseconds: 250),
-                            transitionBuilder:
-                                (child, animation) {
+                            duration: const Duration(milliseconds: 250),
+                            transitionBuilder: (child, animation) {
                               return FadeTransition(
                                 opacity: animation,
                                 child: child,

@@ -205,9 +205,9 @@ class _GroupPanelsState extends State<GroupPanels> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _groupNameController = TextEditingController();
 
-  // ⭐ NEW: controller for invite handle
+  // controller for invite handle
   final TextEditingController _inviteHandleController =
-      TextEditingController(); // ⭐ NEW
+      TextEditingController();
 
   @override
   void initState() {
@@ -219,8 +219,35 @@ class _GroupPanelsState extends State<GroupPanels> {
   @override
   void dispose() {
     _groupNameController.dispose();
-    _inviteHandleController.dispose(); // ⭐ NEW
+    _inviteHandleController.dispose();
     super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shared error popup (matches style of your other dialogs)
+  // ---------------------------------------------------------------------------
+  Future<void> _showErrorPopup(String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFFF4E9D8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Ok"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showDeleteConfirmationDialog(
@@ -279,9 +306,7 @@ class _GroupPanelsState extends State<GroupPanels> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        await _showErrorPopup('Failed to delete study group: $e');
       }
     } finally {
       if (mounted) setState(() => _isDeleting = false);
@@ -344,9 +369,7 @@ class _GroupPanelsState extends State<GroupPanels> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        await _showErrorPopup('Failed to leave study group: $e');
       }
     } finally {
       if (mounted) setState(() => _isLeaving = false);
@@ -428,9 +451,7 @@ class _GroupPanelsState extends State<GroupPanels> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        await _showErrorPopup('Failed to update study group: $e');
       }
     } finally {
       if (mounted) setState(() => _isEditing = false);
@@ -529,7 +550,7 @@ class _GroupPanelsState extends State<GroupPanels> {
                                     fontWeight: FontWeight.w600)),
                             const SizedBox(height: 8),
 
-                            //OWNER VIEW – add "Invite by handle" here
+                            // OWNER VIEW – add "Invite by handle" here
                             if (groupResponse.access == "owner") ...[
                               const SizedBox(height: 12),
                               const Text(
@@ -546,7 +567,7 @@ class _GroupPanelsState extends State<GroupPanels> {
                                     child: TextField(
                                       controller: _inviteHandleController,
                                       decoration: const InputDecoration(
-                                        prefixText: '@', 
+                                        prefixText: '@',
                                         hintText: "student123",
                                         border: OutlineInputBorder(),
                                         isDense: true,
@@ -573,21 +594,23 @@ class _GroupPanelsState extends State<GroupPanels> {
                                             .showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                                'Invited $handle to this group'),
+                                                'Invited @$handle to this group'),
                                           ),
                                         );
                                         _inviteHandleController.clear();
                                         _onReloadNeeded();
-                                      } catch (e) {
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content:
-                                                Text('Failed to invite: $e'),
-                                          ),
-                                        );
-                                      }
+} catch (e) {
+  if (!mounted) return;
+
+  // Clean the backend error (remove "Exception:" if present)
+  final String cleaned =
+      e.toString().replaceFirst("Exception: ", "").trim();
+
+  await _showErrorPopup(
+    'Failed to invite.\n$cleaned',
+  );
+}
+
                                     },
                                     style: ElevatedButton.styleFrom(
                                       padding: const EdgeInsets.symmetric(

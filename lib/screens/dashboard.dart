@@ -6,11 +6,10 @@ import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
+import '../services/group_service.dart';      // 👈 NEW
+import '../models/group.dart';               // 👈 for StudyGroupResponse
 import 'dart:async';
 import '../config/dev_config.dart';
-
-// 👇 NEW: import the badge widget
-import '../widgets/activity_badge.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -20,11 +19,18 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
+  bool _checkingOut = false;
+
+  // 👇 NEW: activity count for the My Activities badge
+  int _activityCount = 0;
+  final GroupService _groupService = const GroupService();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkAuth();
+
     // Rebuild when timer or check-in state changes
     TimerService.instance.addListener(_onExternalChange);
     CheckInService.instance.addListener(_onExternalChange);
@@ -38,9 +44,11 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
       TimerService.instance.stop();
 
       // 2) Rehydrate from Firestore and restart timer based on end time
-      _restoreCheckinFromProfile().then((_) {
+      _restoreCheckinFromProfile().then((_) async {
+        // 3) Also refresh activity badge count when returning to app
+        await _loadActivityCount();
         if (!mounted) return;
-        setState(() {}); // just to be extra sure UI redraws
+        setState(() {}); // ensure UI redraws
       });
     }
   }
@@ -99,7 +107,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
         ),
       );
     } catch (e) {
-      // Optional: handle failure silently or log it
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -131,12 +138,42 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     } else {
       // After confirming login, restore check-in state if needed
       await _restoreCheckinFromProfile();
+      // Also load initial activity count for badge
+      await _loadActivityCount();
       if (!mounted) return;
       setState(() {}); // ensure UI reflects restored state
     }
   }
 
-  bool _checkingOut = false;
+  // 👇 NEW: compute how many incoming items exist (join requests + invites)
+  Future<void> _loadActivityCount() async {
+    try {
+      // 1) Get all groups (for ownership)
+      final List<StudyGroupResponse> allGroups =
+          await _groupService.listAllStudyGroups();
+
+      int incoming = 0;
+
+      // 2) For each group I own, count join requests
+      for (final g in allGroups) {
+        if (g.access == "owner") {
+          final reqs = await _groupService.listIncomingRequests(g.id);
+          incoming += reqs.length;
+        }
+      }
+
+      // 3) Invites sent TO ME
+      final myInvites = await _groupService.listMyIncomingInvites();
+      incoming += myInvites.length;
+
+      if (!mounted) return;
+      setState(() {
+        _activityCount = incoming;
+      });
+    } catch (_) {
+      // You can add debugPrint here if you want; silently ignore for now.
+    }
+  }
 
   Future<void> _checkOutRoom() async {
     if (_checkingOut) return; // prevents double-taps
@@ -188,6 +225,15 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
+  LinearGradient get _brandGradient => const LinearGradient(
+        colors: [
+          Color(0xFFFFDE59),
+          Color(0xFFFF914D),
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      );
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -211,27 +257,60 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const SizedBox(height: 40),
-                const Text(
-                  "Hello, Student",
-                  style: TextStyle(
-                    fontFamily: "BrittanySignature",
-                    fontSize: 65,
+                const SizedBox(height: 20),
+
+                // ===== Header card with cursive =====
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7E0),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  textAlign: TextAlign.center,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        "Hello, Student",
+                        style: TextStyle(
+                          fontFamily: "BrittanySignature",
+                          fontSize: 52, // slightly smaller but still cursive
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        "Welcome back! Let’s find a room or join a study group.",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 30),
+
+                const SizedBox(height: 24),
+
                 const SizedBox(
-                  height: 60,
+                  height: 50,
                   width: double.infinity,
                   child: CursiveDivider(
                     color: Color(0xFFfcbf49),
-                    strokeWidth: 10,
+                    strokeWidth: 8,
                   ),
                 ),
-                const SizedBox(height: 30),
 
-                // === Top row ===
+                const SizedBox(height: 24),
+
+                // ===== Top row: Account & Study Group =====
                 Row(
                   children: [
                     Expanded(
@@ -239,23 +318,24 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                         text: "Account\nSettings",
                         onPressed: () =>
                             Navigator.pushNamed(context, '/profile'),
-                        backgroundColor: const Color(0xFFf79f79),
+                        backgroundColor: const Color(0xFFF8C4B4),
                       ),
                     ),
-                    const SizedBox(width: 30),
+                    const SizedBox(width: 20),
                     Expanded(
                       child: SquareButton(
                         text: "Find Study\nGroup",
                         onPressed: () =>
                             Navigator.pushNamed(context, '/studygroup'),
-                        backgroundColor: const Color(0xFFf7d08a),
+                        backgroundColor: const Color(0xFFFEE1A8),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 30),
 
-                // === Bottom row ===
+                const SizedBox(height: 20),
+
+                // ===== Bottom row: Find Room & My Activities (with badge) =====
                 Row(
                   children: [
                     Expanded(
@@ -263,35 +343,63 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                         text: "Find\nRoom",
                         onPressed: () =>
                             Navigator.pushNamed(context, '/rooms'),
-                        backgroundColor: const Color(0xFFbfd7b5),
+                        backgroundColor: const Color(0xFFBFD7B5),
                       ),
                     ),
-                    const SizedBox(width: 30),
+                    const SizedBox(width: 20),
                     Expanded(
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
                           SquareButton(
                             text: "My\nActivities",
-                            onPressed: () =>
-                                Navigator.pushNamed(context, "/activities"),
-                            backgroundColor: const Color(0xFFffd6af),
+                            onPressed: () async {
+                              await Navigator.pushNamed(
+                                  context, "/activities");
+                              // After returning, reload counts
+                              await _loadActivityCount();
+                            },
+                            backgroundColor: const Color(0xFFFFD6AF),
                           ),
-                          // 👇 Badge in the top-right corner of the square
-                          const Positioned(
-                            top: -6,
-                            right: -6,
-                            child: ActivityBadge(),
-                          ),
+                          if (_activityCount > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.18),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  _activityCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 50),
+                const SizedBox(height: 32),
 
-                // === Timer widget (visible only when checked in) ===
+                // ===== Timer widget (visible only when checked in) =====
                 if (checkedIn)
                   Container(
                     width: double.infinity,
@@ -299,8 +407,11 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                         vertical: 10, horizontal: 15),
                     margin: const EdgeInsets.only(bottom: 15),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFDDD8),
-                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFFFFF1E9),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFFFCCBC),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -310,18 +421,17 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
                           'Timer',
                           style: TextStyle(
                             fontFamily: 'SuperLobster',
-                            fontSize: 16,
+                            fontSize: 18,
                             color: Color(0xFFE57373),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const Spacer(),
                         Text(
-                          _formatTime(
-                              TimerService.instance.secondsRemaining),
+                          _formatTime(TimerService.instance.secondsRemaining),
                           style: const TextStyle(
                             fontFamily: 'SuperLobster',
-                            fontSize: 18,
+                            fontSize: 20,
                             color: Color(0xFFE57373),
                             fontWeight: FontWeight.bold,
                           ),
@@ -332,7 +442,7 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
 
                 const SizedBox(height: 10),
 
-                // === Check-out / info section ===
+                // ===== Check-out / info section =====
                 Container(
                   height: 60,
                   width: double.infinity,
