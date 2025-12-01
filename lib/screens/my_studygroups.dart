@@ -224,7 +224,7 @@ class _GroupPanelsState extends State<GroupPanels> {
   }
 
   // ---------------------------------------------------------------------------
-  // Shared error popup (matches style of your other dialogs)
+  //  popup messages (error) + helper for dialog
   // ---------------------------------------------------------------------------
   Future<void> _showErrorPopup(String message) async {
     await showDialog<void>(
@@ -249,6 +249,160 @@ class _GroupPanelsState extends State<GroupPanels> {
       },
     );
   }
+
+Widget _buildMembersList(List<dynamic>? rawMembers) {
+  final List<String> members =
+      (rawMembers ?? []).map((e) => e.toString()).toList();
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const Text(
+        "Members",
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 6),
+      if (members.isEmpty)
+        const Text(
+          "No other members yet.",
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+          ),
+        )
+      else
+        ...members.map(
+          (m) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("•  ", style: TextStyle(fontSize: 14)),
+                Expanded(
+                  child: Text(
+                    m,
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+Future<void> _showMembershipPopup({
+  required bool isOwner,
+  required String ownerName,
+  required List<String> members,
+}) async {
+  final List<String> others =
+      members.where((m) => m != ownerName).toList();
+  await showDialog(
+    context: context,
+    builder: (_) {
+      return AlertDialog(
+        title: const Text(
+          "Membership Information",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isOwner
+                  ? "You are the owner of this study group."
+                  : "You are a member of this study group.",
+            ),
+            const SizedBox(height: 16),
+
+            // Owner Section
+            const Text(
+              "Owner:",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+
+           Row(
+  children: [
+    const Icon(
+      Icons.workspace_premium,     
+      color: Colors.amber,
+      size: 20,
+    ),
+    const SizedBox(width: 6),
+    Expanded(
+      child: Text(
+        ownerName,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+  ],
+),
+
+
+            const SizedBox(height: 16),
+
+            // Members Section
+            const Text(
+              "Members:",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            if (others.isEmpty)
+              const Text(
+                "No other members.",
+                style: TextStyle(color: Colors.black54),
+              )
+            else
+              ...others.map(
+                (m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person, size: 18, color: Colors.grey),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          m,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: const Text("OK"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+
+
 
   Future<void> _showDeleteConfirmationDialog(
       BuildContext context, String groupID) async {
@@ -543,12 +697,27 @@ class _GroupPanelsState extends State<GroupPanels> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600)),
                             const SizedBox(height: 6),
-                            Text(
-                                "${groupResponse.quantity} members: ${groupResponse.members}",
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+  icon: const Icon(Icons.group_outlined),
+  label: const Text("View Members"),
+  style: ElevatedButton.styleFrom(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  ),
+onPressed: () async {
+    final List membersRaw = groupResponse.members ?? [];
+    final memberNames = membersRaw.map((m) => m.toString()).toList();
+
+    await _showMembershipPopup(
+      isOwner: groupResponse.access == "owner",
+      ownerName: groupResponse.ownerDisplayName,
+      members: memberNames,
+    );
+  },
+),
+
+const SizedBox(height: 8),
+
 
                             // OWNER VIEW – add "Invite by handle" here
                             if (groupResponse.access == "owner") ...[
@@ -606,9 +775,10 @@ class _GroupPanelsState extends State<GroupPanels> {
   final String cleaned =
       e.toString().replaceFirst("Exception: ", "").trim();
 
-  await _showErrorPopup(
-    'Failed to invite.\n$cleaned',
-  );
+await _showErrorPopup(
+  'Unable to send invite.\nThis user already has a study group at that time.',
+);
+
 }
 
                                     },
@@ -674,31 +844,72 @@ class _GroupPanelsState extends State<GroupPanels> {
                                 ],
                               ),
                             ],
+if (groupResponse.access == "member") ...[
+  const SizedBox(height: 12),
 
-                            if (groupResponse.access == "member") ...[
-                              Align(
-                                alignment: Alignment.bottomRight,
-                                child: ElevatedButton(
-                                  onPressed: () =>
-                                      _showLeaveConfirmationDialog(
-                                          context, groupResponse.id),
-                                  style: ElevatedButton.styleFrom(
-                                      backgroundColor: theme.colorScheme.error,
-                                      foregroundColor:
-                                          theme.colorScheme.onError,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      maximumSize: const Size(140, 60)),
-                                  child: const Text(
-                                    "LEAVE",
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700),
-                                  ),
-                                ),
-                              ),
-                            ]
+  // MEMBERSHIP INFORMATION BUTTON
+  Align(
+    alignment: Alignment.centerLeft,
+    child: ElevatedButton.icon(
+      icon: const Icon(Icons.info_outline),
+      label: const Text(
+        "Membership Information",
+        style: TextStyle(fontSize: 14),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blueGrey.shade50,
+        foregroundColor: Colors.black87,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+      onPressed: () async {
+        final List membersRaw = groupResponse.members ?? [];
+        final memberNames = membersRaw.map((m) => m.toString()).toList();
+
+        await _showMembershipPopup(
+          isOwner: false,
+          ownerName: groupResponse.ownerDisplayName,
+        	members: memberNames,
+        );
+      },
+    ),
+  ),
+
+  const SizedBox(height: 12),
+
+  // existing members list under the button
+  _buildMembersList(groupResponse.members),
+
+  const SizedBox(height: 16),
+
+  // LEAVE button
+  Align(
+    alignment: Alignment.bottomRight,
+    child: ElevatedButton(
+      onPressed: () =>
+          _showLeaveConfirmationDialog(context, groupResponse.id),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: theme.colorScheme.error,
+        foregroundColor: theme.colorScheme.onError,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        maximumSize: const Size(140, 60),
+      ),
+      child: const Text(
+        "LEAVE",
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ),
+  ),
+],
+
+
                           ],
                         ),
                       ),
