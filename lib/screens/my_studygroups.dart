@@ -58,7 +58,6 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
         ),
       ),
       body: Container(
-        // soft gradient like My Activities
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
@@ -97,7 +96,7 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
               ),
               const SizedBox(height: 16),
 
-              // Add Study Group button – pill gradient
+              
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: GradientButton(
@@ -216,7 +215,7 @@ class _GroupsState extends State<Groups> {
 }
 
 // ---------------------------------------------------------------------------
-// GROUP PANELS
+// GROUP PANELS (no ExpansionTile, flat cards like studygroup.dart)
 // ---------------------------------------------------------------------------
 
 class GroupPanels extends StatefulWidget {
@@ -277,7 +276,7 @@ class _GroupPanelsState extends State<GroupPanels> {
               ),
               SizedBox(width: 8),
               Text(
-                "Error",
+                "Unable to send invite.",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.red,
@@ -458,6 +457,228 @@ class _GroupPanelsState extends State<GroupPanels> {
     );
   }
 
+  void _showInviteDialog(StudyGroupResponse groupResp) {
+    _inviteHandleController.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: const Color(0xFFFFF7EB),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+            top: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Invite by handle",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _inviteHandleController,
+                decoration: const InputDecoration(
+                  prefixText: '@',
+                  hintText: "student123",
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.send, size: 18),
+                  label: const Text("Send invite"),
+                  onPressed: () async {
+                    final handle = _inviteHandleController.text.trim();
+                    if (handle.isEmpty) return;
+
+                    try {
+                      
+                      await _service.inviteByHandle(groupResp.id, handle);
+                      if (!mounted) return;
+
+                      // close the sheet + refresh data
+                      Navigator.of(ctx).pop();
+                      _inviteHandleController.clear();
+                      _onReloadNeeded();
+
+                      
+                      _showSuccessSnackBar('Invite sent to @$handle');
+                    } catch (e) {
+                      if (!mounted) return;
+
+                      final String cleaned =
+                          e.toString().replaceFirst("Exception: ", "").trim();
+                      debugPrint('inviteByHandle error: $cleaned');
+
+                      String userMessage;
+                      final lower = cleaned.toLowerCase();
+
+                      if (lower.contains('time overlap')) {
+                        userMessage =
+                            '\nFor one of the following reason:\n\n-This user already has a study group at that time. \n\n -This user is a member of this study group.';
+                      } else if (lower.contains('handle not found') ||
+                          lower.contains('user not found') ||
+                          lower.contains('no user found') ||
+                          lower.contains('unknown handle')) {
+                        userMessage =
+                            'Unable to send invite.\nThat handle could not be found. Please check the spelling and try again.';
+                      } else if (lower.contains('already in this study group') ||
+                          lower.contains('already a member of this study group') ||
+                          lower.contains('already a member')) {
+                       
+                        userMessage = 'Already in this study group.';
+                      } else {
+                        userMessage = 'Unable to send invite.\n$cleaned';
+                      }
+
+                      await _showErrorPopup(userMessage);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: const Color(0xFF81C784), 
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 8,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // Opens the bottom sheet with Invite / Edit / Delete
+  void _showOwnerActionsSheet(StudyGroupResponse groupResp) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      backgroundColor: const Color(0xFFFFF7EB),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              const Text(
+                "Study Group Options",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Divider(indent: 16, endIndent: 16),
+
+              ListTile(
+                leading: const Icon(Icons.person_add_alt_1),
+                title: const Text("Invite By Handle"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showInviteDialog(groupResp);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text("Edit Group"),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditConfirmationDialog(context, groupResp);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text(
+                  "Delete Group",
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showDeleteConfirmationDialog(context, groupResp.id);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget buildRolePill(String role) {
+    Color bg;
+    Color text;
+
+    switch (role) {
+      case "owner":
+        bg = const Color(0xFFB5E4C7); // soft green
+        text = const Color(0xFF1B5E20);
+        break;
+      case "member":
+        bg = const Color(0xFFBBDEFB); // soft blue
+        text = const Color(0xFF0D47A1);
+        break;
+      default:
+        bg = const Color(0xFFE0E0E0);
+        text = const Color(0xFF424242);
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        role[0].toUpperCase() + role.substring(1), // capitalizes
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: text,
+        ),
+      ),
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // DELETE / LEAVE / EDIT LOGIC (unchanged)
   // ---------------------------------------------------------------------------
@@ -499,45 +720,44 @@ class _GroupPanelsState extends State<GroupPanels> {
   }
 
   Future<void> _handleDelete(String groupID) async {
-  setState(() => _isDeleting = true);
+    setState(() => _isDeleting = true);
 
-  try {
-    await _service.deleteStudyGroup(groupID);
-    _onReloadNeeded();
-    if (!mounted) return;
+    try {
+      await _service.deleteStudyGroup(groupID);
+      _onReloadNeeded();
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Study Group successfully deleted',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Study Group successfully deleted',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+          backgroundColor: const Color(0xFF81C784),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 8,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: const Color(0xFF81C784), // <-- THEME COLOR
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 8,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
 
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        await _showErrorPopup('Failed to delete study group: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isDeleting = false);
     }
-  } catch (e) {
-    if (mounted) {
-      await _showErrorPopup('Failed to delete study group: $e');
-    }
-  } finally {
-    if (mounted) setState(() => _isDeleting = false);
   }
-}
-
 
   Future<void> _showLeaveConfirmationDialog(
       BuildContext context, String groupID) async {
@@ -575,46 +795,45 @@ class _GroupPanelsState extends State<GroupPanels> {
     );
   }
 
-Future<void> _handleLeaving(String groupID) async {
-  setState(() => _isLeaving = true);
+  Future<void> _handleLeaving(String groupID) async {
+    setState(() => _isLeaving = true);
 
-  try {
-    await _service.leaveStudyGroup(groupID);
-    _onReloadNeeded();
-    if (!mounted) return;
+    try {
+      await _service.leaveStudyGroup(groupID);
+      _onReloadNeeded();
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Successfully left Study Group',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Successfully left Study Group',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+          backgroundColor: const Color(0xFF81C784),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 8,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: const Color(0xFF81C784), // SAME THEME COLOR
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 8,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
 
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        await _showErrorPopup('Failed to leave study group: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isLeaving = false);
     }
-  } catch (e) {
-    if (mounted) {
-      await _showErrorPopup('Failed to leave study group: $e');
-    }
-  } finally {
-    if (mounted) setState(() => _isLeaving = false);
   }
-}
-
 
   Future<void> _showEditConfirmationDialog(
       BuildContext context, StudyGroupResponse groupResp) async {
@@ -655,9 +874,8 @@ Future<void> _handleLeaving(String groupID) async {
                   ? null
                   : () {
                       if (_formKey.currentState!.validate()) {
-                        final groupUpdated =
-                            groupResp.copyWith(name: _groupNameController.text
-                                .trim());
+                        final groupUpdated = groupResp.copyWith(
+                            name: _groupNameController.text.trim());
                         _handleUpdate(groupUpdated);
                       }
                     },
@@ -679,48 +897,47 @@ Future<void> _handleLeaving(String groupID) async {
   }
 
   Future<void> _handleUpdate(StudyGroupResponse groupUpdated) async {
-  setState(() => _isEditing = true);
+    setState(() => _isEditing = true);
 
-  try {
-    await _service.updateStudyGroup(groupUpdated);
-    _onReloadNeeded();
-    if (!mounted) return;
+    try {
+      await _service.updateStudyGroup(groupUpdated);
+      _onReloadNeeded();
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Successfully updated Study Group',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Successfully updated Study Group',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
           ),
+          backgroundColor: const Color(0xFF81C784),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 8,
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: const Color(0xFF81C784), // same theme color
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 8,
-        duration: Duration(seconds: 2),
-      ),
-    );
+      );
 
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        await _showErrorPopup('Failed to update study group: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isEditing = false);
     }
-  } catch (e) {
-    if (mounted) {
-      await _showErrorPopup('Failed to update study group: $e');
-    }
-  } finally {
-    if (mounted) setState(() => _isEditing = false);
   }
-}
-
 
   // ---------------------------------------------------------------------------
-  // MAIN BUILD – CARD + EXPANSIONTILE
+  // MAIN BUILD 
   // ---------------------------------------------------------------------------
 
   @override
@@ -744,409 +961,346 @@ Future<void> _handleLeaving(String groupID) async {
             ),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF6EC),
+                color: const Color(0xFFFFF7EB),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.20),
                     blurRadius: 16,
-                    spreadRadius: 1, 
+                    spreadRadius: 1,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  dividerColor: Colors.transparent,
-                ),
-                child: ExpansionTile(
-                  initiallyExpanded: group.isExpanded,
-                  onExpansionChanged: (expanded) {
-                    setState(() {
-                      group.isExpanded = expanded;
-                    });
-                  },
-                  tilePadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  childrenPadding:
-                      const EdgeInsets.fromLTRB(16, 0, 16, 16),
-
-                  // ===== HEADER =====
-                  title: Text(
-                    group.name,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        formatDate(group.date),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${formatTo12Hour(group.startTime)} - ${formatTo12Hour(group.endTime)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // ===== BODY =====
-                  children: [
-                    FutureBuilder(
-                      future: _service.getStudyGroup(group.id),
-                      builder: (context, snap) {
-                        if (snap.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 24),
-                            child:
-                                Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        if (snap.hasError) {
-                          return Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Text(
-                              '${snap.error}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          );
-                        }
-
-                        final groupResponse = snap.data!;
-                        final bool isOwner =
-                            groupResponse.access == "owner";
-                        final bool isMember =
-                            groupResponse.access == "member";
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 8),
-
-                            // Building name lookup
-                            FutureBuilder(
-                              future: _service
-                                  .getBuildingName(groupResponse.buildingCode),
-                              builder: (context, buildingSnap) {
-                                if (buildingSnap.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Text("Location: ...");
-                                }
-
-                                final buildingName =
-                                    buildingSnap.data ??
-                                        groupResponse.buildingCode;
-
-                                return Text(
-                                  "Location: $buildingName - ${groupResponse.roomNumber}",
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                );
-                              },
-                            ),
-
-                            const SizedBox(height: 6),
-                            Text(
-                              "Owner: ${groupResponse.ownerDisplayName} (${groupResponse.ownerHandle})",
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-
-                            // ===== OWNER VIEW =====
-                            if (isOwner) ...[
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: ElevatedButton.icon(
-                                  icon: const Icon(Icons.group_outlined,
-                                      size: 18),
-                                  label: const Text("View Members"),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 10,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                  onPressed: () async {
-                                    final membersRaw =
-                                        groupResponse.members ?? [];
-                                    final memberNames = membersRaw
-                                        .map((m) => m.toString())
-                                        .toList();
-
-                                    await _showMembershipPopup(
-                                      isOwner: true,
-                                      ownerName:
-                                          groupResponse.ownerDisplayName,
-                                      members: memberNames,
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              const Text(
-                                "Invite by handle",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: _inviteHandleController,
-                                      decoration: const InputDecoration(
-                                        prefixText: '@',
-                                        hintText: "student123",
-                                        border: OutlineInputBorder(),
-                                        isDense: true,
-                                        contentPadding:
-                                            EdgeInsets.symmetric(
-                                          vertical: 10,
-                                          horizontal: 12,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      final handle =
-                                          _inviteHandleController.text
-                                              .trim();
-                                      if (handle.isEmpty) return;
-
-                                      try {
-                                        await _service.inviteByHandle(
-                                            groupResponse.id, handle);
-                                        if (!mounted) return;
-
-                                        await _showSuccessPopup(
-                                          'Invite sent to @$handle.\nPlease wait for approval.',
-                                        );
-
-                                        _inviteHandleController.clear();
-                                        _onReloadNeeded();
-                                      } catch (e) {
-                                        if (!mounted) return;
-
-                                        final String cleaned = e
-                                            .toString()
-                                            .replaceFirst(
-                                                "Exception: ", "")
-                                            .trim();
-                                        debugPrint(
-                                            'inviteByHandle error: $cleaned');
-
-                                        String userMessage;
-                                        final lower =
-                                            cleaned.toLowerCase();
-
-                                        if (lower
-                                            .contains('time overlap')) {
-                                          userMessage =
-                                              'Unable to send invite.\nThis user already has a study group at that time.';
-                                        } else if (lower.contains(
-                                                'handle not found') ||
-                                            lower.contains(
-                                                'user not found') ||
-                                            lower.contains(
-                                                'no user found') ||
-                                            lower.contains(
-                                                'unknown handle')) {
-                                          userMessage =
-                                              'Unable to send invite.\nThat handle could not be found. Please check the spelling and try again.';
-                                        } else {
-                                          userMessage =
-                                              'Unable to send invite.\n$cleaned';
-                                        }
-
-                                        await _showErrorPopup(
-                                            userMessage);
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      padding:
-                                          const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 10,
-                                      ),
-                                    ),
-                                    child: const Text("Invite"),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-Row(
-  mainAxisAlignment: MainAxisAlignment.end,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top row: name 
+                 Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
   children: [
-    // EDIT – soft beige, brown text, outlined
-    SizedBox(
-      height: 40,
-      child: OutlinedButton(
-        onPressed: () => _showEditConfirmationDialog(context, groupResponse),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Color(0xFFB58A3A)), // warm brown
-          backgroundColor: const Color(0xFFFFF7E0),          // soft cream
-          foregroundColor: const Color(0xFF8B6D41),          // brown text
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: const Text(
-          "Edit",
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
+    Expanded(
+      child: Text(
+        group.name,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+          color: theme.colorScheme.onSurface,
         ),
       ),
     ),
-
-    const SizedBox(width: 12),
-// DELETE – still stands out, but softer & rounded
-    SizedBox(
-      height: 40,
-      child: ElevatedButton(
-        onPressed: () =>
-            _showDeleteConfirmationDialog(context, groupResponse.id),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE35B5B),          // softer red
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 3,
-        ),
-        child: const Text(
-          "DELETE",
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+    const SizedBox(width: 8),
+    Text(
+      formatDate(group.date),
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
       ),
     ),
   ],
 ),
-],
 
-                            // ===== MEMBER VIEW =====
-                            if (isMember) ...[
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  ElevatedButton.icon(
-                                    icon: const Icon(
-                                      Icons.group_outlined,
-                                      size: 18,
-                                    ),
-                                    label: const Text(
-                                      "View Members",
-                                      style: TextStyle(fontSize: 14),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          const Color(0xFFF4E8C2),
-                                      foregroundColor: Colors.brown,
-                                      padding:
-                                          const EdgeInsets.symmetric(
-                                        horizontal: 14,
-                                        vertical: 10,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                    onPressed: () async {
-                                      final membersRaw =
-                                          groupResponse.members ?? [];
-                                      final memberNames = membersRaw
-                                          .map((m) => m.toString())
-                                          .toList();
 
-                                      await _showMembershipPopup(
-                                        isOwner: false,
-                                        ownerName: groupResponse
-                                            .ownerDisplayName,
-                                        members: memberNames,
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(width: 12),
 
-         SizedBox(
-        height: 40,
-        child: ElevatedButton(
-          onPressed: () => _showLeaveConfirmationDialog(
-            context,
-            groupResponse.id,
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFE35B5B),   // same soft red
-            foregroundColor: Colors.white,              // white text
-            padding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 10,
+
+                  const SizedBox(height: 10),
+
+                  // BODY – fetch full group info
+                  FutureBuilder<StudyGroupResponse>(
+                    future: _service.getStudyGroup(group.id),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: SizedBox(
+                            height: 22,
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        );
+                      }
+                      if (snap.hasError || !snap.hasData) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4.0),
+                          child: Text(
+                            'Error loading group details',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.red.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }
+final groupResponse = snap.data!;
+final bool isOwner = groupResponse.access == "owner";
+final bool isMember = groupResponse.access == "member";
+final int memberCount = (groupResponse.members?.length ?? 0);
+
+return Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    // 1) OWNER INFO directly under the group name
+    Text(
+      'Owned by: ${groupResponse.ownerDisplayName}',
+      style: const TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    const SizedBox(height: 2),
+    Text(
+       '@${groupResponse.ownerHandle}',
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: Colors.black54,
+      ),
+    ),
+
+    const SizedBox(height: 8),
+
+    // 2) Location + building info + time + members
+    FutureBuilder<String?>(
+      future: _service.getBuildingName(groupResponse.buildingCode),
+      builder: (context, buildingSnap) {
+        final buildingName =
+            buildingSnap.data ?? groupResponse.buildingCode;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),   // same radius
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.apartment_rounded,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    buildingName,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            elevation: 3,                                 // same elevation
-          ),
-          child: const Text(
-            "LEAVE",
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.access_time,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${formatTo12Hour(group.startTime)} - ${formatTo12Hour(group.endTime)}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.group_outlined,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Members: $memberCount',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    ),
+
+    // 3) OWNER / MEMBER ACTIONS (unchanged)
+    if (isOwner) ...[
+      const SizedBox(height: 12),
+      const Divider(
+        color: Color(0x22000000),
+        thickness: 1,
+        height: 20,
+      ),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          SizedBox(
+            height: 36,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.group_outlined, size: 18),
+              label: const Text(
+                "View Members",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFB58A3A)),
+                backgroundColor: const Color(0xFFFFF7E0),
+                foregroundColor: const Color(0xFF8B6D41),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                final membersRaw = groupResponse.members ?? [];
+                final memberNames =
+                    membersRaw.map((m) => m.toString()).toList();
+
+                await _showMembershipPopup(
+                  isOwner: true,
+                  ownerName: groupResponse.ownerDisplayName,
+                  members: memberNames,
+                );
+              },
             ),
           ),
+          IconButton(
+            icon: const Icon(Icons.more_vert_rounded, size: 22),
+            color: Colors.brown,
+            padding: EdgeInsets.zero,
+            onPressed: () => _showOwnerActionsSheet(groupResponse),
+            tooltip: "More actions",
+          ),
+        ],
+      ),
+    ],
+
+    if (isMember) ...[
+      const SizedBox(height: 12),
+      const Divider(
+        color: Color(0x22000000),
+        thickness: 1,
+        height: 20,
+      ),
+      const SizedBox(height: 8),
+      Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFAF0),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SizedBox(
+              height: 36,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.group_outlined, size: 18),
+                label: const Text(
+                  "View Members",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFB58A3A)),
+                  backgroundColor: const Color(0xFFFFF7E0),
+                  foregroundColor: const Color(0xFF8B6D41),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () async {
+                  final membersRaw = groupResponse.members ?? [];
+                  final memberNames =
+                      membersRaw.map((m) => m.toString()).toList();
+
+                  await _showMembershipPopup(
+                    isOwner: false,
+                    ownerName: groupResponse.ownerDisplayName,
+                    members: memberNames,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              height: 36,
+              child: ElevatedButton(
+                onPressed: () => _showLeaveConfirmationDialog(
+                  context,
+                  groupResponse.id,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      const Color.fromARGB(255, 223, 75, 12),
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  "LEAVE",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-    
-  
-],
-                                
-                              ),
-                            ],
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
+    ],
+  ],
+);
+
+
+
+                    },
+                  ),
+                ],
               ),
             ),
           ),

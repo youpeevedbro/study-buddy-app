@@ -1,9 +1,9 @@
-// Study Groups screen
+// lib/pages/studygroups.dart
 import 'package:flutter/material.dart';
 import 'package:study_buddy/models/group.dart';
 import '../services/group_service.dart';
-
 import '../components/grad_button.dart';
+import 'package:intl/intl.dart';   
 
 class StudyGroupsPage extends StatefulWidget {
   const StudyGroupsPage({super.key});
@@ -70,7 +70,6 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // List content
                 const Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(bottom: 8.0),
@@ -86,6 +85,10 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// FUTURE WRAPPER
+// ---------------------------------------------------------------------------
+
 class AllGroups extends StatefulWidget {
   const AllGroups({super.key});
 
@@ -100,13 +103,12 @@ class _AllGroupsState extends State<AllGroups> {
   @override
   void initState() {
     super.initState();
-    _futureGroups = _service.listAllStudyGroups(); // returns StudyGroupResponses with appropriate access
+    _futureGroups = _service.listAllStudyGroups();
   }
 
   void _reloadData() {
     setState(() {
-      _futureGroups =
-          _service.listAllStudyGroups(); // Re-assign the Future to trigger reload
+      _futureGroups = _service.listAllStudyGroups();
     });
   }
 
@@ -124,6 +126,7 @@ class _AllGroupsState extends State<AllGroups> {
             ),
           );
         }
+
         if (snap.hasError) {
           return Padding(
             padding: const EdgeInsets.all(20.0),
@@ -136,6 +139,7 @@ class _AllGroupsState extends State<AllGroups> {
             ),
           );
         }
+
         final groups = snap.data ?? [];
 
         if (groups.isEmpty) {
@@ -150,11 +154,18 @@ class _AllGroupsState extends State<AllGroups> {
           );
         }
 
-        return AllGroupPanels(groups: groups, onReloadNeeded: _reloadData);
+        return AllGroupPanels(
+          groups: groups,
+          onReloadNeeded: _reloadData,
+        );
       },
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// GROUP PANELS – MODERN CARDS + COLLAPSIBLE SECTIONS
+// ---------------------------------------------------------------------------
 
 class AllGroupPanels extends StatefulWidget {
   final VoidCallback onReloadNeeded;
@@ -173,11 +184,31 @@ class AllGroupPanels extends StatefulWidget {
 class _AllGroupPanelsState extends State<AllGroupPanels> {
   late List<StudyGroupResponse> _groups;
   late VoidCallback _onReloadNeeded;
-  final GroupService _service = const GroupService();
+  final GroupService _service = GroupService();
 
-  // Single text controller for "invite handle" (simple approach)
-  final TextEditingController _inviteHandleController =
-      TextEditingController();
+  //Format time and date
+  String _formatDate(String yyyymmdd) {
+    try {
+      final d = DateTime.parse(yyyymmdd);
+      return DateFormat('MMM d, yyyy').format(d); 
+    } catch (_) {
+      return yyyymmdd;
+    }
+  }
+
+  String _formatTime(String hhmm) {
+    try {
+      // Input is “17:30” → convert to a DateTime and format
+      final dt = DateTime.parse("2025-01-01 $hhmm:00");
+      return DateFormat('h:mm a').format(dt); 
+    } catch (_) {
+      return hhmm;
+    }
+  }
+
+  // Section expansion states
+  bool _pendingExpanded = true;
+  bool _discoverExpanded = true;
 
   @override
   void initState() {
@@ -186,15 +217,10 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     _onReloadNeeded = widget.onReloadNeeded;
   }
 
-  @override
-  void dispose() {
-    _inviteHandleController.dispose();
-    super.dispose();
-  }
+  // ---------------------------------------------------------------------------
+  // Helpers: popup + status label/colors
+  // ---------------------------------------------------------------------------
 
-  // ---------------------------------------------------------------------------
-  // Helpers: popup + friendly error
-  // ---------------------------------------------------------------------------
   Future<void> _showPopup({
     required String title,
     required String message,
@@ -241,25 +267,23 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     if (group.access == "owner") return "Owner";
     if (group.access == "member") return "Member";
     if (group.hasPendingRequest == true) return "Pending";
-    return "Public";
+    return "Joinable";
   }
 
   Color _statusColor(StudyGroupResponse group) {
-    if (group.access == "owner") {
-      return const Color(0xFF81C784); // green
-    }
     if (group.access == "member") {
       return const Color(0xFF64B5F6); // blue
     }
     if (group.hasPendingRequest == true) {
       return const Color(0xFFFFB74D); // orange
     }
-    return const Color(0xFFB0BEC5); // grey
+    return const Color(0xFF81C784); // green
   }
 
   // ---------------------------------------------------------------------------
-  // Membership info (owner / member) – same behavior, nicer UI
+  // Membership info dialog (owner / member)
   // ---------------------------------------------------------------------------
+
   Future<void> _showMembershipDialog({
     required bool isOwner,
     required String ownerName,
@@ -289,7 +313,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
             ),
             const SizedBox(height: 16),
 
-            // Owner section
+            // Owner
             const Text(
               "Owner:",
               style: TextStyle(
@@ -369,9 +393,34 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     );
   }
 
+  // Small helper so all rows look identical and spacing stays consistent
+  Widget _buildInfoRow(
+    IconData icon,
+    String text, {
+    FontWeight fontWeight = FontWeight.w500,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: fontWeight,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   // ---------------------------------------------------------------------------
-  // UI: single card builder (functionality SAME as before)
+  // Single group card (modern UI, same behavior)
   // ---------------------------------------------------------------------------
+
   Widget _buildGroupCard(StudyGroupResponse group) {
     final theme = Theme.of(context);
 
@@ -392,7 +441,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER ROW: name + date + status pill
+          // HEADER: name + owner + date + status pill
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -417,7 +466,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                       ),
                     ),
                     Text(
-                      group.ownerHandle,
+                      '@${group.ownerHandle}',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -432,7 +481,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    group.date,
+                    _formatDate(group.date),
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -462,54 +511,57 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
 
           const SizedBox(height: 10),
 
-          // INFO ROWS
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined, size: 18),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  "${group.buildingCode} - ${group.roomNumber}",
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+          // INFO ROWS – now evenly spaced
+          Builder(
+            builder: (context) {
+              const double rowGap = 6.0;
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow(
+                    Icons.location_on_outlined,
+                    "${group.buildingCode} - ${group.roomNumber}",
                   ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.access_time, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                "${group.startTime} - ${group.endTime}",
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              const Icon(Icons.group_outlined, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                "Members: ${group.quantity}",
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+                  const SizedBox(height: rowGap),
+
+                  FutureBuilder<String?>(
+                    future: _service.getBuildingName(group.buildingCode),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        // No text while loading; keeps layout clean
+                        return const SizedBox.shrink();
+                      }
+
+                      final buildingName = snap.data ?? group.buildingCode;
+
+                      return _buildInfoRow(
+                        Icons.apartment_rounded,
+                        buildingName,
+                        fontWeight: FontWeight.w600,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: rowGap),
+
+                  _buildInfoRow(
+                    Icons.access_time,
+                    "${_formatTime(group.startTime)} - ${_formatTime(group.endTime)}",
+                  ),
+                  const SizedBox(height: rowGap),
+
+                  _buildInfoRow(
+                    Icons.group_outlined,
+                    "Members: ${group.quantity}",
+                  ),
+                ],
+              );
+            },
           ),
 
           const SizedBox(height: 14),
 
-          // ACTION AREA – SAME BEHAVIOR AS OLD UI
+          // ACTIONS – same logic as old UI
           if (group.access == "public") ...[
             Align(
               alignment: Alignment.center,
@@ -534,11 +586,24 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                         });
 
                         if (!mounted) return;
-                        await _showPopup(
-                          title: "Notice",
-                          message:
-                              "Join request sent — please wait for approval.",
-                        );
+                        ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    behavior: SnackBarBehavior.floating,
+    backgroundColor: const Color(0xFF81C784), // same green as screenshot
+    margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    content: const Text(
+      "Join request sent — please wait for approval.",
+      style: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    duration: Duration(seconds: 2),
+  ),
+);
                       } catch (e) {
                         if (!mounted) return;
 
@@ -617,13 +682,96 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
   }
 
   // ---------------------------------------------------------------------------
-  // Build grouped list (sections) – functionality unchanged
+  // Collapsible section wrapper
   // ---------------------------------------------------------------------------
+
+  Widget _buildCollapsibleSection({
+  required String title,
+  required List<StudyGroupResponse> groups,
+  required bool isExpanded,
+  required VoidCallback onHeaderTap,
+  bool alwaysShowHeader = false,
+}) {
+  if (!alwaysShowHeader && groups.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      InkWell(
+        onTap: onHeaderTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              AnimatedRotation(
+                turns: isExpanded ? 0.0 : 0.5,
+                duration: const Duration(milliseconds: 200),
+                child: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 24,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      AnimatedCrossFade(
+        firstChild: const SizedBox.shrink(),
+        secondChild: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: 4),
+            if (groups.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                child: Text(
+                  "No groups to discover yet.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                ),
+             ),
+
+            // Normal cards when groups exist
+            if (groups.isNotEmpty)
+              ...groups.map(_buildGroupCard).toList(),
+
+            const SizedBox(height: 8),
+          ],
+        ),
+        crossFadeState:
+            isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+        duration: const Duration(milliseconds: 200),
+      ),
+    ],
+  );
+}
+
+
+  // ---------------------------------------------------------------------------
+  // Build – compute sections + use collapsible sections
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    // Split groups into sections
-    final yourGroups = _groups
-        .where((g) => g.access == "owner" || g.access == "member")
+    // split into sections
+    final discoverGroups = _groups
+        .where((g) =>
+            g.access == "public" &&
+            (g.hasPendingRequest != true))
         .toList();
     final pendingGroups = _groups
         .where((g) =>
@@ -631,65 +779,41 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
             g.access != "member" &&
             g.hasPendingRequest == true)
         .toList();
-    final discoverGroups = _groups
-        .where((g) =>
-            g.access == "public" &&
-            (g.hasPendingRequest != true)) // only truly joinable
-        .toList();
 
-    // Sort each section by date (string compare is ok if format is YYYY-MM-DD)
     int dateCompare(StudyGroupResponse a, StudyGroupResponse b) =>
         a.date.compareTo(b.date);
 
-    yourGroups.sort(dateCompare);
     pendingGroups.sort(dateCompare);
     discoverGroups.sort(dateCompare);
-
-    final List<Widget> children = [];
-
-    void addSection(String title, List<StudyGroupResponse> list) {
-      if (list.isEmpty) return;
-      children.add(
-        Padding(
-          padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      );
-      children.add(const SizedBox(height: 4));
-      children.addAll(list.map(_buildGroupCard));
-      children.add(const SizedBox(height: 12));
-    }
-
-    addSection("Your Groups", yourGroups);
-    addSection("Pending Requests", pendingGroups);
-    addSection("Discover Groups", discoverGroups);
-
-    if (children.isEmpty) {
-      // Fallback (should not really happen because groups.isNotEmpty)
-      children.add(
-        const Center(
-          child: Padding(
-            padding: EdgeInsets.all(30),
-            child: Text(
-              "No study groups to display.",
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ),
-      );
-    }
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+        children: [
+          _buildCollapsibleSection(
+            title: "Discover Groups",
+            groups: discoverGroups,
+            isExpanded: _discoverExpanded,
+            onHeaderTap: () {
+              setState(() {
+                _discoverExpanded = !_discoverExpanded;
+              });
+            },
+            alwaysShowHeader: true,
+          ),
+          _buildCollapsibleSection(
+            title: "Pending Requests",
+            groups: pendingGroups,
+            isExpanded: _pendingExpanded,
+            onHeaderTap: () {
+              setState(() {
+                _pendingExpanded = !_pendingExpanded;
+              });
+            },
+          ),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
