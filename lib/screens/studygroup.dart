@@ -39,56 +39,47 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
           color: Colors.black,
         ),
       ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
-                const SizedBox(height: 20),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 25.0),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Study Groups",
-                      style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
+                const Text(
+                  "Study Groups",
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w300,
+                    letterSpacing: 0.2,
+                    fontFamily: 'SuperLobster',
                   ),
                 ),
-
+                const SizedBox(height: 8),
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 25.0),
-                  child: const Divider(
-                    color: Colors.black,
-                    thickness: 2,
-                  ),
+                  margin: const EdgeInsets.only(right: 40),
+                  height: 2,
+                  color: Colors.black87,
                 ),
+                const SizedBox(height: 16),
 
-                const SizedBox(height: 10),
-
-                // Expandable group list
-                Expanded(
+                // List content
+                const Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFADA7A),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.all(10),
-                      child: const AllGroups(),
-                    ),
+                    padding: EdgeInsets.only(bottom: 8.0),
+                    child: AllGroups(),
                   ),
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -109,8 +100,7 @@ class _AllGroupsState extends State<AllGroups> {
   @override
   void initState() {
     super.initState();
-    _futureGroups =
-        _service.listAllStudyGroups(); // returns StudyGroupResponses with appropriate access
+    _futureGroups = _service.listAllStudyGroups(); // returns StudyGroupResponses with appropriate access
   }
 
   void _reloadData() {
@@ -122,40 +112,46 @@ class _AllGroupsState extends State<AllGroups> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: FutureBuilder<List<StudyGroupResponse>>(
-        future: _futureGroups,
-        builder: (BuildContext context,
-            AsyncSnapshot<List<StudyGroupResponse>> snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Padding(
+    return FutureBuilder<List<StudyGroupResponse>>(
+      future: _futureGroups,
+      builder:
+          (BuildContext context, AsyncSnapshot<List<StudyGroupResponse>> snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snap.hasError) {
-            return Text(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        if (snap.hasError) {
+          return Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
               'Error: ${snap.error}',
-              style: const TextStyle(height: 1.3),
-            );
-          }
-          final groups = snap.data ?? [];
-
-          if (groups.isEmpty) {
-            return const Padding(
-              padding: EdgeInsets.all(30),
-              child: Center(
-                child: Text(
-                  'There are currently no active study groups.',
-                  style: TextStyle(fontSize: 18),
-                ),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
-            );
-          }
+            ),
+          );
+        }
+        final groups = snap.data ?? [];
 
-          return AllGroupPanels(groups: groups, onReloadNeeded: _reloadData);
-        },
-      ),
+        if (groups.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.all(30),
+            child: Center(
+              child: Text(
+                'There are currently no active study groups.',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+          );
+        }
+
+        return AllGroupPanels(groups: groups, onReloadNeeded: _reloadData);
+      },
     );
   }
 }
@@ -241,536 +237,460 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     );
   }
 
-  Widget _buildMembersList(List<dynamic>? rawMembers) {
+  String _statusLabel(StudyGroupResponse group) {
+    if (group.access == "owner") return "Owner";
+    if (group.access == "member") return "Member";
+    if (group.hasPendingRequest == true) return "Pending";
+    return "Public";
+  }
+
+  Color _statusColor(StudyGroupResponse group) {
+    if (group.access == "owner") {
+      return const Color(0xFF81C784); // green
+    }
+    if (group.access == "member") {
+      return const Color(0xFF64B5F6); // blue
+    }
+    if (group.hasPendingRequest == true) {
+      return const Color(0xFFFFB74D); // orange
+    }
+    return const Color(0xFFB0BEC5); // grey
+  }
+
+  // ---------------------------------------------------------------------------
+  // Membership info (owner / member) – same behavior, nicer UI
+  // ---------------------------------------------------------------------------
+  Future<void> _showMembershipDialog({
+    required bool isOwner,
+    required String ownerName,
+    required List<dynamic>? rawMembers,
+  }) async {
     final List<String> members =
         (rawMembers ?? []).map((e) => e.toString()).toList();
+    final List<String> others =
+        members.where((m) => m != ownerName).toList(growable: false);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Text(
-          "Members",
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
+    await showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text(
+          "Membership Information",
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        const SizedBox(height: 6),
-        if (members.isEmpty)
-          const Text(
-            "No other members yet.",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isOwner
+                  ? "You are the owner of this study group."
+                  : "You are a member of this study group.",
+              style: const TextStyle(fontSize: 14),
             ),
-          )
-        else
-          ...members.map(
-            (m) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("•  ", style: TextStyle(fontSize: 14)),
-                  Expanded(
-                    child: Text(
-                      m,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 16),
+
+            // Owner section
+            const Text(
+              "Owner:",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
             ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.workspace_premium,
+                  color: Colors.amber,
+                  size: 20,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    ownerName,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Members
+            const Text(
+              "Members:",
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (others.isEmpty)
+              const Text(
+                "No other members.",
+                style: TextStyle(
+                  color: Colors.black54,
+                ),
+              )
+            else
+              ...others.map(
+                (m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          m,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            child: const Text("OK"),
+            onPressed: () => Navigator.pop(context),
           ),
-      ],
+        ],
+      ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Build
+  // UI: single card builder (functionality SAME as before)
   // ---------------------------------------------------------------------------
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildGroupCard(StudyGroupResponse group) {
     final theme = Theme.of(context);
-    return ExpansionPanelList(
-      expansionCallback: (int panelIndex, bool isExpanded) {
-        setState(() {
-          _groups[panelIndex].isExpanded = isExpanded;
-        });
-      },
-      children: _groups.map<ExpansionPanel>((StudyGroupResponse group) {
-        return ExpansionPanel(
-          canTapOnHeader: true,
-          backgroundColor: const Color(0xFFFCF6DB),
-          headerBuilder: (BuildContext context, bool isExpanded) {
-            return ListTile(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    group.name,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w500,
-                      color: isExpanded ? theme.primaryColor : Colors.black,
-                    ),
-                  ),
-                  Text(
-                    "Owned by: \n${group.ownerDisplayName}",
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color:
-                          isExpanded ? theme.primaryColor : Colors.black,
-                    ),
-                  ),
-                  Text(
-                    group.ownerHandle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: isExpanded
-                          ? theme.primaryColor
-                          : theme.colorScheme.outline,
-                    ),
-                  ),
-                ],
-              ),
-              trailing: SizedBox(
-                width: 50,
-                child: Text(
-                  group.date,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            );
-          },
-          body: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(20),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Location: ${group.buildingCode} - ${group.roomNumber}",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "Time: ${group.startTime} - ${group.endTime}",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "Number of members: ${group.quantity}",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
 
-                  // -------------------------------
-                  // ACCESS-BASED CONTROLS
-                  // -------------------------------
-                  if (group.access == "public") ...[
-                    // PUBLIC VIEW
-                    Align(
-                      alignment: Alignment.center,
-                      child: IgnorePointer(
-                        ignoring: group.hasPendingRequest,
-                        child: Opacity(
-                          opacity: group.hasPendingRequest ? 0.5 : 1.0,
-                          child: GradientButton(
-                            height: 35,
-                            borderRadius: BorderRadius.circular(12.0),
-                            onPressed: () async {
-                              if (group.hasPendingRequest) return;
-
-                              try {
-                                debugPrint(
-                                  "Sending Join Request for group ID: ${group.id}",
-                                );
-                                await _service.sendJoinRequest(group.id);
-
-                                // immediately mark as pending in UI
-                                setState(() {
-                                  group.hasPendingRequest = true;
-                                });
-
-                                if (!mounted) return;
-                                await _showPopup(
-                                  title: "Notice",
-                                  message:
-                                      "Join request sent — please wait for approval.",
-                                );
-                              }  catch (e) {
-  if (!mounted) return;
-
-  final String cleaned =
-      e.toString().replaceFirst("Exception: ", "").trim();
-  debugPrint('sendJoinRequest error: $cleaned');
-
-  final lower = cleaned.toLowerCase();
-  String message;
-
-  if (lower.contains('time overlap')) {
-    // e.g. "Time overlap exists with joined Study Groups"
-    message =
-        'You cannot join this study group because its time overlaps with one of your existing study groups.';
-  } else if (lower.contains('cannot invite yourself') ||
-             lower.contains('cannot join your own') ||
-             lower.contains('own study group')) {
-    message =
-        'You cannot send a join request to your own study group.';
-  } else {
-    // Fallback: show backend text
-    message = cleaned.isEmpty
-        ? 'Something went wrong while sending your join request.'
-        : cleaned;
-  }
-
-  await _showPopup(
-    title: "Error",
-    message: message,
-    isError: true,
-  );
-}
-
-                            },
-                            child: Text(
-                              group.hasPendingRequest
-                                  ? "Pending"
-                                  : "Send Join Request",
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18.0,
-                              ),
-                            ),
-                          ),
-                        ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7EB),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // HEADER ROW: name + date + status pill
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
-                  ] else if (group.access == "owner") ...[
-                    // -------------------------------
-                    // OWNER VIEW → POPUP
-                    // -------------------------------
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text(
-                          "View Members",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final List<dynamic> membersRaw =
-                              group.members ?? [];
-                          final List<String> memberNames = membersRaw
-                              .map((m) => m.toString())
-                              .toList();
-
-                          final String ownerName =
-                              group.ownerDisplayName;
-
-                          final List<String> others =
-                              memberNames.where((m) => m != ownerName).toList();
-
-                          await showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text(
-                                "Membership Information",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "You are the owner of this study group.",
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 16),
-
-                                  // OWNER SECTION
-                                  const Text(
-                                    "Owner:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.workspace_premium,
-                                        color: Colors.amber,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          ownerName,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight:
-                                                FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // MEMBERS SECTION
-                                  const Text(
-                                    "Members:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-
-                                  if (others.isEmpty)
-                                    const Text(
-                                      "No other members.",
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                      ),
-                                    )
-                                  else
-                                    ...others.map(
-                                      (m) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(
-                                                bottom: 4),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.person,
-                                              size: 18,
-                                              color: Colors.grey,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                m,
-                                                style:
-                                                    const TextStyle(
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  child: const Text("OK"),
-                                  onPressed: () =>
-                                      Navigator.pop(context),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                    const SizedBox(height: 4),
+                    Text(
+                      "Owned by: ${group.ownerDisplayName}",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ] else if (group.access == "member") ...[
-                    // -------------------------------
-                    // MEMBER VIEW → POPUP
-                    // -------------------------------
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.info_outline),
-                        label: const Text(
-                          "View Members",
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final List<dynamic> membersRaw =
-                              group.members ?? [];
-                          final List<String> memberNames = membersRaw
-                              .map((m) => m.toString())
-                              .toList();
-
-                          final String ownerName =
-                              group.ownerDisplayName;
-
-                          final List<String> others =
-                              memberNames.where((m) => m != ownerName).toList();
-
-                          await showDialog(
-                            context: context,
-                            builder: (_) => AlertDialog(
-                              title: const Text(
-                                "Membership Information",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    "You are a member of this study group.",
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  const SizedBox(height: 16),
-
-                                  // OWNER SECTION
-                                  const Text(
-                                    "Owner:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.workspace_premium,
-                                        color: Colors.amber,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          ownerName,
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight:
-                                                FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  const SizedBox(height: 16),
-
-                                  // MEMBERS SECTION
-                                  const Text(
-                                    "Members:",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-
-                                  if (others.isEmpty)
-                                    const Text(
-                                      "No other members.",
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                      ),
-                                    )
-                                  else
-                                    ...others.map(
-                                      (m) => Padding(
-                                        padding:
-                                            const EdgeInsets.only(
-                                                bottom: 4),
-                                        child: Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.person,
-                                              size: 18,
-                                              color: Colors.grey,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Expanded(
-                                              child: Text(
-                                                m,
-                                                style:
-                                                    const TextStyle(
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              actions: [
-                                TextButton(
-                                  child: const Text("OK"),
-                                  onPressed: () =>
-                                      Navigator.pop(context),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                    Text(
+                      group.ownerHandle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: theme.colorScheme.outline,
                       ),
                     ),
                   ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    group.date,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _statusColor(group),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      _statusLabel(group),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ],
               ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          // INFO ROWS
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  "${group.buildingCode} - ${group.roomNumber}",
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.access_time, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                "${group.startTime} - ${group.endTime}",
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.group_outlined, size: 18),
+              const SizedBox(width: 6),
+              Text(
+                "Members: ${group.quantity}",
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // ACTION AREA – SAME BEHAVIOR AS OLD UI
+          if (group.access == "public") ...[
+            Align(
+              alignment: Alignment.center,
+              child: IgnorePointer(
+                ignoring: group.hasPendingRequest,
+                child: Opacity(
+                  opacity: group.hasPendingRequest ? 0.5 : 1.0,
+                  child: GradientButton(
+                    height: 38,
+                    borderRadius: BorderRadius.circular(14.0),
+                    onPressed: () async {
+                      if (group.hasPendingRequest) return;
+
+                      try {
+                        debugPrint(
+                          "Sending Join Request for group ID: ${group.id}",
+                        );
+                        await _service.sendJoinRequest(group.id);
+
+                        setState(() {
+                          group.hasPendingRequest = true;
+                        });
+
+                        if (!mounted) return;
+                        await _showPopup(
+                          title: "Notice",
+                          message:
+                              "Join request sent — please wait for approval.",
+                        );
+                      } catch (e) {
+                        if (!mounted) return;
+
+                        final String cleaned =
+                            e.toString().replaceFirst("Exception: ", "").trim();
+                        debugPrint('sendJoinRequest error: $cleaned');
+
+                        final lower = cleaned.toLowerCase();
+                        String message;
+
+                        if (lower.contains('time overlap')) {
+                          message =
+                              'You cannot join this study group because its time overlaps with one of your existing study groups.';
+                        } else if (lower.contains('cannot invite yourself') ||
+                            lower.contains('cannot join your own') ||
+                            lower.contains('own study group')) {
+                          message =
+                              'You cannot send a join request to your own study group.';
+                        } else {
+                          message = cleaned.isEmpty
+                              ? 'Something went wrong while sending your join request.'
+                              : cleaned;
+                        }
+
+                        await _showPopup(
+                          title: "Error",
+                          message: message,
+                          isError: true,
+                        );
+                      }
+                    },
+                    child: Text(
+                      group.hasPendingRequest ? "Pending" : "Send Join Request",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ] else if (group.access == "owner" || group.access == "member") ...[
+            Align(
+              alignment: Alignment.center,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.group_outlined, size: 18),
+                label: const Text(
+                  "View Members",
+                  style: TextStyle(fontSize: 14),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF4E8C2),
+                  foregroundColor: Colors.brown,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                onPressed: () async {
+                  await _showMembershipDialog(
+                    isOwner: group.access == "owner",
+                    ownerName: group.ownerDisplayName,
+                    rawMembers: group.members,
+                  );
+                },
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Build grouped list (sections) – functionality unchanged
+  // ---------------------------------------------------------------------------
+  @override
+  Widget build(BuildContext context) {
+    // Split groups into sections
+    final yourGroups = _groups
+        .where((g) => g.access == "owner" || g.access == "member")
+        .toList();
+    final pendingGroups = _groups
+        .where((g) =>
+            g.access != "owner" &&
+            g.access != "member" &&
+            g.hasPendingRequest == true)
+        .toList();
+    final discoverGroups = _groups
+        .where((g) =>
+            g.access == "public" &&
+            (g.hasPendingRequest != true)) // only truly joinable
+        .toList();
+
+    // Sort each section by date (string compare is ok if format is YYYY-MM-DD)
+    int dateCompare(StudyGroupResponse a, StudyGroupResponse b) =>
+        a.date.compareTo(b.date);
+
+    yourGroups.sort(dateCompare);
+    pendingGroups.sort(dateCompare);
+    discoverGroups.sort(dateCompare);
+
+    final List<Widget> children = [];
+
+    void addSection(String title, List<StudyGroupResponse> list) {
+      if (list.isEmpty) return;
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 8.0, bottom: 4.0),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          isExpanded: group.isExpanded,
-        );
-      }).toList(),
+        ),
+      );
+      children.add(const SizedBox(height: 4));
+      children.addAll(list.map(_buildGroupCard));
+      children.add(const SizedBox(height: 12));
+    }
+
+    addSection("Your Groups", yourGroups);
+    addSection("Pending Requests", pendingGroups);
+    addSection("Discover Groups", discoverGroups);
+
+    if (children.isEmpty) {
+      // Fallback (should not really happen because groups.isNotEmpty)
+      children.add(
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.all(30),
+            child: Text(
+              "No study groups to display.",
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
     );
   }
 }

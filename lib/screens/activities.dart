@@ -767,32 +767,34 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   // Build
   // ---------------------------------------------------------------------------
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Transform.translate(
-            offset: const Offset(3.0, 0),
-            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          ),
-          onPressed: () => Navigator.pop(context),
+  return Scaffold(
+    appBar: AppBar(
+      leading: IconButton(
+        icon: Transform.translate(
+          offset: const Offset(3.0, 0),
+          child: const Icon(Icons.arrow_back_ios, color: Colors.black),
         ),
-        toolbarHeight: 100,
-        title: const Text("Study Buddy"),
-        centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'BrittanySignature',
-          fontSize: 40,
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
-        ),
+        onPressed: () => Navigator.pop(context),
       ),
-      body: Container(
-        // ← vertical gradient to match MyStudyGroupsPage
+      toolbarHeight: 100,
+      title: const Text("Study Buddy"),
+      centerTitle: true,
+      backgroundColor: theme.scaffoldBackgroundColor,
+      foregroundColor: Colors.black,
+      titleTextStyle: const TextStyle(
+        fontFamily: 'BrittanySignature',
+        fontSize: 40,
+        fontWeight: FontWeight.w500,
+        color: Colors.black,
+      ),
+    ),
+    body: RefreshIndicator(
+      onRefresh: _loadActivities,
+      child: Container(
+        // ← vertical gradient 
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
@@ -801,179 +803,189 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  "My Activities",
-                  style: TextStyle(
-                    fontSize: 32.0,
-                    fontWeight: FontWeight.w300,
-                    fontFamily: 'SuperLobster',
-                  ),
-                ),
-                const Divider(thickness: 1.5, color: Colors.black),
-                const SizedBox(height: 20),
-
-                // My Study Groups button
-                GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, '/mystudygroups'),
-                  child: Container(
-                    height: 60,
-                    decoration: BoxDecoration(
-                      gradient: _brandGradient,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.orange.withOpacity(0.30),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          "My Activities",
+                          style: TextStyle(
+                            fontSize: 32.0,
+                            fontWeight: FontWeight.w300,
+                            fontFamily: 'SuperLobster',
+                          ),
                         ),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Text(
-                      "My Study Groups",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
+                        const Divider(thickness: 1.5, color: Colors.black),
+                        const SizedBox(height: 20),
 
-                const SizedBox(height: 30),
+                        // My Study Groups button
+                        GestureDetector(
+                          onTap: () =>
+                              Navigator.pushNamed(context, '/mystudygroups'),
+                          child: Container(
+                            height: 60,
+                            decoration: BoxDecoration(
+                              gradient: _brandGradient,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.orange.withOpacity(0.30),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              "My Study Groups",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
 
-                // Incoming / Outgoing toggle
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: _brandGradient,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(3),
-                  child: Stack(
-                    children: [
-                      AnimatedAlign(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeInOut,
-                        alignment: _selectedTab == 0
-                            ? Alignment.centerLeft
-                            : Alignment.centerRight,
-                        child: Container(
-                          height: 44,
-                          width: MediaQuery.of(context).size.width / 2 - 28,
+                        const SizedBox(height: 30),
+
+                        // Incoming / Outgoing toggle
+                        Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF7E0),
-                            borderRadius: BorderRadius.circular(26),
+                            gradient: _brandGradient,
+                            borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.20),
-                                blurRadius: 16,
-                                spreadRadius: 1,
-                                offset: const Offset(0, 6),
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: Stack(
+                            children: [
+                              AnimatedAlign(
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeInOut,
+                                alignment: _selectedTab == 0
+                                    ? Alignment.centerLeft
+                                    : Alignment.centerRight,
+                                child: Container(
+                                  height: 44,
+                                  width: MediaQuery.of(context).size.width / 2 - 28,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF7E0),
+                                    borderRadius: BorderRadius.circular(26),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.20),
+                                        blurRadius: 16,
+                                        spreadRadius: 1,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(26),
+                                      onTap: () {
+                                        setState(() => _selectedTab = 0);
+                                      },
+                                      child: SizedBox(
+                                        height: 44,
+                                        child: Center(
+                                          child: Text(
+                                            "Incoming (${incomingRequests.length})",
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: _selectedTab == 0
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              color: _selectedTab == 0
+                                                  ? Colors.orange
+                                                  : Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(26),
+                                      onTap: () {
+                                        setState(() => _selectedTab = 1);
+                                      },
+                                      child: SizedBox(
+                                        height: 44,
+                                        child: Center(
+                                          child: Text(
+                                            "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: _selectedTab == 1
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              color: _selectedTab == 1
+                                                  ? Colors.orange
+                                                  : Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
                         ),
-                      ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(26),
-                              onTap: () {
-                                setState(() => _selectedTab = 0);
-                              },
-                              child: SizedBox(
-                                height: 44,
-                                child: Center(
-                                  child: Text(
-                                    "Incoming (${incomingRequests.length})",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: _selectedTab == 0
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: _selectedTab == 0
-                                          ? Colors.orange
-                                          : Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
+
+                        const SizedBox(height: 20),
+
+                        // Lists / loading (no Expanded, no inner RefreshIndicator)
+                        if (_loading)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 40),
+                              child: CircularProgressIndicator(),
                             ),
+                          )
+                        else
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            transitionBuilder: (child, animation) {
+                              return FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              );
+                            },
+                            child: _selectedTab == 0
+                                ? _buildIncomingList()
+                                : _buildOutgoingList(),
                           ),
-                          Expanded(
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(26),
-                              onTap: () {
-                                setState(() => _selectedTab = 1);
-                              },
-                              child: SizedBox(
-                                height: 44,
-                                child: Center(
-                                  child: Text(
-                                    "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: _selectedTab == 1
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: _selectedTab == 1
-                                          ? Colors.orange
-                                          : Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                // Lists / loading / refresh
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : RefreshIndicator(
-                          onRefresh: _loadActivities,
-                          child: SingleChildScrollView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 250),
-                              transitionBuilder: (child, animation) {
-                                return FadeTransition(
-                                  opacity: animation,
-                                  child: child,
-                                );
-                              },
-                              child: _selectedTab == 0
-                                  ? _buildIncomingList()
-                                  : _buildOutgoingList(),
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
