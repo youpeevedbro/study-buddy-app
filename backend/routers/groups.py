@@ -287,11 +287,11 @@ def list_my_incoming_invites(
 
 
 
-# ADD dependency: User accepting request to join is Study Group Owner 
-#                    + ensure User being added is not already a member
+
+
 @router.post("/{group_id}/members/{user_id}")
-#def add_group_member(group_id: str, user_id: str, claims: dict = Depends(verify_firebase_token)):
-def add_group_member(group_id: str, user_id: str):
+def add_group_member(group_id: str, user_id: str, 
+                     claims: dict = Depends(verify_firebase_token)):
     """
     Adding a new member to a study group. Use when Study Group Owner accepts a request to join.
     """
@@ -356,7 +356,7 @@ def get_all_groups(
     """"
     Accepts optional name_filter query parameter to filter by Study Group Name.
     If no query parameter is specified, returns all study groups.
-    
+
     Returns List of Study Groups with appropriate access based on user.
     Owners and members have access to the 'members' field.
     Users who are not members can see number of people in a group but do not have access to the 'members' field.
