@@ -6,7 +6,7 @@ from pydantic import BaseModel
 # Request model for creating a Study Group
 class StudyGroupCreate(BaseModel):
     buildingCode: str
-    roomNumber: int
+    roomNumber: str
     date: str        #YYYY-MM-DD
     startTime: str   #HH:MM on 24 hr cycle
     endTime: str     #HH:MM on 24 hr cycle
@@ -18,7 +18,7 @@ class StudyGroupCreate(BaseModel):
             "examples": [
                 {
                     "buildingCode": "VEC",
-                    "roomNumber": 305,
+                    "roomNumber": "305",
                     "date": "2025-08-20",
                     "startTime": "9:00",
                     "endTime": "13:00",

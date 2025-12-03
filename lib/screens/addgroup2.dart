@@ -298,6 +298,7 @@ try {
           ),
         ),
         backgroundColor: const Color(0xFFE53935), 
+        behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
