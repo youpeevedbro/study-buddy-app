@@ -1,7 +1,7 @@
-import 'dart:convert';
+// lib/pages/filter.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import '../components/grad_button.dart';
+import '../services/building_service.dart';
 
 // ---------------------- Backend Zone Helper ---------------------
 class FilterCriteria {
@@ -60,51 +60,77 @@ class FilterPage extends StatefulWidget {
 }
 
 class _FilterPageState extends State<FilterPage> {
-  Map<String, String> _buildingList = {};
-  String? _selectedBuilding;
+  // Was Map<String, String> _buildingList
+  List<BuildingInfo> _buildings = [];
+  bool _loadingBuildings = true;
+  String? _buildingsError;
+
+  String? _selectedBuildingCode;
   TimeOfDay? startTime;
   TimeOfDay? endTime;
-  String? _timeError;    // 👈 NEW
+  String? _timeError; // time validation error
 
   @override
   void initState() {
     super.initState();
-    _loadBuildings();
+
+    final cached = BuildingService.cachedBuildings;
+    if (cached != null && cached.isNotEmpty) {
+      _buildings = cached;
+      _loadingBuildings = false;
+    } else {
+      _loadBuildings();
+    }
 
     if (widget.initialFilters != null) {
-      _selectedBuilding = widget.initialFilters!.buildingCode;
+      _selectedBuildingCode = widget.initialFilters!.buildingCode;
       startTime = widget.initialFilters!.startTime;
       endTime = widget.initialFilters!.endTime;
     }
   }
 
-  // Load building list from JSON
+
+
   Future<void> _loadBuildings() async {
+    setState(() {
+      _loadingBuildings = true;
+      _buildingsError = null;
+    });
+
     try {
-      final String response =
-          await rootBundle.loadString('assets/building_codes.json');
-      final data = json.decode(response) as Map<String, dynamic>;
+      final buildings = await BuildingService.fetchBuildings();
+
+      if (!mounted) return;
+
       setState(() {
-        _buildingList =
-            data.map((key, value) => MapEntry(key, value.toString()));
+        _buildings = buildings;
+        _loadingBuildings = false;
+
+        if (_selectedBuildingCode != null &&
+            !_buildings.any((b) => b.code == _selectedBuildingCode)) {
+          _selectedBuildingCode = null;
+        }
       });
     } catch (e) {
-      print('Error loading buildings: $e');
+      if (!mounted) return;
+      setState(() {
+        _loadingBuildings = false;
+        _buildingsError = e.toString();
+      });
     }
   }
 
+
+
   int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
-  // Placeholder backend call
-  // Placeholder backend call
   Future<void> _applyFilters() async {
     // 1) Validate time range if both set
     if (startTime != null && endTime != null) {
       final startMin = _toMinutes(startTime!);
-      final endMin   = _toMinutes(endTime!);
+      final endMin = _toMinutes(endTime!);
 
       if (startMin >= endMin) {
-        // Show inline error in the sheet
         setState(() {
           _timeError = 'End time must be after start time.';
         });
@@ -119,10 +145,9 @@ class _FilterPageState extends State<FilterPage> {
 
     // 2) Build criteria as before
     final criteria = FilterCriteria(
-      buildingCode: _selectedBuilding,
+      buildingCode: _selectedBuildingCode,
       startTime: startTime,
       endTime: endTime,
-      // overlap: _overlap,  // if/when you add it
     );
 
     try {
@@ -130,36 +155,31 @@ class _FilterPageState extends State<FilterPage> {
       Navigator.pop(context, criteria);
     } catch (e) {
       print('Filter error: $e');
-      // You *can* still use a SnackBar here since it’s a real error, not validation
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error applying filters: $e')),
       );
     }
   }
 
-
-
   void _clearFilters() {
     setState(() {
-      _selectedBuilding = null;
+      _selectedBuildingCode = null;
 
       // Reset to “free AT the current time”
       final now = TimeOfDay.now();
       startTime = now;
       endTime = null;
 
-      // Clear any time validation error
       _timeError = null;
     });
   }
-
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return FractionallySizedBox(
-      heightFactor: 0.7, 
+      heightFactor: 0.7,
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -199,37 +219,16 @@ class _FilterPageState extends State<FilterPage> {
               ),
               const Divider(),
 
-              // Building Dropdown
-              const Text("Building",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 10),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCF6DB),
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedBuilding,
-                  hint: const Text("Select a building"),
-                  underline: const SizedBox(),
-                  items: _buildingList.entries.map((entry) {
-                    return DropdownMenuItem<String>(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() => _selectedBuilding = value);
-                  },
-                ),
+              // Building
+              const Text(
+                "Building",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
               ),
+              const SizedBox(height: 10),
+
+              _buildBuildingDropdown(),
               const SizedBox(height: 20),
 
-              // Time
               // Time
               const Text(
                 "Free (at/between/until)",
@@ -237,7 +236,7 @@ class _FilterPageState extends State<FilterPage> {
               ),
               const SizedBox(height: 10),
 
-              if (_timeError != null)               // 👈 NEW
+              if (_timeError != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6.0),
                   child: Text(
@@ -255,7 +254,7 @@ class _FilterPageState extends State<FilterPage> {
                   _buildTimeField("Start Time", startTime, (t) {
                     setState(() => startTime = t);
                   }),
-                  const SizedBox(width: 10),
+              const SizedBox(width: 10),
                   _buildTimeField("End Time", endTime, (t) {
                     setState(() => endTime = t);
                   }),
@@ -292,7 +291,7 @@ class _FilterPageState extends State<FilterPage> {
                       width: double.infinity,
                       height: 43,
                       borderRadius: BorderRadius.circular(12.0),
-                      onPressed: () => _applyFilters(),
+                      onPressed: _applyFilters,
                       child: const Text(
                         'Apply Filters',
                         style: TextStyle(
@@ -312,64 +311,116 @@ class _FilterPageState extends State<FilterPage> {
     );
   }
 
-  // ---------------- Helper ----------------
-  Widget _buildTimeField(
-    String label, TimeOfDay? time, Function(TimeOfDay?) onTimePicked) {
-      return Expanded(
-        child: InkWell(
-          onTap: () async {
-            final picked = await showTimePicker(
-              context: context,
-              initialTime: time ?? TimeOfDay.now(),
-              builder: (context, child) {
-                return Theme(
-                  data: ThemeData.light().copyWith(
-                    colorScheme: const ColorScheme.light(
-                      primary: Color(0xFFE7C144),
-                      surface: Color(0xFFFCF6DB),
-                      onSurface: Colors.black,
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
-            );
-            if (picked != null) onTimePicked(picked);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFCF6DB),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade400),
-            ),
-            child: Row(
-              children: [
-                // Label / time text
-                Expanded(
-                  child: Text(
-                    time != null ? time.format(context) : label,
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                ),
+  // ---------------- Helper widgets ----------------
 
-                // If a time is set, show a small "X" to clear it
-                if (time != null) ...[
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.close, size: 16),
-                    onPressed: () => onTimePicked(null),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-
-                // Clock icon
-                const Icon(Icons.access_time, size: 18),
-              ],
-            ),
-          ),
-        ),
+  Widget _buildBuildingDropdown() {
+    if (_loadingBuildings) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: const LinearProgressIndicator(),
       );
     }
+
+    if (_buildingsError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Could not load buildings.',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+          TextButton(
+            onPressed: _loadBuildings,
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCF6DB),
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _selectedBuildingCode,
+        hint: const Text("Select a building"),
+        underline: const SizedBox(),
+        items: _buildings
+            .map(
+              (b) => DropdownMenuItem<String>(
+                value: b.code,
+                child: Text(b.name), // 👈 show full name from Firestore
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          setState(() => _selectedBuildingCode = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimeField(
+    String label,
+    TimeOfDay? time,
+    Function(TimeOfDay?) onTimePicked,
+  ) {
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          final picked = await showTimePicker(
+            context: context,
+            initialTime: time ?? TimeOfDay.now(),
+            builder: (context, child) {
+              return Theme(
+                data: ThemeData.light().copyWith(
+                  colorScheme: const ColorScheme.light(
+                    primary: Color(0xFFE7C144),
+                    surface: Color(0xFFFCF6DB),
+                    onSurface: Colors.black,
+                  ),
+                ),
+                child: child!,
+              );
+            },
+          );
+          if (picked != null) onTimePicked(picked);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFCF6DB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade400),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  time != null ? time.format(context) : label,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+              if (time != null) ...[
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: () => onTimePicked(null),
+                ),
+                const SizedBox(width: 4),
+              ],
+              const Icon(Icons.access_time, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
