@@ -20,6 +20,8 @@ import 'screens/addgroup2.dart';
 import 'screens/login.dart';
 import 'screens/onboarding/create_profile.dart';
 import 'config/dev_config.dart';
+import 'services/user_service.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +63,7 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
+        // Still waiting on Firebase auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -69,11 +72,38 @@ class AuthGate extends StatelessWidget {
 
         final user = snapshot.data;
 
+        // Not signed in → go to landing
         if (user == null) {
           return const LandingPage();
         }
 
-        return const Dashboard();
+        // Signed in → now check if Firestore profile exists
+        return FutureBuilder<bool>(
+          future: UserService.instance.currentUserProfileExists(),
+          builder: (context, profileSnap) {
+            if (profileSnap.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (profileSnap.hasError) {
+              return const Scaffold(
+                body: Center(
+                  child: Text('Error loading profile. Please try again.'),
+                ),
+              );
+            }
+
+            final hasProfile = profileSnap.data ?? false;
+
+            if (hasProfile) {
+              return const Dashboard();
+            } else {
+              return const CreateProfileScreen();
+            }
+          },
+        );
       },
     );
   }
