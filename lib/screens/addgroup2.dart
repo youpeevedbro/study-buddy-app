@@ -400,222 +400,225 @@ Future<void> _showOverlappedGroupDialog(
   }
   
 
-  @override
+   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Transform.translate(
-            offset: const Offset(3.0, 0),
-            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        toolbarHeight: 100,
-        title: const Text('Study Buddy'),
-        centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'BrittanySignature',
-          fontSize: 40,
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
-        ),
-      ),
-      
-      body: Container(
+    return Container(
+      // ⬅️ Gradient now wraps the entire page (including AppBar)
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-           Color(0xFFFFFCF8),  // very light cream (almost white)
-           Color(0xFFFFF0C9),  // soft light yellow
+            Color(0xFFFFFCF8), // very light cream (almost white)
+            Color(0xFFFFF0C9), // soft light yellow
           ],
         ),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Form(
-            key: _formKeyForGroupCreation,
-            child: ListView(
-              children: [
-                const SizedBox(height: 10),
+      child: Scaffold(
+        backgroundColor: Colors
+            .transparent, // let the gradient show through the Scaffold
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Transform.translate(
+              offset: const Offset(3.0, 0),
+              child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          toolbarHeight: 100,
+          title: const Text('Study Buddy'),
+          centerTitle: true,
+          backgroundColor: Colors
+              .transparent, // ⬅️ transparent so gradient shows behind AppBar
+          foregroundColor: Colors.black,
+          titleTextStyle: const TextStyle(
+            fontFamily: 'BrittanySignature',
+            fontSize: 40,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
+          elevation: 0,
+        ),
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Form(
+              key: _formKeyForGroupCreation,
+              child: ListView(
+                children: [
+                  const SizedBox(height: 10),
 
-                // Group Name
-                TextFormField(
-                  controller: _groupNameController,
-                  decoration: InputDecoration(
-                    labelText: 'Group Name',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  // Group Name
+                  TextFormField(
+                    controller: _groupNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Group Name',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'You must enter a group name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 15),
+
+                  // Date (Calendar)
+                  TextFormField(
+                    key: _dateFieldKey,
+                    controller: _dateController,
+                    readOnly: true,
+                    enableInteractiveSelection: false,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'You must enter a date to see time slots';
+                      }
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Date (MM/DD/YYYY)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      suffixIcon: const Icon(Icons.calendar_today),
+                    ),
+                    onTap: () {
+                      if (_canEdit == true) {
+                        _selectDate(context);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  GradientButton(
+                    onPressed: () => _navigateToFindRoomForGroup(),
+                    borderRadius: BorderRadius.circular(12),
+                    height: 40,
+                    child: _submitting
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Find time slots',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 20,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // Building
+                  TextFormField(
+                    controller: _buildingController,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Find Time Slots to set a building';
+                      }
+                      return null;
+                    },
+                    readOnly: true,
+                    enableInteractiveSelection: false,
+                    decoration: const InputDecoration(
+                      labelText: 'Building',
                     ),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'You must enter a group name';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 15),
+                  const SizedBox(height: 15),
 
-                // Date (Calendar)
-                TextFormField(
-                  key: _dateFieldKey,
-                  controller: _dateController,
-                  readOnly: true,
-                  enableInteractiveSelection: false,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'You must enter a date to see time slots';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Date (MM/DD/YYYY)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  // Room Number
+                  TextFormField(
+                    controller: _roomController,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Find Time Slots to set a room';
+                      }
+                      return null;
+                    },
+                    readOnly: true,
+                    enableInteractiveSelection: false,
+                    decoration: const InputDecoration(labelText: 'Room Number'),
+                  ),
+                  const SizedBox(height: 15),
+
+                  // Start Time
+                  TextFormField(
+                    controller: _startTimeController,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Find Time Slots to set a start time';
+                      }
+                      return null;
+                    },
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Start Time',
+                      suffixIcon: Icon(Icons.access_time),
                     ),
-                    suffixIcon: const Icon(Icons.calendar_today),
+                    onTap: () =>
+                        _showCupertinoTimePickerFor(_startTimeController),
                   ),
-                  onTap: () {
-                    if (_canEdit == true) {
-                      _selectDate(context);
-                    }
-                  },
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 15),
 
-                GradientButton(
-                  onPressed: () => _navigateToFindRoomForGroup(),
-                  borderRadius: BorderRadius.circular(12),
-                  height: 40,
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Find time slots',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 20,
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 30),
-
-                // Building
-                TextFormField(
-                  controller: _buildingController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Find Time Slots to set a building';
-                    }
-                    return null;
-                  },
-                  readOnly: true,
-                  enableInteractiveSelection: false,
-                  decoration: const InputDecoration(
-                    labelText: 'Building',
+                  // End Time
+                  TextFormField(
+                    controller: _endTimeController,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Find Time Slots to set an end time';
+                      }
+                      return null;
+                    },
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'End Time',
+                      suffixIcon: Icon(Icons.access_time),
+                    ),
+                    onTap: () =>
+                        _showCupertinoTimePickerFor(_endTimeController),
                   ),
-                ),
-                const SizedBox(height: 15),
+                  const SizedBox(height: 30),
 
-                // Room Number
-                TextFormField(
-                  controller: _roomController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Find Time Slots to set a room';
-                    }
-                    return null;
-                  },
-                  readOnly: true,
-                  enableInteractiveSelection: false,
-                  decoration:
-                      const InputDecoration(labelText: 'Room Number'),
-                ),
-                const SizedBox(height: 15),
-
-                // Start Time
-                TextFormField(
-                  controller: _startTimeController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Find Time Slots to set a start time';
-                    }
-                    return null;
-                  },
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Start Time',
-                    suffixIcon: Icon(Icons.access_time),
-                  ),
-                  onTap: () =>
-                      _showCupertinoTimePickerFor(_startTimeController),
-                ),
-                const SizedBox(height: 15),
-
-                // End Time
-                TextFormField(
-                  controller: _endTimeController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Find Time Slots to set an end time';
-                    }
-                    return null;
-                  },
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'End Time',
-                    suffixIcon: Icon(Icons.access_time),
-                  ),
-                  onTap: () =>
-                      _showCupertinoTimePickerFor(_endTimeController),
-                ),
-                const SizedBox(height: 30),
-
-                GradientButton(
-                  onPressed: () => _createGroup(),
-                  borderRadius: BorderRadius.circular(12),
-                  height: 50,
-                  child: _submitting
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                  GradientButton(
+                    onPressed: () => _createGroup(),
+                    borderRadius: BorderRadius.circular(12),
+                    height: 50,
+                    child: _submitting
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'Create Group',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 20,
+                            ),
                           ),
-                        )
-                      : const Text(
-                          'Create Group',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 20,
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 30),
-              ],
+                  ),
+                  const SizedBox(height: 30),
+                ],
+              ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
+
 }

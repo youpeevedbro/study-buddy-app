@@ -13,41 +13,44 @@ class StudyGroupsPage extends StatefulWidget {
 }
 
 class _StudyGroupsPageState extends State<StudyGroupsPage> {
+  bool _backPressed = false;
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Transform.translate(
-            offset: const Offset(3.0, 0),
-            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          ),
-          onPressed: () => Navigator.pop(context), // back to Dashboard
-        ),
-        toolbarHeight: 100,
-        title: const Text("Study Buddy"),
-        centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'BrittanySignature',
-          fontSize: 40,
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      child: Scaffold(
+        backgroundColor: Colors
+            .transparent, 
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Transform.translate(
+              offset: const Offset(3.0, 0),
+              child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            ),
+            onPressed: () => Navigator.pop(context), // back to Dashboard
+          ),
+          toolbarHeight: 100,
+          title: const Text("Study Buddy"),
+          centerTitle: true,
+          backgroundColor:
+              Colors.transparent, 
+          elevation: 0,
+          foregroundColor: Colors.black,
+          titleTextStyle: const TextStyle(
+            fontFamily: 'BrittanySignature',
+            fontSize: 40,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
           ),
         ),
-        child: SafeArea(
+        body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Column(
@@ -63,13 +66,11 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Container(
-                  margin: const EdgeInsets.only(right: 40),
-                  height: 2,
-                  color: Colors.black87,
+                const Divider(
+                  thickness: 1.5,
+                  color: Colors.black,
                 ),
                 const SizedBox(height: 16),
-
                 const Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(bottom: 8.0),
@@ -84,7 +85,6 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
     );
   }
 }
-
 // ---------------------------------------------------------------------------
 // FUTURE WRAPPER
 // ---------------------------------------------------------------------------
@@ -182,9 +182,20 @@ class AllGroupPanels extends StatefulWidget {
 }
 
 class _AllGroupPanelsState extends State<AllGroupPanels> {
+  int _selectedTab = 0; 
   late List<StudyGroupResponse> _groups;
   late VoidCallback _onReloadNeeded;
   final GroupService _service = GroupService();
+
+  //gradient 
+  LinearGradient get _brandGradient => const LinearGradient(
+        colors: [
+          Color(0xFFFFDE59),
+          Color(0xFFFF914D),
+        ],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      );
 
   //Format time and date
   String _formatDate(String yyyymmdd) {
@@ -272,12 +283,12 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
 
   Color _statusColor(StudyGroupResponse group) {
     if (group.access == "member") {
-      return const Color(0xFF64B5F6); // blue
+      return const Color(0xFF64B5F6); 
     }
     if (group.hasPendingRequest == true) {
-      return const Color(0xFFFFB74D); // orange
+      return const Color(0xFFFFB74D); 
     }
-    return const Color(0xFF81C784); // green
+    return const Color(0xFF81C784); 
   }
 
   // ---------------------------------------------------------------------------
@@ -393,7 +404,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     );
   }
 
-  // Small helper so all rows look identical and spacing stays consistent
+  // Small helper so all rows look identical
   Widget _buildInfoRow(
     IconData icon,
     String text, {
@@ -418,7 +429,120 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
   }
 
   // ---------------------------------------------------------------------------
-  // Single group card (modern UI, same behavior)
+  // Slider 
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDiscoverPendingSlider({
+  required int discoverCount,
+  required int pendingCount,
+}) {
+  final screenWidth = MediaQuery.of(context).size.width;
+
+  return Center(
+    child: Container(
+      width: screenWidth - 40,
+      decoration: BoxDecoration(
+        gradient: _brandGradient,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Stack(
+        children: [
+        
+          AnimatedAlign(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: _selectedTab == 0
+                ? Alignment.centerLeft
+                : Alignment.centerRight,
+            child: Container(
+              height: 44,
+              width: screenWidth / 2 - 28, 
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7E0),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.20),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Row(
+            children: [
+              // DISCOVER tab
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(26),
+                  onTap: () => setState(() => _selectedTab = 0),
+                  child: SizedBox(
+                    height: 44,
+                    child: Center(
+                      child: Text(
+                        "Discover ($discoverCount)",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _selectedTab == 0
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: _selectedTab == 0
+                              ? Colors.orange
+                              : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // PENDING tab
+              Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(26),
+                  onTap: () => setState(() => _selectedTab = 1),
+                  child: SizedBox(
+                    height: 44,
+                    child: Center(
+                      child: Text(
+                        "Pending ($pendingCount)",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: _selectedTab == 1
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: _selectedTab == 1
+                              ? Colors.orange
+                              : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+
+  // ---------------------------------------------------------------------------
+  // Single group card 
   // ---------------------------------------------------------------------------
 
   Widget _buildGroupCard(StudyGroupResponse group) {
@@ -511,7 +635,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
 
           const SizedBox(height: 10),
 
-          // INFO ROWS – now evenly spaced
+          // INFO ROWS 
           Builder(
             builder: (context) {
               const double rowGap = 6.0;
@@ -529,7 +653,6 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                     future: _service.getBuildingName(group.buildingCode),
                     builder: (context, snap) {
                       if (snap.connectionState == ConnectionState.waiting) {
-                        // No text while loading; keeps layout clean
                         return const SizedBox.shrink();
                       }
 
@@ -561,7 +684,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
 
           const SizedBox(height: 14),
 
-          // ACTIONS – same logic as old UI
+          // ACTIONS 
           if (group.access == "public") ...[
             Align(
               alignment: Alignment.center,
@@ -589,7 +712,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
                         ScaffoldMessenger.of(context).showSnackBar(
   SnackBar(
     behavior: SnackBarBehavior.floating,
-    backgroundColor: const Color(0xFF81C784), // same green as screenshot
+    backgroundColor: const Color(0xFF81C784), 
     margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12),
@@ -681,140 +804,93 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Collapsible section wrapper
-  // ---------------------------------------------------------------------------
-
-  Widget _buildCollapsibleSection({
-  required String title,
-  required List<StudyGroupResponse> groups,
-  required bool isExpanded,
-  required VoidCallback onHeaderTap,
-  bool alwaysShowHeader = false,
-}) {
-  if (!alwaysShowHeader && groups.isEmpty) {
-    return const SizedBox.shrink();
-  }
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      InkWell(
-        onTap: onHeaderTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              AnimatedRotation(
-                turns: isExpanded ? 0.0 : 0.5,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(
-                  Icons.keyboard_arrow_down_rounded,
-                  size: 24,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      AnimatedCrossFade(
-        firstChild: const SizedBox.shrink(),
-        secondChild: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 4),
-            if (groups.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                child: Text(
-                  "No groups to discover yet.",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-             ),
-
-            // Normal cards when groups exist
-            if (groups.isNotEmpty)
-              ...groups.map(_buildGroupCard).toList(),
-
-            const SizedBox(height: 8),
-          ],
-        ),
-        crossFadeState:
-            isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-        duration: const Duration(milliseconds: 200),
-      ),
-    ],
-  );
-}
-
 
   // ---------------------------------------------------------------------------
   // Build – compute sections + use collapsible sections
   // ---------------------------------------------------------------------------
 
   @override
-  Widget build(BuildContext context) {
-    // split into sections
-    final discoverGroups = _groups
-        .where((g) =>
-            g.access == "public" &&
-            (g.hasPendingRequest != true))
-        .toList();
-    final pendingGroups = _groups
-        .where((g) =>
-            g.access != "owner" &&
-            g.access != "member" &&
-            g.hasPendingRequest == true)
-        .toList();
+Widget build(BuildContext context) {
+  // -------------------------------
+  // Split into Discover / Pending
+  // -------------------------------
+  final discoverGroups = _groups
+      .where((g) =>
+          g.access == "public" &&
+          (g.hasPendingRequest != true))
+      .toList();
 
-    int dateCompare(StudyGroupResponse a, StudyGroupResponse b) =>
-        a.date.compareTo(b.date);
+  final pendingGroups = _groups
+      .where((g) =>
+          g.access != "owner" &&
+          g.access != "member" &&
+          g.hasPendingRequest == true)
+      .toList();
 
-    pendingGroups.sort(dateCompare);
-    discoverGroups.sort(dateCompare);
+  int dateCompare(StudyGroupResponse a, StudyGroupResponse b) =>
+      a.date.compareTo(b.date);
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildCollapsibleSection(
-            title: "Discover Groups",
-            groups: discoverGroups,
-            isExpanded: _discoverExpanded,
-            onHeaderTap: () {
-              setState(() {
-                _discoverExpanded = !_discoverExpanded;
-              });
-            },
-            alwaysShowHeader: true,
-          ),
-          _buildCollapsibleSection(
-            title: "Pending Requests",
-            groups: pendingGroups,
-            isExpanded: _pendingExpanded,
-            onHeaderTap: () {
-              setState(() {
-                _pendingExpanded = !_pendingExpanded;
-              });
-            },
-          ),
-          const SizedBox(height: 4),
+  discoverGroups.sort(dateCompare);
+  pendingGroups.sort(dateCompare);
+
+  // -------------------------------
+  // UI — page layout
+  // -------------------------------
+  return SingleChildScrollView(
+    physics: const BouncingScrollPhysics(),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        _buildDiscoverPendingSlider(
+          discoverCount: discoverGroups.length,
+          pendingCount: pendingGroups.length,
+        ),
+
+        const SizedBox(height: 20),
+
+        // -------------------------------
+        // Tab: DISCOVER
+        // -------------------------------
+        if (_selectedTab == 0) ...[
+          if (discoverGroups.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+              child: Text(
+                "No groups to discover yet.",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                ),
+              ),
+            )
+          else ...discoverGroups.map(_buildGroupCard).toList(),
+        ]
+
+        // -------------------------------
+        // Tab: PENDING
+        // -------------------------------
+        else ...[
+          if (pendingGroups.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 8),
+              child: Text(
+                "No pending requests.",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.black54,
+                ),
+              ),
+            )
+          else ...pendingGroups.map(_buildGroupCard).toList(),
         ],
-      ),
-    );
-  }
+
+        const SizedBox(height: 20),
+      ],
+    ),
+  );
+}
+
+
+
 }
