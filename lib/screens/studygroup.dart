@@ -13,6 +13,28 @@ class StudyGroupsPage extends StatefulWidget {
 }
 
 class _StudyGroupsPageState extends State<StudyGroupsPage> {
+  final TextEditingController _nameFilterController = TextEditingController();
+  String? _nameFilter;
+
+  void _updateNameQuery() {
+    setState(() {
+      _nameFilter = _nameFilterController.text.trim();
+    });
+  }
+
+  void _clearNameQuery() {
+    setState(() {
+      _nameFilterController.clear();
+      _nameFilter = null;
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameFilterController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -70,10 +92,39 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
                 ),
                 const SizedBox(height: 16),
 
-                const Expanded(
+                TextField(   //SEARCH BAR
+                  controller: _nameFilterController,
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    hintText: 'Search by StudyGroup Name',
+                  ),
+                ),
+                SizedBox(height: 10),
+                Row( 
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: (){
+                        _clearNameQuery();
+                      },
+                      child: Text("Reset"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_nameFilterController.text.isEmpty) return;
+                        _updateNameQuery();
+                      }, 
+                      child: Text("Submit"))
+                  ],
+                ),
+
+                Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(bottom: 8.0),
-                    child: AllGroups(),
+                    child: AllGroups(nameFilter: _nameFilter),
                   ),
                 ),
               ],
@@ -90,7 +141,8 @@ class _StudyGroupsPageState extends State<StudyGroupsPage> {
 // ---------------------------------------------------------------------------
 
 class AllGroups extends StatefulWidget {
-  const AllGroups({super.key});
+  final String? nameFilter;
+  const AllGroups({super.key, required this.nameFilter});
 
   @override
   State<AllGroups> createState() => _AllGroupsState();
@@ -98,19 +150,36 @@ class AllGroups extends StatefulWidget {
 
 class _AllGroupsState extends State<AllGroups> {
   final GroupService _service = const GroupService();
+  late String? _nameFilter;
   late Future<List<StudyGroupResponse>> _futureGroups;
+
+   @override
+  void didUpdateWidget(covariant AllGroups oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.nameFilter != widget.nameFilter) {
+      // Parent value has changed, do something if needed
+      print("Child received new value: ${widget.nameFilter}");
+      setState(() {
+        _nameFilter = widget.nameFilter;
+        _futureGroups = _service.listAllStudyGroups(name: _nameFilter);
+      });
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _futureGroups = _service.listAllStudyGroups();
+    _nameFilter = widget.nameFilter;
+    _futureGroups = _service.listAllStudyGroups(name: _nameFilter);
   }
 
+  /*
   void _reloadData() {
     setState(() {
-      _futureGroups = _service.listAllStudyGroups();
+      _futureGroups = _service.listAllStudyGroups(name: _nameFilter);
     });
   }
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -156,7 +225,7 @@ class _AllGroupsState extends State<AllGroups> {
 
         return AllGroupPanels(
           groups: groups,
-          onReloadNeeded: _reloadData,
+          //onReloadNeeded: _reloadData,
         );
       },
     );
@@ -168,13 +237,13 @@ class _AllGroupsState extends State<AllGroups> {
 // ---------------------------------------------------------------------------
 
 class AllGroupPanels extends StatefulWidget {
-  final VoidCallback onReloadNeeded;
+  //final VoidCallback onReloadNeeded;
   final List<StudyGroupResponse> groups;
 
   const AllGroupPanels({
     super.key,
     required this.groups,
-    required this.onReloadNeeded,
+    //required this.onReloadNeeded,
   });
 
   @override
@@ -183,7 +252,7 @@ class AllGroupPanels extends StatefulWidget {
 
 class _AllGroupPanelsState extends State<AllGroupPanels> {
   late List<StudyGroupResponse> _groups;
-  late VoidCallback _onReloadNeeded;
+  //late VoidCallback _onReloadNeeded;
   final GroupService _service = GroupService();
 
   //Format time and date
@@ -214,7 +283,7 @@ class _AllGroupPanelsState extends State<AllGroupPanels> {
   void initState() {
     super.initState();
     _groups = widget.groups;
-    _onReloadNeeded = widget.onReloadNeeded;
+    //_onReloadNeeded = widget.onReloadNeeded;
   }
 
   // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 # backend/routers/groups.py
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Union
+from fastapi import APIRouter, HTTPException, Depends, Query
+from typing import List, Union, Optional
 from services.firestore_client import get_db, firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.cloud.firestore_v1.field_path import FieldPath
@@ -150,9 +150,12 @@ def _add_groupMember_transaction(transaction, groupRef, userRef):
 def _update_group_transaction(transaction, studyGroupRef, updates_data: dict, usersQuery):
     user_docs = usersQuery.get(transaction=transaction)
     doc = studyGroupRef.get(transaction=transaction)
-    
-    transaction.update(studyGroupRef, updates_data)   # Updates Study group doc
-    for doc in user_docs: # Updates all applicable User docs - only updates name
+
+    if "name" in updates_data:
+        updates_data["nameLower"] = updates_data["name"].casefold() 
+
+    transaction.update(studyGroupRef, updates_data)   # Updates Study group doc 'name' and 'nameLower' fields
+    for doc in user_docs: # Updates all applicable User docs - only updates 'name' field
         transaction.update(doc.reference, {f"joinedStudyGroups.{studyGroupRef.id}.name": updates_data.get("name")} )
     # ADD: UPDATE all applicable incoming_requests documents 'studyGroupName' field
 
@@ -194,7 +197,9 @@ def _delete_group_transaction(transaction, groupRef, usersQuery):
 
 
 @router.post("/")
-def create_group(group: StudyGroupCreate, claims: dict = Depends(verify_firebase_token),): 
+def create_group(group: StudyGroupCreate, 
+                 claims: dict = Depends(verify_firebase_token),
+                 ): 
     try:
         db = get_db()
         col = db.collection(COLLECTION)
@@ -206,6 +211,7 @@ def create_group(group: StudyGroupCreate, claims: dict = Depends(verify_firebase
         newGroupRef = col.document() # creates studyGroup doc ref + auto-ID
         data = group.model_dump()
         data.update({"id": newGroupRef.id,  
+                     "nameLower" : data["name"].casefold(), # casefold: for case-insensitive string matching 
                      "quantity": 1, 
                      "ownerID": userRef.id,
                      "members": [userRef.id],
@@ -343,15 +349,23 @@ def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedSt
 
 
 @router.get("/")
-def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupList:
+def get_all_groups(
+    name_filter: Optional[str] = Query(None, description="StudyGroupName"),
+    claims: dict = Depends(verify_firebase_token)
+    ) -> StudyGroupList:
     """"
+    Accepts optional name_filter query parameter to filter by Study Group Name.
+    If no query parameter is specified, returns all study groups.
+    
     Returns List of Study Groups with appropriate access based on user.
     Owners and members have access to the 'members' field.
     Users who are not members can see number of people in a group but do not have access to the 'members' field.
     """
     try:
         db = get_db()
-        col = db.collection(COLLECTION)
+        query = db.collection(COLLECTION)
+        if name_filter:
+            query = query.where(filter=FieldFilter("nameLower", "==", name_filter.casefold()))
         items: List[StudyGroupPublicResponse] = []
 
         uid = claims.get("uid") or claims.get("sub")
@@ -365,8 +379,7 @@ def get_all_groups(claims: dict = Depends(verify_firebase_token)) -> StudyGroupL
             for d in pending_query.stream()
         }
 
-
-        docs = col.stream()
+        docs = query.stream()
         for doc in docs:
             groupEndTime = doc.to_dict()["expireAt"]
             if groupEndTime < datetime.now(timezone.utc):

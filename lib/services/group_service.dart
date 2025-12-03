@@ -8,6 +8,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../config/app_config.dart';
 import '../models/group.dart';
 
+import 'dart:io' show Platform; // REMOVE LATER
+import 'package:flutter/foundation.dart' show kIsWeb; // REMOVE LATER
+
 class GroupService {
   const GroupService();
 
@@ -15,9 +18,13 @@ class GroupService {
   String get _base => AppConfig.apiBase;
 
   /// Build a Uri for group-related endpoints.
-  Uri _u(String path) {
+  Uri _u(String path, [Map<String, String>? qp]) {
     final normalized = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$_base$normalized');
+    //return Uri.parse('$_base$normalized').replace(queryParameters: qp); //ADD BACK
+    String temp_base = 'http://localhost:8000'; // REMOVE FOLLOWING
+    if (kIsWeb) temp_base = 'http://localhost:8000';
+    if (Platform.isAndroid) temp_base = 'http://10.0.2.2:8000';
+    return Uri.parse('$temp_base$normalized').replace(queryParameters: qp);
   }
 
   /// Shared HTTP timeout for all backend calls.
@@ -99,8 +106,11 @@ class GroupService {
     return joinedGroups.map((m) => JoinedGroup.fromJson(m)).toList();
   }
 
-  Future<List<StudyGroupResponse>> listAllStudyGroups() async {
-    final uri = _u('/group/');
+  Future<List<StudyGroupResponse>> listAllStudyGroups({String? name}) async {  //optional named parameter
+    Map<String, String> qp = {};
+    if (name != null && name.isNotEmpty) qp["name_filter"] = name;
+
+    final uri = _u('/group/', qp);
     final resp =
         await http.get(uri, headers: await _headers()).timeout(_timeout);
 
