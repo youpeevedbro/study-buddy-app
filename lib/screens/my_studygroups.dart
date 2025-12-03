@@ -847,6 +847,7 @@ class _GroupPanelsState extends State<GroupPanels> {
           content: Form(
             key: _formKey,
             child: TextFormField(
+              maxLength: 60,
               controller: _groupNameController,
               decoration: InputDecoration(
                 labelText: 'Study Group name..',

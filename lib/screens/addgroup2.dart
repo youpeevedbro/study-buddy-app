@@ -449,6 +449,7 @@ Future<void> _showOverlappedGroupDialog(
 
                 // Group Name
                 TextFormField(
+                  maxLength: 60,
                   controller: _groupNameController,
                   decoration: InputDecoration(
                     labelText: 'Group Name',
