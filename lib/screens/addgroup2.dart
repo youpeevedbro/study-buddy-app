@@ -201,20 +201,43 @@ class _AddGroupPageState extends State<AddGroupPage> {
   // Date picker
   Future<void> _selectDate(BuildContext context) async {
     if (!_canEdit) return;
-    String d = _dateController.text;
-    DateTime initialDate = (d != null && d.isNotEmpty) ? DateTime.parse(d) : DateTime.now();
-    DateTime? picked = await showDatePicker(
+
+    // Define allowed window: today -> 7 days from today (inclusive)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekOut = today.add(const Duration(days: 7));
+
+    // Try to use the currently selected date, but clamp it to [today, weekOut]
+    final text = _dateController.text;
+    DateTime initialDate;
+    final parsed = text.isNotEmpty ? DateTime.tryParse(text) : null;
+
+    if (parsed != null) {
+      if (parsed.isBefore(today)) {
+        initialDate = today;
+      } else if (parsed.isAfter(weekOut)) {
+        initialDate = weekOut;
+      } else {
+        initialDate = parsed;
+      }
+    } else {
+      initialDate = today;
+    }
+
+    final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: initialDate, 
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2101),
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: weekOut,
     );
+
     if (picked != null) {
       setState(() {
-        _dateController.text = _formatDate(picked);
+        _dateController.text = _formatDate(picked); // yyyy-MM-dd
       });
     }
   }
+
 
   
   Future<void> _createGroup() async {

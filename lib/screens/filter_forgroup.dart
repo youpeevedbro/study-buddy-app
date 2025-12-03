@@ -91,14 +91,29 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
     super.initState();
     _loadBuildings();
 
+    // Define allowed window: today -> 7 days from today (inclusive)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekOut = today.add(const Duration(days: 7));
+
     if (widget.initialFilters != null) {
-      //_selectedBuilding = widget.initialFilters!.buildingCode;
-      _selectedDate = widget.initialFilters!.date;
-      _dateController.text = _formatDate(_selectedDate);
-      //startTime = widget.initialFilters!.startTime;
-      //endTime = widget.initialFilters!.endTime;
+      final d = widget.initialFilters!.date;
+      // Clamp initialFilters date into [today, weekOut]
+      if (d.isBefore(today)) {
+        _selectedDate = today;
+      } else if (d.isAfter(weekOut)) {
+        _selectedDate = weekOut;
+      } else {
+        _selectedDate = d;
+      }
+    } else {
+      _selectedDate = today;
     }
+
+    _dateController.text = _formatDate(_selectedDate);
   }
+
+
 
   // Load building list from JSON
   Future<void> _loadBuildings() async {
@@ -182,19 +197,34 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    DateTime? picked = await showDatePicker(
+    // Allowed window: today -> 7 days from today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekOut = today.add(const Duration(days: 7));
+
+    // Clamp the current selected date into the valid window
+    DateTime initialDate = _selectedDate;
+    if (initialDate.isBefore(today)) {
+      initialDate = today;
+    } else if (initialDate.isAfter(weekOut)) {
+      initialDate = weekOut;
+    }
+
+    final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate, //DateTime.now(),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2101),
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: weekOut,
     );
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        _dateController.text = _formatDate(picked);
+        _dateController.text = _formatDate(picked); // yyyy-MM-dd
       });
     }
   }
+
 
 
   @override
