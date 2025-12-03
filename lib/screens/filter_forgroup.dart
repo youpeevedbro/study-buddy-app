@@ -92,12 +92,14 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
     _loadBuildings();
 
     // Define allowed window: today -> 7 days from today (inclusive)
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final nowDT = DateTime.now();
+    final today = DateTime(nowDT.year, nowDT.month, nowDT.day);
     final weekOut = today.add(const Duration(days: 7));
+    final nowTime = TimeOfDay.now();
 
     if (widget.initialFilters != null) {
       final d = widget.initialFilters!.date;
+
       // Clamp initialFilters date into [today, weekOut]
       if (d.isBefore(today)) {
         _selectedDate = today;
@@ -106,13 +108,23 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
       } else {
         _selectedDate = d;
       }
+
+      // Carry over building if present
+      _selectedBuilding = widget.initialFilters!.buildingCode;
+
+      // If parent passed a time, use it; otherwise default to now
+      startTime = widget.initialFilters!.startTime ?? nowTime;
+      endTime = widget.initialFilters!.endTime;
     } else {
+      // First time opening filter sheet
       _selectedDate = today;
+      _selectedBuilding = null;
+      startTime = nowTime;   // 👈 This makes “Start Time” show the current time
+      endTime = null;
     }
 
     _dateController.text = _formatDate(_selectedDate);
   }
-
 
 
   // Load building list from JSON

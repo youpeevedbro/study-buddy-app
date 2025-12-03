@@ -10,7 +10,6 @@ import '../services/api.dart';
 import '../models/room.dart';
 import '../models/group.dart';
 
-
 class FindRoomForGroupPage extends StatefulWidget {
   final SelectedGroupFields initialFilters;
   const FindRoomForGroupPage({super.key, required this.initialFilters});
@@ -31,23 +30,20 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
   // --- Future for the current page ---
   Future<RoomsPage>? _futurePage;
 
-
-  late DateTime _date;
-
   @override
   void initState() {
     super.initState();
 
-    // Default: "Free Now" = buildingCode null, startTime = now, endTime = null
+    // Default: FREE AT NOW on the chosen date
     final now = TimeOfDay.now();
-
     _currentFilter = FilterCriteriaForGroup(
       date: widget.initialFilters.date!,
+      startTime: now,
+      endTime: null,
     );
 
     _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
   }
-
 
   // -------- Helpers to read values from FilterCriteriaForGroup safely --------
   String? _buildingFrom(FilterCriteriaForGroup? f) {
@@ -94,10 +90,10 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
     return TimeOfDay.fromDateTime(dt).format(context);
   }
 
-  TimeOfDay _hhmmToTimeOfDay(String t){
+  TimeOfDay _hhmmToTimeOfDay(String t) {
     final parts = t.split(':');
     if (parts.length != 2) {
-      return TimeOfDay(hour: 0, minute: 0);
+      return const TimeOfDay(hour: 0, minute: 0);
     }
 
     final hour = int.tryParse(parts[0]) ?? 0;
@@ -107,9 +103,43 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
   }
 
   String _formatDate(DateTime d) {
-      DateFormat formatted_date = DateFormat('yyyy-MM-dd');
-      return formatted_date.format(d);
+    DateFormat formatted_date = DateFormat('yyyy-MM-dd');
+    return formatted_date.format(d);
+  }
+
+  // ---------- helpers to determine if a slot is already closed ----------
+
+  /// Convert this room slot's date + end time into a DateTime.
+  DateTime? _slotEndDateTime(Room r) {
+    try {
+      if (r.date.isEmpty || r.end.isEmpty) return null;
+
+      // r.date is "yyyy-MM-dd"
+      final dateParts = r.date.split('-');
+      if (dateParts.length != 3) return null;
+      final year = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[2]);
+
+      // r.end is "HH:mm"
+      final timeParts = r.end.split(':');
+      if (timeParts.length != 2) return null;
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      return DateTime(year, month, day, hour, minute);
+    } catch (_) {
+      return null;
     }
+  }
+
+  /// Returns true if this slot has fully ended (end < now).
+  bool _isSlotClosed(Room r) {
+    final end = _slotEndDateTime(r);
+    if (end == null) return false; // if data is weird, keep it selectable
+    final now = DateTime.now();
+    return end.isBefore(now);
+  }
 
   // Core fetch with current filters
   Future<RoomsPage> _fetchPage({
@@ -163,13 +193,12 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
     );
 
     if (result != null) {
-      setState(() { 
+      setState(() {
         _currentFilter = result;
-        });
+      });
       _reload();
     }
   }
-
 
   // Pagination controls
   void _goNext() {
@@ -191,11 +220,10 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
 
   String _currentFilterLabel() {
     final f = _currentFilter;
-    
+
     if (f == null) return "Free Now";
 
-    final noBuilding =
-    (f.buildingCode == null || f.buildingCode!.isEmpty);
+    final noBuilding = (f.buildingCode == null || f.buildingCode!.isEmpty);
     final noStart = (f.startTime == null);
     final noEnd = (f.endTime == null);
 
@@ -373,7 +401,7 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                               final parts = header.split('|');
                               final left = parts[0].trim();
                               final right =
-                              (parts.length > 1) ? parts[1].trim() : '';
+                                  (parts.length > 1) ? parts[1].trim() : '';
 
                               return Container(
                                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -423,15 +451,79 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                                   ),
                                   children: [
                                     ...slots.map((r) {
-                                      
+                                      final isClosed = _isSlotClosed(r);
+
+                                      Widget innerRow = Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: isClosed
+                                                  ? Colors.grey
+                                                  : Colors.black,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 14),
+                                          GradientButton(
+                                            width: 100,
+                                            height: 35,
+                                            borderRadius:
+                                                BorderRadius.circular(12.0),
+                                            onPressed: isClosed
+                                                ? null
+                                                : () {
+                                                    final fields =
+                                                        SelectedGroupFields(
+                                                      date:
+                                                          _currentFilter!.date,
+                                                      building: r.buildingCode,
+                                                      roomNumber: r.roomNumber,
+                                                      startTime:
+                                                          _hhmmToTimeOfDay(
+                                                              r.start),
+                                                      endTime:
+                                                          _hhmmToTimeOfDay(
+                                                              r.end),
+                                                      availabilitySlotDoc:
+                                                          r.id,
+                                                    );
+                                                    Navigator.pop(
+                                                        context, fields);
+                                                  },
+                                            child: const Text(
+                                              '+Add',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16.0,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+
+                                      if (isClosed) {
+                                        innerRow = IgnorePointer(
+                                          child: Opacity(
+                                            opacity: 0.45,
+                                            child: innerRow,
+                                          ),
+                                        );
+                                      }
+
                                       return Container(
-                                        margin: const EdgeInsets.only(
-                                            bottom: 10),
+                                        margin:
+                                            const EdgeInsets.only(bottom: 10),
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
                                           borderRadius:
-                                          BorderRadius.circular(10),
+                                              BorderRadius.circular(10),
                                           boxShadow: [
                                             BoxShadow(
                                               color: Colors.black
@@ -441,46 +533,7 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                                             ),
                                           ],
                                         ),
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 14),
-                                            GradientButton(
-                                              width: 100,
-                                              height: 35,
-                                              borderRadius:
-                                              BorderRadius.circular(
-                                                  12.0),
-                                              onPressed: () {
-                                                final fields = SelectedGroupFields(
-                                                  date: _currentFilter!.date,
-                                                  building: r.buildingCode,
-                                                  roomNumber: r.roomNumber,
-                                                  startTime: _hhmmToTimeOfDay(r.start),
-                                                  endTime: _hhmmToTimeOfDay(r.end),
-                                                  availabilitySlotDoc: r.id
-                                                );
-                                                Navigator.pop(context, fields);
-                                              },
-                                              child: const Text(
-                                                '+Add',
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 16.0,
-                                                ),
-                                              ),
-                                            )
-                                          ],
-                                        ),
+                                        child: innerRow,
                                       );
                                     }).toList(),
                                   ],
@@ -492,7 +545,7 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                                MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
                                 onPressed: (_prevTokens.length > 1)
