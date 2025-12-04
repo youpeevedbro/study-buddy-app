@@ -1,8 +1,9 @@
-import 'dart:convert';
+// lib/pages/filter_forgroup.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import '../components/grad_button.dart';
 import 'package:intl/intl.dart';
+
+import '../components/grad_button.dart';
+import '../services/building_service.dart';
 
 // ---------------------- Backend Zone Helper ---------------------
 class FilterCriteriaForGroup {
@@ -18,12 +19,10 @@ class FilterCriteriaForGroup {
     this.endTime,
   });
 
-  
-
   Map<String, dynamic> toJson() {
     String _formatDate(DateTime d) {
-      DateFormat formatted_date = DateFormat('yyyy-MM-dd');
-      return formatted_date.format(d);
+      DateFormat formattedDate = DateFormat('yyyy-MM-dd');
+      return formattedDate.format(d);
     }
 
     return {
@@ -77,53 +76,107 @@ class FilterPageForGroup extends StatefulWidget {
 }
 
 class _FilterPageForGroupState extends State<FilterPageForGroup> {
-  Map<String, String> _buildingList = {};
-  String? _selectedBuilding;
+  // Buildings: now using live data via BuildingService
+  List<BuildingInfo> _buildings = [];
+  bool _loadingBuildings = true;
+  String? _buildingsError;
+
+  String? _selectedBuildingCode;
+
   late DateTime _selectedDate;
   TimeOfDay? startTime;
   TimeOfDay? endTime;
-  String? _timeError;    // 👈 NEW
+  String? _timeError; // time validation error
 
   final TextEditingController _dateController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _loadBuildings();
+
+    // --- Buildings setup using shared cache ---
+    final cached = BuildingService.cachedBuildings;
+    if (cached != null && cached.isNotEmpty) {
+      _buildings = cached;
+      _loadingBuildings = false;
+    } else {
+      _loadBuildings();
+    }
+
+    // Define allowed window: today -> 7 days from today (inclusive)
+    final nowDT = DateTime.now();
+    final today = DateTime(nowDT.year, nowDT.month, nowDT.day);
+    final weekOut = today.add(const Duration(days: 7));
+    final nowTime = TimeOfDay.now();
 
     if (widget.initialFilters != null) {
-      //_selectedBuilding = widget.initialFilters!.buildingCode;
-      _selectedDate = widget.initialFilters!.date;
-      _dateController.text = _formatDate(_selectedDate);
-      //startTime = widget.initialFilters!.startTime;
-      //endTime = widget.initialFilters!.endTime;
+      final d = widget.initialFilters!.date;
+
+      // Clamp initialFilters date into [today, weekOut]
+      if (d.isBefore(today)) {
+        _selectedDate = today;
+      } else if (d.isAfter(weekOut)) {
+        _selectedDate = weekOut;
+      } else {
+        _selectedDate = d;
+      }
+
+      // Carry over building if present
+      _selectedBuildingCode = widget.initialFilters!.buildingCode;
+
+      // If parent passed a time, use it; otherwise default to now
+      startTime = widget.initialFilters!.startTime ?? nowTime;
+      endTime = widget.initialFilters!.endTime;
+    } else {
+      // First time opening filter sheet
+      _selectedDate = today;
+      _selectedBuildingCode = null;
+      startTime = nowTime; // “Start Time” shows the current time
+      endTime = null;
     }
+
+    _dateController.text = _formatDate(_selectedDate);
   }
 
-  // Load building list from JSON
+  // Load building list from backend via BuildingService
   Future<void> _loadBuildings() async {
+    setState(() {
+      _loadingBuildings = true;
+      _buildingsError = null;
+    });
+
     try {
-      final String response =
-          await rootBundle.loadString('assets/building_codes.json');
-      final data = json.decode(response) as Map<String, dynamic>;
+      final buildings = await BuildingService.fetchBuildings();
+
+      if (!mounted) return;
+
       setState(() {
-        _buildingList =
-            data.map((key, value) => MapEntry(key, value.toString()));
+        _buildings = buildings;
+        _loadingBuildings = false;
+
+        if (_selectedBuildingCode != null &&
+            !_buildings.any((b) => b.code == _selectedBuildingCode)) {
+          _selectedBuildingCode = null;
+        }
       });
     } catch (e) {
-      print('Error loading buildings: $e');
+      if (!mounted) return;
+
+      setState(() {
+        _loadingBuildings = false;
+        _buildingsError = e.toString();
+      });
     }
   }
 
   int _toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
 
- 
-  // Placeholder backend call
+  // Apply filters
   Future<void> _applyFilters() async {
     // 1) Validate time range if both set
     if (startTime != null && endTime != null) {
       final startMin = _toMinutes(startTime!);
-      final endMin   = _toMinutes(endTime!);
+      final endMin = _toMinutes(endTime!);
 
       if (startMin >= endMin) {
         // Show inline error in the sheet
@@ -141,30 +194,26 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
 
     // 2) Build criteria as before
     final criteria = FilterCriteriaForGroup(
-      buildingCode: _selectedBuilding,
+      buildingCode: _selectedBuildingCode,
       date: _selectedDate,
       startTime: startTime,
       endTime: endTime,
-      // overlap: _overlap,  // if/when you add it
     );
 
     try {
-      print('Filter criteria: ${criteria.toJson()}');
+      print('Filter criteria (groups): ${criteria.toJson()}');
       Navigator.pop(context, criteria);
     } catch (e) {
       print('Filter error: $e');
-      // You *can* still use a SnackBar here since it’s a real error, not validation
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error applying filters: $e')),
       );
     }
   }
 
-
-
   void _clearFilters() {
     setState(() {
-      _selectedBuilding = null;
+      _selectedBuildingCode = null;
 
       // Reset to “free AT the current time”
       final now = TimeOfDay.now();
@@ -182,294 +231,346 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
-    DateTime? picked = await showDatePicker(
+    // Allowed window: today -> 7 days from today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final weekOut = today.add(const Duration(days: 7));
+
+    // Clamp the current selected date into the valid window
+    DateTime initialDate = _selectedDate;
+    if (initialDate.isBefore(today)) {
+      initialDate = today;
+    } else if (initialDate.isAfter(weekOut)) {
+      initialDate = weekOut;
+    }
+
+    final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate, //DateTime.now(),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2101),
+      initialDate: initialDate,
+      firstDate: today,
+      lastDate: weekOut,
     );
+
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        _dateController.text = _formatDate(picked);
+        _dateController.text = _formatDate(picked); // yyyy-MM-dd
       });
     }
   }
 
-
   @override
-Widget build(BuildContext context) {
-  final theme = Theme.of(context);
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
-  return FractionallySizedBox(
-    heightFactor: 0.7,
-    child: Container(
-      // 🔸 vertical gradient background
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFFFF3D9), // same as my_studygroup.dart
-            Color(0xFFFFE2B8),
-          ],
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          top: 10,
-          left: 20,
-          right: 20,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 50,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 15),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Filters",
-                    style:
-                        TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: _clearFilters,
-                    child: const Text("Reset"),
-                  ),
-                ],
-              ),
-              const Divider(),
-
-              const Text("Date",
-                  style:
-                      TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 10),
-              // Date (Calendar)
-              TextFormField(
-                controller: _dateController,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'Date (MM/DD/YYYY)',
-                  suffixIcon: Icon(Icons.calendar_today),
-                ),
-                onTap: () => _selectDate(context),
-              ),
-              const SizedBox(height: 15),
-
-              // Building Dropdown
-              const Text("Building",
-                  style:
-                      TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              const SizedBox(height: 10),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCF6DB),
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedBuilding,
-                  hint: const Text("Select a building"),
-                  underline: const SizedBox(),
-                  items: _buildingList.entries.map((entry) {
-                    return DropdownMenuItem<String>(
-                      value: entry.key,
-                      child: Text(entry.value),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() => _selectedBuilding = value);
-                  },
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              const Text(
-                "Free (at/between/until)",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 10),
-
-              if (_timeError != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6.0),
-                  child: Text(
-                    _timeError!,
-                    style: const TextStyle(
-                      color: Colors.red,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-
-              Row(
-                children: [
-                  _buildTimeField("Start Time", startTime, (t) {
-                    setState(() => startTime = t);
-                  }),
-                  const SizedBox(width: 10),
-                  _buildTimeField("End Time", endTime, (t) {
-                    setState(() => endTime = t);
-                  }),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-
-              // Buttons with shadows
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.18),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          backgroundColor:
-                              Colors.white.withOpacity(0.9), // subtle fill
-                        ),
-                        child: Text(
-                          "Cancel",
-                          style: TextStyle(
-                            color: theme.primaryColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.22),
-                            blurRadius: 12,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: GradientButton(
-                        width: double.infinity,
-                        height: 43,
-                        borderRadius: BorderRadius.circular(12.0),
-                        onPressed: () => _applyFilters(),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 19.0,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 15),
+    return FractionallySizedBox(
+      heightFactor: 0.7,
+      child: Container(
+        // 🔸 vertical gradient background
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFFFF3D9), // same as my_studygroup.dart
+              Color(0xFFFFE2B8),
             ],
           ),
         ),
-      ),
-    ),
-  );
-}
-
-
-  // ---------------- Helper ----------------
-  Widget _buildTimeField(
-    String label, TimeOfDay? time, Function(TimeOfDay?) onTimePicked) {
-      return Expanded(
-        child: InkWell(
-          onTap: () async {
-            final picked = await showTimePicker(
-              context: context,
-              initialTime: time ?? TimeOfDay.now(),
-              builder: (context, child) {
-                return Theme(
-                  data: ThemeData.light().copyWith(
-                    colorScheme: const ColorScheme.light(
-                      primary: Color(0xFFE7C144),
-                      surface: Color(0xFFFCF6DB),
-                      onSurface: Colors.black,
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
-            );
-            if (picked != null) onTimePicked(picked);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFCF6DB),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade400),
-            ),
-            child: Row(
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 10,
+            left: 20,
+            right: 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Label / time text
-                Expanded(
-                  child: Text(
-                    time != null ? time.format(context) : label,
-                    style: const TextStyle(fontSize: 14),
+                Center(
+                  child: Container(
+                    width: 50,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 15),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
 
-                // If a time is set, show a small "X" to clear it
-                if (time != null) ...[
-                  IconButton(
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    icon: const Icon(Icons.close, size: 16),
-                    onPressed: () => onTimePicked(null),
-                  ),
-                  const SizedBox(width: 4),
-                ],
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Filters",
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    TextButton(
+                      onPressed: _clearFilters,
+                      child: const Text("Reset"),
+                    ),
+                  ],
+                ),
+                const Divider(),
 
-                // Clock icon
-                const Icon(Icons.access_time, size: 18),
+                const Text(
+                  "Date",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 10),
+
+                // Date (Calendar)
+                TextFormField(
+                  controller: _dateController,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Date (MM/DD/YYYY)',
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  onTap: () => _selectDate(context),
+                ),
+                const SizedBox(height: 15),
+
+                // Building
+                const Text(
+                  "Building",
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 10),
+                _buildBuildingDropdown(),
+                const SizedBox(height: 20),
+
+                const Text(
+                  "Free (at/between/until)",
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const SizedBox(height: 10),
+
+                if (_timeError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6.0),
+                    child: Text(
+                      _timeError!,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+
+                Row(
+                  children: [
+                    _buildTimeField("Start Time", startTime, (t) {
+                      setState(() => startTime = t);
+                    }),
+                    const SizedBox(width: 10),
+                    _buildTimeField("End Time", endTime, (t) {
+                      setState(() => endTime = t);
+                    }),
+                  ],
+                ),
+
+                const SizedBox(height: 30),
+
+                // Buttons with shadows
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.18),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            backgroundColor:
+                                Colors.white.withOpacity(0.9), // subtle fill
+                          ),
+                          child: Text(
+                            "Cancel",
+                            style: TextStyle(
+                              color: theme.primaryColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.22),
+                              blurRadius: 12,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: GradientButton(
+                          width: double.infinity,
+                          height: 43,
+                          borderRadius: BorderRadius.circular(12.0),
+                          onPressed: _applyFilters,
+                          child: const Text(
+                            'Apply Filters',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 19.0,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // ---------------- Helper ----------------
+
+  Widget _buildBuildingDropdown() {
+    if (_loadingBuildings) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: const LinearProgressIndicator(),
       );
     }
+
+    if (_buildingsError != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Could not load buildings.',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+          TextButton(
+            onPressed: _loadBuildings,
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCF6DB),
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: DropdownButton<String>(
+        isExpanded: true,
+        value: _selectedBuildingCode,
+        hint: const Text("Select a building"),
+        underline: const SizedBox(),
+        items: _buildings
+            .map(
+              (b) => DropdownMenuItem<String>(
+                value: b.code,
+                child: Text(b.name), // show building name
+              ),
+            )
+            .toList(),
+        onChanged: (value) {
+          setState(() => _selectedBuildingCode = value);
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimeField(
+    String label,
+    TimeOfDay? time,
+    Function(TimeOfDay?) onTimePicked,
+  ) {
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          final picked = await showTimePicker(
+            context: context,
+            initialTime: time ?? TimeOfDay.now(),
+            builder: (context, child) {
+              return Theme(
+                data: ThemeData.light().copyWith(
+                  colorScheme: const ColorScheme.light(
+                    primary: Color(0xFFE7C144),
+                    surface: Color(0xFFFCF6DB),
+                    onSurface: Colors.black,
+                  ),
+                ),
+                child: child!,
+              );
+            },
+          );
+          if (picked != null) onTimePicked(picked);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFCF6DB),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade400),
+          ),
+          child: Row(
+            children: [
+              // Label / time text
+              Expanded(
+                child: Text(
+                  time != null ? time.format(context) : label,
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ),
+
+              // If a time is set, show a small "X" to clear it
+              if (time != null) ...[
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.close, size: 16),
+                  onPressed: () => onTimePicked(null),
+                ),
+                const SizedBox(width: 4),
+              ],
+
+              // Clock icon
+              const Icon(Icons.access_time, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

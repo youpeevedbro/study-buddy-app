@@ -23,7 +23,41 @@ log = logging.getLogger("uvicorn.error")
 COLLECTION = "availabilitySlots"
 # Subcollection used to track which users have reported a slot as locked.
 USER_SUBCOLLECTION = "lockedReportsUsers"
+BUILDINGS_COLLECTION = "buildings"
 
+@router.get("/buildings")
+def list_buildings(
+    claims: dict = Depends(verify_firebase_token),
+):
+    """
+    Return all buildings (code + name) from the Firestore 'buildings' collection.
+
+    Each document in 'buildings' is expected to have fields:
+      - code: "VEC"
+      - name: "Vivian Engineering Center"
+    """
+    try:
+        db = get_db()
+        col = db.collection(BUILDINGS_COLLECTION)
+
+        docs = col.stream()
+        buildings = []
+        for d in docs:
+            data = d.to_dict() or {}
+            code = data.get("code") or d.id
+            name = data.get("name") or code
+            buildings.append({"code": code, "name": name})
+
+        # sort by code so it's stable
+        buildings.sort(key=lambda b: b["code"])
+        return buildings
+
+    except Exception as e:
+        log.exception("list_buildings failed: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail=f"/rooms/buildings failed: {type(e).__name__}: {e}",
+        )
 
 
 def _doc_to_room(doc, user_has_reported: bool = False) -> Room:
