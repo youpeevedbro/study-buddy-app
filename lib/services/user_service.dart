@@ -263,9 +263,7 @@ class UserService {
       await user.delete();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
-        throw Exception(
-          'For security reasons, please sign out and log in again before deleting your account.',
-        );
+        return;
       }
       rethrow;
     }
