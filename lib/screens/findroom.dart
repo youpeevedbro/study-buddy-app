@@ -1,17 +1,18 @@
 // lib/pages/findroom.dart
-import 'dart:collection';
+// import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'filter.dart';
-import '../components/grad_button.dart';
+// import '../components/grad_button.dart';
 import '../services/api.dart';
 import '../models/room.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
 import '../services/timer_service.dart';
 import '../config/dev_config.dart';
+import '../components/room_card.dart';
 
 class FindRoomPage extends StatefulWidget {
   const FindRoomPage({super.key});
@@ -21,6 +22,26 @@ class FindRoomPage extends StatefulWidget {
 }
 
 class _FindRoomPageState extends State<FindRoomPage> {
+  void _showSuccessSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF81C784),
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
   /// Convert this room's date + end time into a DateTime.
   DateTime? _slotEndDateTime(Room r) {
     try {
@@ -223,12 +244,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
         _slotReportCounts[key] = newCount;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)}) reported as locked',
-          ),
-        ),
+      _showSuccessSnack(
+        '${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)}) reported as locked',
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -239,36 +256,25 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
   Future<void> _checkIn(Room r) async {
     try {
-      // 1) Update Firestore user doc
       await UserService.instance.checkInToRoom(r);
-
-      // 2) Optimistic bump of local count
       r.currentCheckins = (r.currentCheckins) + 1;
-
-      // 3) Update local in-memory check-in state
       CheckInService.instance.checkIn(room: r);
 
-      // 4) Start countdown timer for the remaining duration of this slot
       final end = _slotEndDateTime(r);
-      final now = _now(); // uses DevConfig.now() (real or fake)
+      final now = _now();
       if (end != null) {
         final diff = end.difference(now);
         if (diff.inSeconds > 0) {
           TimerService.instance.start(diff);
         } else {
-          // slot already ended or invalid -> make sure timer is stopped
           TimerService.instance.stop();
         }
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'You checked into ${r.buildingCode}-${r.roomNumber} '
-            '(${_fmt(context, r.start)}-${_fmt(context, r.end)})',
-          ),
-        ),
+      _showSuccessSnack(
+        'You checked into ${r.buildingCode}-${r.roomNumber} '
+        '(${_fmt(context, r.start)}-${_fmt(context, r.end)})',
       );
     } catch (e) {
       if (!mounted) return;
@@ -279,7 +285,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
       );
     } finally {
       if (mounted) {
-        setState(() {}); // refresh buttons + counts if needed
+        setState(() {});
       }
     }
   }
@@ -300,12 +306,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
       CheckInService.instance.checkOut();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'You checked out of ${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)})',
-          ),
-        ),
+      _showSuccessSnack(
+        'You checked out of ${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)})',
       );
     } catch (e) {
       if (!mounted) return;
@@ -391,12 +393,23 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // final theme = Theme.of(context);
 
     final checkedIn = CheckInService.instance.checkedIn;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFF7F8EB), // lighter tint
+            Color(0xFFF1F3E0), // requested base color
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: Transform.translate(
@@ -408,7 +421,8 @@ class _FindRoomPageState extends State<FindRoomPage> {
         toolbarHeight: 100,
         title: const Text("Study Buddy"),
         centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         foregroundColor: Colors.black,
         titleTextStyle: const TextStyle(
           fontFamily: 'BrittanySignature',
@@ -468,17 +482,9 @@ class _FindRoomPageState extends State<FindRoomPage> {
                 ),
                 const SizedBox(height: 8),
 
-                // GOLD BACKGROUND CONTAINER
-                Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFADA7A),
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(25),
-                      bottom: Radius.circular(25),
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(16),
+                // Flatten: remove inner card background; render directly on gradient
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
                   child: FutureBuilder<RoomsPage>(
                     future: _futurePage,
                     builder: (context, snap) {
@@ -515,270 +521,55 @@ class _FindRoomPageState extends State<FindRoomPage> {
                         );
                       }
 
-                      // Group by "{buildingCode}-{roomNumber} | date"
-                      final Map<String, List<Room>> grouped = SplayTreeMap();
-                      for (final r in rooms) {
-                        final key =
-                            '${r.buildingCode}-${r.roomNumber} | ${r.date}';
-                        grouped.putIfAbsent(key, () => []).add(r);
-                      }
-
+                      // Render via RoomSlotCard component
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: grouped.length,
-                            itemBuilder: (context, i) {
-                              final entry = grouped.entries.elementAt(i);
-                              final header = entry.key;
-                              final slots = entry.value;
+                            itemCount: rooms.length,
+                            itemBuilder: (context, index) {
+                              final r = rooms[index];
 
-                              // Left = room label (e.g. "ECS-407")
-                              final parts = header.split('|');
-                              final left = parts[0].trim();
+                              final isActiveNow = _isSlotActiveNow(r);
+                              final isCurrent = CheckInService.instance.isCurrentRoom(r);
+                              final key = _slotKey(r);
 
-                              // Header shows first slot's time range instead of the date
-                              String headerTimeRange = '';
-                              if (slots.isNotEmpty) {
-                                final firstSlot = slots.first;
-                                headerTimeRange =
-                                    '${_fmt(context, firstSlot.start)} - ${_fmt(context, firstSlot.end)}';
-                              }
+                              final isReported = r.userHasReported || _reportedSlots.contains(key);
+                              final reportCount = _slotReportCounts[key] ?? r.lockedReports;
 
-                              return Container(
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFCF6DB),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.08),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: ExpansionTile(
-                                  tilePadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  childrenPadding: const EdgeInsets.only(
-                                    left: 16,
-                                    right: 16,
-                                    bottom: 16,
-                                    top: 8,
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          left,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontStyle: FontStyle.italic,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        headerTimeRange,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  children: [
-                                    ...slots.map((r) {
-                                      final isActiveNow = _isSlotActiveNow(r);
-                                      final isCurrent = CheckInService.instance
-                                          .isCurrentRoom(r);
-                                      final key = _slotKey(r);
+                              final canReportLocked = isActiveNow && !isReported;
+                              final canCheckInOut = isActiveNow;
+                              final showCheckOut = checkedIn && isCurrent;
 
-                                      final isReported = r.userHasReported ||
-                                          _reportedSlots.contains(key);
-
-                                      final reportCount =
-                                          _slotReportCounts[key] ??
-                                              r.lockedReports;
-                                      final hasAnyReports =
-                                          reportCount > 0;
-                                      final reportLabel =
-                                          '$reportCount Report${reportCount == 1 ? '' : 's'}';
-
-                                      // Locked button disabled if already reported OR slot not active
-                                      final shouldDisableLocked =
-                                          isReported || !isActiveNow;
-
-                                      final lockedButton = IgnorePointer(
-                                        ignoring: shouldDisableLocked,
-                                        child: Opacity(
-                                          opacity:
-                                              shouldDisableLocked ? 0.4 : 1.0,
-                                          child: GradientButton(
-                                            height: 35,
-                                            borderRadius:
-                                                BorderRadius.circular(12.0),
-                                            onPressed: () =>
-                                                _reportLocked(r),
-                                            child: const Text(
-                                              'Locked',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 16.0,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-
-                                      // Check-in / Check-out disabled if slot not active
-                                      final checkInOutButton = IgnorePointer(
-                                        ignoring: !isActiveNow,
-                                        child: Opacity(
-                                          opacity: !isActiveNow ? 0.4 : 1.0,
-                                          child: checkedIn && isCurrent
-                                              ? GradientButton(
-                                                  height: 35,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          12.0),
-                                                  onPressed: () =>
-                                                      _checkOut(r),
-                                                  child: const Text(
-                                                    'Check-out',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16.0,
-                                                    ),
-                                                  ),
-                                                )
-                                              : GradientButton(
-                                                  height: 35,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          12.0),
-                                                  onPressed: () =>
-                                                      _checkIn(r),
-                                                  child: const Text(
-                                                    'Check-in',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 16.0,
-                                                    ),
-                                                  ),
-                                                ),
-                                        ),
-                                      );
-
-                                      // === Check-in count label ===
-                                      final checkins = r.currentCheckins;
-                                      final checkinsLabel =
-                                          checkins == 0
-                                              ? 'No one checked in yet'
-                                              : '$checkins student${checkins == 1 ? '' : 's'} checked in';
-
-                                      return Container(
-                                        margin: const EdgeInsets.only(
-                                            bottom: 10),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withOpacity(0.05),
-                                              blurRadius: 3,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceEvenly,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Column(
-                                                  children: [
-                                                    lockedButton,
-                                                    if (hasAnyReports)
-                                                      Padding(
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .only(
-                                                                top: 4.0),
-                                                        child: Text(
-                                                          reportLabel,
-                                                          style:
-                                                              const TextStyle(
-                                                            color: Colors.red,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w600,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                checkInOutButton,
-                                              ],
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              checkinsLabel,
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.black54,
-                                                fontStyle: FontStyle.italic,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ],
-                                ),
+                              return RoomSlotCard(
+                                roomLabel: '${r.buildingCode}-${r.roomNumber}',
+                                timeRangeLabel: '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
+                                isActiveNow: isActiveNow,
+                                checkinsCount: r.currentCheckins,
+                                reportCount: reportCount,
+                                canReportLocked: canReportLocked,
+                                canCheckInOut: canCheckInOut,
+                                showCheckOut: showCheckOut,
+                                onReportLocked: () => _reportLocked(r),
+                                onCheckIn: () => _checkIn(r),
+                                onCheckOut: () => _checkOut(r),
                               );
                             },
                           ),
 
                           const SizedBox(height: 16),
                           Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
-                                onPressed: (_prevTokens.length > 1)
-                                    ? _goPrev
-                                    : null,
+                                onPressed: (_prevTokens.length > 1) ? _goPrev : null,
                                 icon: const Icon(Icons.chevron_left),
                                 label: const Text('Previous'),
                               ),
                               OutlinedButton.icon(
-                                onPressed: (_nextToken != null)
-                                    ? _goNext
-                                    : null,
+                                onPressed: (_nextToken != null) ? _goNext : null,
                                 icon: const Icon(Icons.chevron_right),
                                 label: const Text('Next'),
                               ),
@@ -795,6 +586,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
           ),
         ),
       ),
+    ),
     );
   }
 }

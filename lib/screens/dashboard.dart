@@ -5,7 +5,9 @@ import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
+import '../components/grad_button.dart';
 import 'dart:async';
+import 'dart:ui';
 import '../config/dev_config.dart';
 
 class Dashboard extends StatefulWidget {
@@ -82,7 +84,30 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     TimerService.instance.start(Duration(seconds: remaining));
   }
 
-  
+  Future<void> _autoCheckout() async {
+    try {
+      // 1. Update Firestore
+      await UserService.instance.checkOutFromRoom();
+
+      // 2. Update local state
+      CheckInService.instance.checkOut();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text("Your session has ended. You have been checked out."),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Auto-checkout failed: $e"),
+        ),
+      );
+    }
+  }
 
   void _onExternalChange() {
     if (!mounted) return;
@@ -111,90 +136,37 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _autoCheckout() async {
-  try {
-    // 1. Update Firestore
-    await UserService.instance.checkOutFromRoom();
+  Future<void> _checkOutRoom() async {
+    if (_checkingOut) return; // prevents double-taps
 
-    // 2. Update local state
-    CheckInService.instance.checkOut();
+    setState(() => _checkingOut = true);
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          "Your session has ended. You have been checked out.",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
+    try {
+      // 1) Update Firestore user document
+      await UserService.instance.checkOutFromRoom();
+
+      // 2) Update local in-memory service + stop timer
+      CheckInService.instance.checkOut();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("You have checked out of your current room."),
         ),
-        backgroundColor: const Color(0xFF81C784), // same green as other success bars
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to check out: $e"),
         ),
-        elevation: 8,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Auto-checkout failed: $e"),
-      ),
-    );
-  }
-}
-
-Future<void> _checkOutRoom() async {
-  if (_checkingOut) return; // prevents double-taps
-
-  setState(() => _checkingOut = true);
-
-  try {
-    // 1) Update Firestore user document
-    await UserService.instance.checkOutFromRoom();
-
-    // 2) Update local in-memory service + stop timer
-    CheckInService.instance.checkOut();
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          "You have checked out of your current room.",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        backgroundColor: const Color(0xFF81C784),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        elevation: 8,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  } catch (e) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Failed to check out: $e"),
-      ),
-    );
-  } finally {
-    if (mounted) {
-      setState(() => _checkingOut = false);
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _checkingOut = false);
+      }
     }
   }
-}
-
 
   String _formatTime(int totalSeconds) {
     if (totalSeconds < 0) totalSeconds = 0;
@@ -216,95 +188,151 @@ Future<void> _checkOutRoom() async {
 
   // ---- UI HELPERS (layout only, no logic changes) ----
 
-  Widget _buildActionCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    const iconColor = Color(0xFFF4A259); // warm orange
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: Ink(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFCF8),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFF6D7A8)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color.fromRGBO(247, 190, 120, 0.18),
-              offset: Offset(0, 5),
-              blurRadius: 14,
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: const Color(0xFFFFF1DE),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF3A3024),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF8C7A5A),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+ Widget _buildActionCard({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  required Color accent,   
+  required VoidCallback onTap,
+}) {
+  // light pastel background based on accent
+  final bg = Color.lerp(accent, Colors.white, 0.75)!; // still pastel but lighter
 
-  Widget _buildTimerCard(ThemeData theme, int secondsRemaining) {
-    const timerColor = Color(0xFFE57373);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+  return InkWell(
+    borderRadius: BorderRadius.circular(18),
+    onTap: onTap,
+    child: Ink(
       decoration: BoxDecoration(
-        color: const Color(0xFFFFDDD8),
-        borderRadius: BorderRadius.circular(14),
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Color.lerp(accent, Colors.white, 0.4)!),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withAlpha(45), // soft colored shadow
+            offset: const Offset(0, 5),
+            blurRadius: 14,
+          ),
+        ],
       ),
-      child: Row(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Icon(Icons.timer, color: timerColor, size: 22),
-          const SizedBox(width: 8),
-          Text(
-            'Session timer',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: timerColor,
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: accent.withAlpha(50),
+            child: Icon(
+              icon,
+              color: accent.withAlpha(225),
+              size: 20,
             ),
           ),
-          const Spacer(),
+          const SizedBox(height: 12),
           Text(
-            _formatTime(secondsRemaining),
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF604652),
+              //color: Color(0xFFA97155),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: timerColor,
+              fontSize: 12,
+              color: Color(0xFF8C7A5A),
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+
+Widget _buildTimerCard(ThemeData theme, int secondsRemaining) {
+  const pastel = Color(0xFFE57373); // your chosen timer color
+
+  // Create tinted glass variants
+  final glassBase       = pastel.withValues(alpha: 0.25);   // 25% tint
+  final glassHighlight  = pastel.withValues(alpha: 0.40);   // top
+  final glassShadow     = pastel.withValues(alpha: 0.18);   // bottom
+  final glassBorder     = pastel.withValues(alpha: 0.55);   // border
+
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(18),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+
+          // Main tinted glass color
+          color: glassBase,
+
+          // Gradient helps sell the glass look
+          gradient: LinearGradient(
+            colors: [
+              glassHighlight,
+              glassShadow,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+
+          // Colored border (soft and warm)
+          border: Border.all(
+            color: glassBorder,
+            width: 1.2,
+          ),
+
+          // Soft pastel shadow (not dark!)
+          boxShadow: [
+            BoxShadow(
+              color: pastel.withValues(alpha: 0.20),
+              offset: const Offset(0, 8),
+              blurRadius: 20,
+            ),
+          ],
+        ),
+
+        child: Row(
+          children: [
+            const Icon(Icons.timer, color: pastel, size: 22),
+            const SizedBox(width: 8),
+
+            Text(
+              "Session timer",
+              style: theme.textTheme.bodyMedium?.copyWith(
+                //fontWeight: FontWeight.bold,
+                fontFamily: "SuperLobster",
+                fontSize: 17,
+                color: pastel,
+              ),
+            ),
+
+            const Spacer(),
+
+            Text(
+              _formatTime(secondsRemaining),
+              style: const TextStyle(
+                //fontWeight: FontWeight.bold,
+                fontFamily: "SuperLobster",
+                fontSize: 18,
+                color: pastel,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
 
   Widget _buildStatusCard(
     ThemeData theme, {
@@ -358,25 +386,20 @@ Future<void> _checkOutRoom() async {
                   ),
                 ),
                 const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: _checkOutRoom,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF4A259),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
+                GradientButton(
+                  height: 30,
+                  borderRadius:
+                    BorderRadius.circular(12.0),
+                  onPressed: () =>
+                      _checkOutRoom(),
+                  child: const Text(
+                    'Check-out',
+                    style: TextStyle(
+                      fontFamily: 'SuperLobster',
+                      color: Colors.white,
+                      fontSize: 16.0,
                     ),
-                    textStyle: const TextStyle(
-                      fontSize: 16,
-                      fontFamily: "SuperLobster",
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    elevation: 2,
                   ),
-                  child: const Text("Check-out"),
                 ),
               ],
             )
@@ -419,7 +442,7 @@ Future<void> _checkOutRoom() async {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+            colors: [Color(0xFFFFFDF9), Color(0xFFFFF3E1)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -440,7 +463,7 @@ Future<void> _checkOutRoom() async {
                       "Hello, Student",
                       style: TextStyle(
                         fontFamily: "BrittanySignature",
-                        fontSize: 65,
+                        fontSize: 60,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -458,7 +481,7 @@ Future<void> _checkOutRoom() async {
                       ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -480,7 +503,7 @@ Future<void> _checkOutRoom() async {
                             vertical: 18,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF8E8),
+                            color: const Color(0xFFFFF1D5),
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
                               color: const Color(0xFFF6D7A8),
@@ -501,7 +524,8 @@ Future<void> _checkOutRoom() async {
                                 style:
                                     theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF3A3024),
+                                  fontSize: 20,
+                                  color: const Color(0xFF604652),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -515,6 +539,7 @@ Future<void> _checkOutRoom() async {
                               const SizedBox(height: 16),
 
                               // 2x2 GRID
+                              // 2x2 GRID
                               Row(
                                 children: [
                                   Expanded(
@@ -522,8 +547,8 @@ Future<void> _checkOutRoom() async {
                                       icon: Icons.manage_accounts_rounded,
                                       title: "Account Settings",
                                       subtitle: "Profile & preferences",
-                                      onTap: () => Navigator.pushNamed(
-                                          context, '/profile'),
+                                      accent: const Color(0xFFF08787), 
+                                      onTap: () => Navigator.pushNamed(context, '/profile'),
                                     ),
                                   ),
                                   const SizedBox(width: 16),
@@ -532,8 +557,8 @@ Future<void> _checkOutRoom() async {
                                       icon: Icons.group_rounded,
                                       title: "Find Study Group",
                                       subtitle: "Browse & join groups",
-                                      onTap: () => Navigator.pushNamed(
-                                          context, '/studygroup'),
+                                      accent: const Color(0xFFEDA35A),
+                                      onTap: () => Navigator.pushNamed(context, '/studygroup'),
                                     ),
                                   ),
                                 ],
@@ -546,8 +571,8 @@ Future<void> _checkOutRoom() async {
                                       icon: Icons.meeting_room_rounded,
                                       title: "Find Room",
                                       subtitle: "Locate study spaces",
-                                      onTap: () => Navigator.pushNamed(
-                                          context, '/rooms'),
+                                      accent: const Color(0xFFA3DC9A), 
+                                      onTap: () => Navigator.pushNamed(context, '/rooms'),
                                     ),
                                   ),
                                   const SizedBox(width: 16),
@@ -556,8 +581,8 @@ Future<void> _checkOutRoom() async {
                                       icon: Icons.event_note_rounded,
                                       title: "My Activities",
                                       subtitle: "Requests & invites",
-                                      onTap: () => Navigator.pushNamed(
-                                          context, '/activities'),
+                                      accent: const Color(0xFF9EC6F3), 
+                                      onTap: () => Navigator.pushNamed(context, '/activities'),
                                     ),
                                   ),
                                 ],
@@ -566,7 +591,7 @@ Future<void> _checkOutRoom() async {
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 30),
 
                         // TIMER (only when checked in)
                         if (checkedIn)
@@ -575,7 +600,7 @@ Future<void> _checkOutRoom() async {
                             TimerService.instance.secondsRemaining,
                           ),
 
-                        if (checkedIn) const SizedBox(height: 12),
+                        if (checkedIn) const SizedBox(height: 25),
 
                         // STATUS
                         _buildStatusCard(
