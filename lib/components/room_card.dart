@@ -15,7 +15,7 @@ class RoomSlotCard extends StatelessWidget {
   final VoidCallback onCheckOut;
   final Color accent;
 
-  static const double _actionHeight = 40.0;
+  static const double _actionHeight = 36.0;
 
   const RoomSlotCard({
     super.key,
@@ -36,7 +36,7 @@ class RoomSlotCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasReports = reportCount > 0;
-    final reportLabel = '$reportCount Report${reportCount == 1 ? '' : 's'}';
+    final reportLabel = '$reportCount Locked Report${reportCount == 1 ? '' : 's'}';
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -146,7 +146,7 @@ class RoomSlotCard extends StatelessWidget {
                                     'Locked',
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 15.0,
+                                      fontSize: 16.0,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -189,7 +189,7 @@ class RoomSlotCard extends StatelessWidget {
                             showCheckOut ? 'Check-out' : 'Check-in',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 15.0,
+                              fontSize: 16.0,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

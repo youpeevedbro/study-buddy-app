@@ -42,6 +42,26 @@ class _FindRoomPageState extends State<FindRoomPage> {
       ),
     );
   }
+  void _showLockedSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFFE57373),
+        margin: const EdgeInsets.only(bottom: 20, left: 16, right: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
   /// Convert this room's date + end time into a DateTime.
   DateTime? _slotEndDateTime(Room r) {
     try {
@@ -244,7 +264,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
         _slotReportCounts[key] = newCount;
       });
 
-      _showSuccessSnack(
+      _showLockedSnack(
         '${r.buildingCode}-${r.roomNumber} (${_fmt(context, r.start)}-${_fmt(context, r.end)}) reported as locked',
       );
     } catch (e) {
@@ -428,7 +448,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
           fontFamily: 'BrittanySignature',
           fontSize: 40,
           fontWeight: FontWeight.w500,
-          color: Colors.black,
+          color: Color(0xFF2F3E2F),
         ),
       ),
       body: SafeArea(
@@ -447,9 +467,10 @@ class _FindRoomPageState extends State<FindRoomPage> {
                     const Text(
                       "Find Room",
                       style: TextStyle(
-                        fontSize: 25,
+                        fontFamily: 'SuperLobster',
+                        fontSize: 35,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: Color(0xFF3A3024),
                       ),
                     ),
                     IconButton(
