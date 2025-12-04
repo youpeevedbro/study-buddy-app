@@ -106,7 +106,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   // ---------------------------------------------------------------------------
   // Time and Date
   // ---------------------------------------------------------------------------
-  // ----- date & time formatting helpers -----
   String _formatDate(String yyyymmdd) {
     try {
       final parsed = DateTime.parse(yyyymmdd);
@@ -240,7 +239,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
         incomingRequests.removeAt(index);
       });
 
-      // ✅ green success SnackBar
       _showSuccessSnackBar('Request accepted');
     } catch (e) {
       debugPrint("Failed to accept request: $e");
@@ -276,7 +274,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
         incomingRequests.removeAt(index);
       });
 
-      // ✅ green success SnackBar
       _showSuccessSnackBar('Request declined');
     } catch (e) {
       debugPrint("Failed to decline request: $e");
@@ -299,7 +296,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
         outgoingRequests.removeWhere((g) => g.id == groupId);
       });
 
-      // ✅ green success SnackBar
       _showSuccessSnackBar('Request cancelled');
     } catch (e) {
       debugPrint("Failed to cancel request: $e");
@@ -319,7 +315,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
         );
       });
 
-      // ✅ green success SnackBar
       _showSuccessSnackBar('Invite cancelled');
     } catch (e) {
       debugPrint("Failed to cancel invite: $e");
@@ -333,6 +328,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   // UI helpers
   // ---------------------------------------------------------------------------
   Widget _buildIncomingList() {
+    const cardBg = Color(0xFFFFF8E8);
     return Column(
       key: const ValueKey('incoming'),
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,7 +337,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
           'Swipe right to accept, left to decline.',
           style: TextStyle(
             fontSize: 14,
-            color: Colors.black54,
+            color: Color(0xFF8C7A5A),
             fontStyle: FontStyle.italic,
           ),
         ),
@@ -459,13 +455,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7EB), // ← match StudyGroups
+                        color: cardBg,
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
@@ -492,6 +488,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                                   style: const TextStyle(
                                     fontSize: 17,
                                     fontWeight: FontWeight.w700,
+                                    color: Color(0xFF3A3024),
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -499,7 +496,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                                   subtitleText,
                                   style: const TextStyle(
                                     fontSize: 14,
-                                    color: Colors.black87,
+                                    color: Color(0xFF5A4A36),
                                   ),
                                 ),
                               ],
@@ -524,6 +521,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   }
 
   Widget _buildOutgoingList() {
+    const cardBg = Color(0xFFFFF8E8);
     final hasAny =
         outgoingRequests.isNotEmpty || outgoingInvites.isNotEmpty;
 
@@ -549,6 +547,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
+              color: Color(0xFF3A3024),
             ),
           ),
           const SizedBox(height: 8),
@@ -561,14 +560,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7EB),
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 16,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 6),
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -595,6 +593,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
+                              color: Color(0xFF3A3024),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -602,7 +601,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                             "Owner: ${group.ownerDisplayName}",
                             style: const TextStyle(
                               fontSize: 14,
-                              color: Colors.black87,
+                              color: Color(0xFF5A4A36),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -611,7 +610,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                             "${_formatTime12(group.startTime)} - ${_formatTime12(group.endTime)}",
                             style: const TextStyle(
                               fontSize: 13,
-                              color: Colors.black54,
+                              color: Color(0xFF8C7A5A),
                             ),
                           ),
                         ],
@@ -643,8 +642,8 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                               borderRadius: BorderRadius.circular(50),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.12),
-                                  blurRadius: 6,
+                                  color: Colors.black.withOpacity(0.10),
+                                  blurRadius: 8,
                                   offset: const Offset(0, 3),
                                 ),
                               ],
@@ -674,6 +673,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
+              color: Color(0xFF3A3024),
             ),
           ),
           const SizedBox(height: 8),
@@ -690,14 +690,13 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7EB),
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.20),
-                      blurRadius: 16,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 6),
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -724,6 +723,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
+                              color: Color(0xFF3A3024),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -731,7 +731,7 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                             "Invited: $inviteeName ($inviteeHandle)",
                             style: const TextStyle(
                               fontSize: 14,
-                              color: Colors.black87,
+                              color: Color(0xFF5A4A36),
                             ),
                           ),
                         ],
@@ -754,8 +754,8 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                           borderRadius: BorderRadius.circular(50),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.12),
-                              blurRadius: 6,
+                              color: Colors.black.withOpacity(0.10),
+                              blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
                           ],
@@ -783,44 +783,49 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
   // ---------------------------------------------------------------------------
   // Build
   // ---------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Transform.translate(
-            offset: const Offset(3.0, 0),
-            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        toolbarHeight: 100,
-        title: const Text("Study Buddy"),
-        centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'BrittanySignature',
-          fontSize: 40,
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
+    return Container(
+      // FULL-SCREEN GRADIENT
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadActivities,
-        edgeOffset: 80, // prevents triggering system nav gesture
-        displacement: 40, // smaller refresh animation
-        child: Container(
-          // ← vertical gradient
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+      child: Scaffold(
+        backgroundColor: Colors.transparent, // let gradient show
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Transform.translate(
+              offset: const Offset(3.0, 0),
+              child: const Icon(Icons.arrow_back_ios, color: Colors.black),
             ),
+            onPressed: () => Navigator.pop(context),
           ),
+          toolbarHeight: 100,
+          title: const Text("Study Buddy"),
+          centerTitle: true,
+          backgroundColor: Colors.transparent, // sit over gradient
+          elevation: 0,
+          foregroundColor: Colors.black,
+          titleTextStyle: const TextStyle(
+            fontFamily: 'BrittanySignature',
+            fontSize: 40,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
+        ),
+        body: RefreshIndicator(
+          onRefresh: _loadActivities,
+          edgeOffset: 80,
+          displacement: 40,
           child: SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -845,131 +850,168 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
                           const Divider(thickness: 1.5, color: Colors.black),
                           const SizedBox(height: 20),
 
-                          // My Study Groups button
-                          GestureDetector(
-                            onTap: () =>
-                                Navigator.pushNamed(context, '/mystudygroups'),
-                            child: Container(
-                              height: 60,
-                              decoration: BoxDecoration(
-                                gradient: _brandGradient,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.orange.withOpacity(0.30),
-                                    blurRadius: 14,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              alignment: Alignment.center,
-                              child: const Text(
-                                "My Study Groups",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 30),
-
-                          // Incoming / Outgoing toggle
+                          // Card wrapping "My Study Groups" + tab toggle
                           Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 18,
+                            ),
                             decoration: BoxDecoration(
-                              gradient: _brandGradient,
-                              borderRadius: BorderRadius.circular(30),
-                              boxShadow: [
+                              color: const Color(0xFFFFF8E8),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: const Color(0xFFF6D7A8),
+                              ),
+                              boxShadow: const [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.15),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
+                                  color: Color.fromRGBO(244, 162, 97, 0.18),
+                                  offset: Offset(0, 8),
+                                  blurRadius: 18,
                                 ),
                               ],
                             ),
-                            padding: const EdgeInsets.all(3),
-                            child: Stack(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                AnimatedAlign(
-                                  duration: const Duration(milliseconds: 250),
-                                  curve: Curves.easeInOut,
-                                  alignment: _selectedTab == 0
-                                      ? Alignment.centerLeft
-                                      : Alignment.centerRight,
+                                // My Study Groups button
+                                GestureDetector(
+                                  onTap: () => Navigator.pushNamed(
+                                      context, '/mystudygroups'),
                                   child: Container(
-                                    height: 44,
-                                    width: MediaQuery.of(context).size.width /
-                                            2 -
-                                        28,
+                                    height: 56,
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFFFF7E0),
-                                      borderRadius: BorderRadius.circular(26),
+                                      gradient: _brandGradient,
+                                      borderRadius: BorderRadius.circular(16),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.20),
-                                          blurRadius: 16,
-                                          spreadRadius: 1,
-                                          offset: const Offset(0, 6),
+                                          color:
+                                              Colors.orange.withOpacity(0.25),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 5),
                                         ),
                                       ],
                                     ),
+                                    alignment: Alignment.center,
+                                    child: const Text(
+                                      "My Study Groups",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(26),
-                                        onTap: () {
-                                          setState(() => _selectedTab = 0);
-                                        },
-                                        child: SizedBox(
+
+                                const SizedBox(height: 24),
+
+                                // Incoming / Outgoing toggle
+                                Container(
+                                  decoration: BoxDecoration(
+                                    gradient: _brandGradient,
+                                    borderRadius: BorderRadius.circular(30),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.12),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(3),
+                                  child: Stack(
+                                    children: [
+                                      AnimatedAlign(
+                                        duration:
+                                            const Duration(milliseconds: 250),
+                                        curve: Curves.easeInOut,
+                                        alignment: _selectedTab == 0
+                                            ? Alignment.centerLeft
+                                            : Alignment.centerRight,
+                                        child: Container(
                                           height: 44,
-                                          child: Center(
-                                            child: Text(
-                                              "Incoming (${incomingRequests.length})",
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: _selectedTab == 0
-                                                    ? FontWeight.w700
-                                                    : FontWeight.w500,
-                                                color: _selectedTab == 0
-                                                    ? Colors.orange
-                                                    : Colors.white,
+                                          width: MediaQuery.of(context)
+                                                      .size
+                                                      .width /
+                                                  2 -
+                                              40,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF7E0),
+                                            borderRadius:
+                                                BorderRadius.circular(26),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.16),
+                                                blurRadius: 14,
+                                                offset: const Offset(0, 6),
                                               ),
-                                            ),
+                                            ],
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    Expanded(
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(26),
-                                        onTap: () {
-                                          setState(() => _selectedTab = 1);
-                                        },
-                                        child: SizedBox(
-                                          height: 44,
-                                          child: Center(
-                                            child: Text(
-                                              "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: _selectedTab == 1
-                                                    ? FontWeight.w700
-                                                    : FontWeight.w500,
-                                                color: _selectedTab == 1
-                                                    ? Colors.orange
-                                                    : Colors.white,
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: InkWell(
+                                              borderRadius:
+                                                  BorderRadius.circular(26),
+                                              onTap: () {
+                                                setState(
+                                                    () => _selectedTab = 0);
+                                              },
+                                              child: SizedBox(
+                                                height: 44,
+                                                child: Center(
+                                                  child: Text(
+                                                    "Incoming (${incomingRequests.length})",
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          _selectedTab == 0
+                                                              ? FontWeight.w700
+                                                              : FontWeight.w500,
+                                                      color: _selectedTab == 0
+                                                          ? Colors.orange
+                                                          : Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
+                                          Expanded(
+                                            child: InkWell(
+                                              borderRadius:
+                                                  BorderRadius.circular(26),
+                                              onTap: () {
+                                                setState(
+                                                    () => _selectedTab = 1);
+                                              },
+                                              child: SizedBox(
+                                                height: 44,
+                                                child: Center(
+                                                  child: Text(
+                                                    "Outgoing (${outgoingRequests.length + outgoingInvites.length})",
+                                                    style: TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          _selectedTab == 1
+                                                              ? FontWeight.w700
+                                                              : FontWeight.w500,
+                                                      color: _selectedTab == 1
+                                                          ? Colors.orange
+                                                          : Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -977,7 +1019,6 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
 
                           const SizedBox(height: 20),
 
-                          // Lists / loading (no Expanded, no inner RefreshIndicator)
                           if (_loading)
                             const Center(
                               child: Padding(
@@ -1010,4 +1051,5 @@ class _MyActivitiesPageState extends State<MyActivitiesPage> {
       ),
     );
   }
+
 }

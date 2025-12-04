@@ -158,8 +158,19 @@ class _FilterPageState extends State<FilterPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return FractionallySizedBox(
-      heightFactor: 0.7, 
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFF7F8EB),
+            Color(0xFFF1F3E0),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: FractionallySizedBox(
+      heightFactor: 0.7,
       child: Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -207,7 +218,7 @@ class _FilterPageState extends State<FilterPage> {
                 padding:
                     const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFCF6DB),
+                  color: const Color(0xFFF7F8EB),
                   border: Border.all(color: Colors.grey.shade400),
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -309,6 +320,7 @@ class _FilterPageState extends State<FilterPage> {
           ),
         ),
       ),
+    ),
     );
   }
 
@@ -326,7 +338,7 @@ class _FilterPageState extends State<FilterPage> {
                   data: ThemeData.light().copyWith(
                     colorScheme: const ColorScheme.light(
                       primary: Color(0xFFE7C144),
-                      surface: Color(0xFFFCF6DB),
+                      surface: Color(0xFFF7F8EB),
                       onSurface: Colors.black,
                     ),
                   ),
@@ -339,7 +351,7 @@ class _FilterPageState extends State<FilterPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFCF6DB),
+              color: const Color(0xFFF7F8EB),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.grey.shade400),
             ),

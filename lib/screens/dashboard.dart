@@ -1,12 +1,13 @@
 // lib/pages/dashboard.dart
 import 'package:flutter/material.dart';
-import 'package:study_buddy/components/square_button.dart';
 import 'package:study_buddy/components/cursive_divider.dart';
 import '../services/auth_service.dart';
 import '../services/timer_service.dart';
 import '../services/checkin_service.dart';
 import '../services/user_service.dart';
+import '../components/grad_button.dart';
 import 'dart:async';
+import 'dart:ui';
 import '../config/dev_config.dart';
 
 class Dashboard extends StatefulWidget {
@@ -17,6 +18,8 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
+  bool _checkingOut = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,8 +44,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
       });
     }
   }
-
-
 
   Future<void> _restoreCheckinFromProfile() async {
     final profile = await UserService.instance.getCurrentUserProfile();
@@ -83,7 +84,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     TimerService.instance.start(Duration(seconds: remaining));
   }
 
-
   Future<void> _autoCheckout() async {
     try {
       // 1. Update Firestore
@@ -95,11 +95,11 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("Your session has ended. You have been checked out."),
+          content:
+              Text("Your session has ended. You have been checked out."),
         ),
       );
     } catch (e) {
-      // Optional: handle failure silently or log it
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -136,9 +136,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
-
-  bool _checkingOut = false;
-
   Future<void> _checkOutRoom() async {
     if (_checkingOut) return; // prevents double-taps
 
@@ -171,7 +168,6 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
-
   String _formatTime(int totalSeconds) {
     if (totalSeconds < 0) totalSeconds = 0;
 
@@ -184,12 +180,250 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
 
     if (hours > 0) {
       final hh = hours.toString().padLeft(2, '0');
-      return "$hh:$mm:$ss";    // e.g. 07:59:41
+      return "$hh:$mm:$ss"; // e.g. 07:59:41
     } else {
-      return "$mm:$ss";        // e.g. 59:41
+      return "$mm:$ss"; // e.g. 59:41
     }
   }
 
+  // ---- UI HELPERS (layout only, no logic changes) ----
+
+ Widget _buildActionCard({
+  required IconData icon,
+  required String title,
+  required String subtitle,
+  required Color accent,   
+  required VoidCallback onTap,
+}) {
+  // light pastel background based on accent
+  final bg = Color.lerp(accent, Colors.white, 0.75)!; // still pastel but lighter
+
+  return InkWell(
+    borderRadius: BorderRadius.circular(18),
+    onTap: onTap,
+    child: Ink(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Color.lerp(accent, Colors.white, 0.4)!),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withAlpha(45), // soft colored shadow
+            offset: const Offset(0, 5),
+            blurRadius: 14,
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: accent.withAlpha(50),
+            child: Icon(
+              icon,
+              color: accent.withAlpha(225),
+              size: 20,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF604652),
+              //color: Color(0xFFA97155),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF8C7A5A),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+Widget _buildTimerCard(ThemeData theme, int secondsRemaining) {
+  const pastel = Color(0xFFE57373); // your chosen timer color
+
+  // Create tinted glass variants
+  final glassBase       = pastel.withValues(alpha: 0.25);   // 25% tint
+  final glassHighlight  = pastel.withValues(alpha: 0.40);   // top
+  final glassShadow     = pastel.withValues(alpha: 0.18);   // bottom
+  final glassBorder     = pastel.withValues(alpha: 0.55);   // border
+
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(18),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+
+          // Main tinted glass color
+          color: glassBase,
+
+          // Gradient helps sell the glass look
+          gradient: LinearGradient(
+            colors: [
+              glassHighlight,
+              glassShadow,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+
+          // Colored border (soft and warm)
+          border: Border.all(
+            color: glassBorder,
+            width: 1.2,
+          ),
+
+          // Soft pastel shadow (not dark!)
+          boxShadow: [
+            BoxShadow(
+              color: pastel.withValues(alpha: 0.20),
+              offset: const Offset(0, 8),
+              blurRadius: 20,
+            ),
+          ],
+        ),
+
+        child: Row(
+          children: [
+            const Icon(Icons.timer, color: pastel, size: 22),
+            const SizedBox(width: 8),
+
+            Text(
+              "Session timer",
+              style: theme.textTheme.bodyMedium?.copyWith(
+                //fontWeight: FontWeight.bold,
+                fontFamily: "SuperLobster",
+                fontSize: 17,
+                color: pastel,
+              ),
+            ),
+
+            const Spacer(),
+
+            Text(
+              _formatTime(secondsRemaining),
+              style: const TextStyle(
+                //fontWeight: FontWeight.bold,
+                fontFamily: "SuperLobster",
+                fontSize: 18,
+                color: pastel,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
+
+  Widget _buildStatusCard(
+    ThemeData theme, {
+    required bool checkedIn,
+    required String roomLabel,
+  }) {
+    const borderColor = Color(0xFFF6D7A8);
+    const bgChecked = Color(0xFFFFFCF8);
+       const bgNotChecked = Color(0xFFFFF4DD);
+    const accentText = Color(0xFF3A3024);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: checkedIn ? bgChecked : bgNotChecked,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      padding: const EdgeInsets.symmetric(
+        vertical: 12,
+        horizontal: 14,
+      ),
+      child: checkedIn
+          ? Row(
+              children: [
+                const Icon(
+                  Icons.meeting_room_outlined,
+                  color: Color(0xFFF4A259),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        roomLabel,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: accentText,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "You are currently checked into this room.",
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF8C7A5A),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GradientButton(
+                  height: 30,
+                  borderRadius:
+                    BorderRadius.circular(12.0),
+                  onPressed: () =>
+                      _checkOutRoom(),
+                  child: const Text(
+                    'Check-out',
+                    style: TextStyle(
+                      fontFamily: 'SuperLobster',
+                      color: Colors.white,
+                      fontSize: 16.0,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  color: Color(0xFFF4A259),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    "You are currently not checked into a room",
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: accentText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -204,166 +438,182 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
         : (currentLabel ?? "Room Number");
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 40),
-                const Text(
-                  "Hello, Student",
-                  style: TextStyle(
-                    fontFamily: "BrittanySignature",
-                    fontSize: 65,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 30),
-                const SizedBox(
-                  height: 60,
-                  width: double.infinity,
-                  child: CursiveDivider(
-                    color: Color(0xFFfcbf49),
-                    strokeWidth: 10,
-                  ),
-                ),
-                const SizedBox(height: 30),
-
-                // === Top row ===
-                Row(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFFFFFDF9), Color(0xFFFFF3E1)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // HEADER
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0, vertical: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: SquareButton(
-                        text: "Account\nSettings",
-                        onPressed: () => Navigator.pushNamed(context, '/profile'),
-                        backgroundColor: const Color(0xFFf79f79),
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      "Hello, Student",
+                      style: TextStyle(
+                        fontFamily: "BrittanySignature",
+                        fontSize: 60,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    
+
+                    SizedBox(
+                      height: 40,
+                      width: MediaQuery.of(context).size.width * 0.85,
+                      child: const CursiveDivider(
+                        color: Color(0xFFfcbf49),
+                        strokeWidth: 6,
                       ),
                     ),
-                    const SizedBox(width: 30),
-                    Expanded(
-                      child: SquareButton(
-                        text: "Find Study\nGroup",
-                        onPressed: () => Navigator.pushNamed(context, '/studygroup'),
-                        backgroundColor: const Color(0xFFf7d08a),
-                      ),
-                    ),
+
+                    const SizedBox(height: 20),
                   ],
                 ),
-                const SizedBox(height: 30),
+              ),
 
-                // === Bottom row ===
-                Row(
-                  children: [
-                    Expanded(
-                      child: SquareButton(
-                        text: "Find\nRoom",
-                        onPressed: () => Navigator.pushNamed(context, '/rooms'),
-                        backgroundColor: const Color(0xFFbfd7b5),
-                      ),
-                    ),
-                    const SizedBox(width: 30),
-                    Expanded(
-                      child: SquareButton(
-                        text: "My\nActivities",
-                        onPressed: () => Navigator.pushNamed(context, "/activities"),
-                        backgroundColor: const Color(0xFFffd6af),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 50),
-
-                // === Timer widget (visible only when checked in) ===
-                if (checkedIn)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    margin: const EdgeInsets.only(bottom: 15),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFDDD8),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
+              // BODY
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.fromLTRB(20.0, 0.0, 20.0, 24.0),
+                    child: Column(
                       children: [
-                        const Icon(Icons.timer, color: Color(0xFFE57373)),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Timer',
-                          style: TextStyle(
-                            fontFamily: 'SuperLobster',
-                            fontSize: 16,
-                            color: Color(0xFFE57373),
-                            fontWeight: FontWeight.bold,
+                        // QUICK ACTIONS CARD
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 18,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF1D5),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: const Color(0xFFF6D7A8),
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color.fromRGBO(244, 162, 97, 0.18),
+                                offset: Offset(0, 8),
+                                blurRadius: 18,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Quick actions",
+                                style:
+                                    theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 20,
+                                  color: const Color(0xFF604652),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Jump into the tools you use the most.",
+                                style:
+                                    theme.textTheme.bodySmall?.copyWith(
+                                  color: const Color(0xFF8C7A5A),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // 2x2 GRID
+                              // 2x2 GRID
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildActionCard(
+                                      icon: Icons.manage_accounts_rounded,
+                                      title: "Account Settings",
+                                      subtitle: "Profile & preferences",
+                                      accent: const Color(0xFFF08787), 
+                                      onTap: () => Navigator.pushNamed(context, '/profile'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildActionCard(
+                                      icon: Icons.group_rounded,
+                                      title: "Find Study Group",
+                                      subtitle: "Browse & join groups",
+                                      accent: const Color(0xFFEDA35A),
+                                      onTap: () => Navigator.pushNamed(context, '/studygroup'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildActionCard(
+                                      icon: Icons.meeting_room_rounded,
+                                      title: "Find Room",
+                                      subtitle: "Locate study spaces",
+                                      accent: const Color(0xFFA3DC9A), 
+                                      onTap: () => Navigator.pushNamed(context, '/rooms'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _buildActionCard(
+                                      icon: Icons.event_note_rounded,
+                                      title: "My Activities",
+                                      subtitle: "Requests & invites",
+                                      accent: const Color(0xFF9EC6F3), 
+                                      onTap: () => Navigator.pushNamed(context, '/activities'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const Spacer(),
-                        Text(
-                          _formatTime(TimerService.instance.secondsRemaining),
-                          style: const TextStyle(
-                            fontFamily: 'SuperLobster',
-                            fontSize: 18,
-                            color: Color(0xFFE57373),
-                            fontWeight: FontWeight.bold,
+
+                        const SizedBox(height: 30),
+
+                        // TIMER (only when checked in)
+                        if (checkedIn)
+                          _buildTimerCard(
+                            theme,
+                            TimerService.instance.secondsRemaining,
                           ),
+
+                        if (checkedIn) const SizedBox(height: 25),
+
+                        // STATUS
+                        _buildStatusCard(
+                          theme,
+                          checkedIn: checkedIn,
+                          roomLabel: roomLabel,
                         ),
                       ],
                     ),
                   ),
-
-                const SizedBox(height: 10),
-
-                // === Check-out / info section ===
-                Container(
-                  height: 60,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.secondaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: checkedIn
-                      ? Row(
-                    children: [
-                      const SizedBox(width: 15),
-                      Text(
-                        roomLabel, // ECS-228B
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      ElevatedButton(
-                        onPressed: _checkOutRoom,
-                        style: ElevatedButton.styleFrom(
-                          textStyle: const TextStyle(
-                            fontSize: 18,
-                            fontFamily: "SuperLobster",
-                          ),
-                        ),
-                        child: const Text("Check-out"),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                  )
-                      : const Center(
-                    child: Text(
-                      "You are currently not checked into a room",
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontFamily: 'SuperLobster',
-                        color: Colors.black,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

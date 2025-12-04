@@ -34,38 +34,41 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Transform.translate(
-            offset: const Offset(3.0, 0),
-            child: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        toolbarHeight: 100,
-        title: const Text("Study Buddy"),
-        centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
-        foregroundColor: Colors.black,
-        elevation: 0,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'BrittanySignature',
-          fontSize: 40,
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
+    // ⬇️ Move gradient to wrap the entire Scaffold so it also covers the AppBar area
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+      child: Scaffold(
+        backgroundColor: Colors
+            .transparent, // <-- important: let the gradient show through
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Transform.translate(
+              offset: const Offset(3.0, 0),
+              child: const Icon(Icons.arrow_back_ios, color: Colors.black),
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          toolbarHeight: 100,
+          title: const Text("Study Buddy"),
+          centerTitle: true,
+          backgroundColor: Colors
+              .transparent, // <-- transparent so gradient is visible behind AppBar
+          foregroundColor: Colors.black,
+          elevation: 0,
+          titleTextStyle: const TextStyle(
+            fontFamily: 'BrittanySignature',
+            fontSize: 40,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
           ),
         ),
-        child: SafeArea(
+        body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -96,7 +99,6 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
               ),
               const SizedBox(height: 16),
 
-              
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: GradientButton(
@@ -126,8 +128,8 @@ class _MyStudyGroupsPageState extends State<MyStudyGroupsPage> {
               // Groups list
               Expanded(
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0, vertical: 4),
                   child: Groups(key: _key),
                 ),
               ),
@@ -458,111 +460,186 @@ class _GroupPanelsState extends State<GroupPanels> {
   }
 
   void _showInviteDialog(StudyGroupResponse groupResp) {
-    _inviteHandleController.clear();
+  _inviteHandleController.clear();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: const Color(0xFFFFF7EB),
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            top: 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Invite by handle",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _inviteHandleController,
-                decoration: const InputDecoration(
-                  prefixText: '@',
-                  hintText: "student123",
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 12,
+  showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: const Color(0xFFFFF8E8), // soft cream (same as edit)
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            // extra bottom padding so keyboard doesn't crush content
+            padding: EdgeInsets.fromLTRB(
+              22,
+              22,
+              22,
+              MediaQuery.of(ctx).viewInsets.bottom + 18,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title
+                const Text(
+                  "Invite by handle",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF3A3024),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.send, size: 18),
-                  label: const Text("Send invite"),
-                  onPressed: () async {
-                    final handle = _inviteHandleController.text.trim();
-                    if (handle.isEmpty) return;
-
-                    try {
-                      
-                      await _service.inviteByHandle(groupResp.id, handle);
-                      if (!mounted) return;
-
-                      // close the sheet + refresh data
-                      Navigator.of(ctx).pop();
-                      _inviteHandleController.clear();
-                      _onReloadNeeded();
-
-                      
-                      _showSuccessSnackBar('Invite sent to @$handle');
-                    } catch (e) {
-                      if (!mounted) return;
-
-                      final String cleaned =
-                          e.toString().replaceFirst("Exception: ", "").trim();
-                      debugPrint('inviteByHandle error: $cleaned');
-
-                      String userMessage;
-                      final lower = cleaned.toLowerCase();
-
-                      if (lower.contains('time overlap')) {
-                        userMessage =
-                            '\nFor one of the following reason:\n\n-This user already has a study group at that time. \n\n -This user is a member of this study group.';
-                      } else if (lower.contains('handle not found') ||
-                          lower.contains('user not found') ||
-                          lower.contains('no user found') ||
-                          lower.contains('unknown handle')) {
-                        userMessage =
-                            'Unable to send invite.\nThat handle could not be found. Please check the spelling and try again.';
-                      } else if (lower.contains('already in this study group') ||
-                          lower.contains('already a member of this study group') ||
-                          lower.contains('already a member')) {
-                       
-                        userMessage = 'Already in this study group.';
-                      } else {
-                        userMessage = 'Unable to send invite.\n$cleaned';
-                      }
-
-                      await _showErrorPopup(userMessage);
-                    }
-                  },
+                const SizedBox(height: 4),
+                const Text(
+                  "Send an invite using the student's Study Buddy handle.",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF8C7A5A),
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 
-  
+                const SizedBox(height: 18),
+
+                // Handle field
+                TextField(
+                  controller: _inviteHandleController,
+                  decoration: InputDecoration(
+                    labelText: 'Handle',
+                    prefixText: '@',
+                    hintText: "student123",
+                    filled: true,
+                    fillColor: const Color(0xFFFFFCF8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFE5D3B2),
+                      ),
+                    ),
+                    focusedBorder: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                      borderSide: BorderSide(
+                        color: Color(0xFFF4A259),
+                        width: 1.6,
+                      ),
+                    ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 12,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Buttons row (Cancel + gradient Send invite)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF8C7A5A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 40,
+                      child: GradientButton(
+                        borderRadius: BorderRadius.circular(20),
+                        onPressed: () async {
+                          final handle =
+                              _inviteHandleController.text.trim();
+                          if (handle.isEmpty) return;
+
+                          try {
+                            await _service.inviteByHandle(
+                                groupResp.id, handle);
+                            if (!mounted) return;
+
+                            // close dialog + refresh + success snackbar
+                            Navigator.of(ctx).pop();
+                            _inviteHandleController.clear();
+                            _onReloadNeeded();
+                            _showSuccessSnackBar('Invite sent to @$handle');
+                          } catch (e) {
+                            if (!mounted) return;
+
+                            final String cleaned = e
+                                .toString()
+                                .replaceFirst("Exception: ", "")
+                                .trim();
+                            final lower = cleaned.toLowerCase();
+                            String userMessage;
+
+                            if (lower.contains('time overlap')) {
+                              userMessage =
+                                  '\nFor one of the following reason:\n\n'
+                                  '- This user already has a study group at that time.\n\n'
+                                  '- This user is a member of this study group.';
+                            } else if (lower.contains('handle not found') ||
+                                lower.contains('user not found') ||
+                                lower.contains('no user found') ||
+                                lower.contains('unknown handle')) {
+                              userMessage =
+                                  'Unable to send invite.\nThat handle could not be found. '
+                                  'Please check the spelling and try again.';
+                            } else if (lower
+                                    .contains('already in this study group') ||
+                                lower.contains(
+                                    'already a member of this study group') ||
+                                lower.contains('already a member')) {
+                              userMessage = 'Already in this study group.';
+                            } else {
+                              userMessage =
+                                  'Unable to send invite.\n$cleaned';
+                            }
+
+                            await _showErrorPopup(userMessage);
+                          }
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.send,
+                                size: 18, color: Colors.white),
+                            SizedBox(width: 6),
+                            Text(
+                              "Send invite",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -573,7 +650,7 @@ class _GroupPanelsState extends State<GroupPanels> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: const Color(0xFF81C784), 
+        backgroundColor: const Color(0xFF81C784),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(
@@ -585,64 +662,151 @@ class _GroupPanelsState extends State<GroupPanels> {
     );
   }
 
-  // Opens the bottom sheet with Invite / Edit / Delete
-  void _showOwnerActionsSheet(StudyGroupResponse groupResp) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      backgroundColor: const Color(0xFFFFF7EB),
-      builder: (ctx) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              const Text(
-                "Study Group Options",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+ 
+// Opens the bottom sheet with Invite / Edit / Delete
+void _showOwnerActionsSheet(StudyGroupResponse groupResp) {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent, // allow custom rounded surface
+    isScrollControlled: false,
+    builder: (ctx) {
+      return SafeArea(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 600, // nicer on tablets / landscape
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E8),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(26),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              const Divider(indent: 16, endIndent: 16),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // --- drag handle ---
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.brown.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
 
-              ListTile(
-                leading: const Icon(Icons.person_add_alt_1),
-                title: const Text("Invite By Handle"),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showInviteDialog(groupResp);
-                },
+                  // --- title + subtitle ---
+                  const Center(
+                    child: Text(
+                      "Study Group Options",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF3A3024),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
+                  const Divider(
+                    height: 1,
+                    color: Color(0xFFE5D3B2),
+                  ),
+                  const SizedBox(height: 4),
+
+                  // --- general actions ---
+                  _buildActionSheetTile(
+                    icon: Icons.person_add_alt_1,
+                    label: "Invite By Handle",
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showInviteDialog(groupResp);
+                    },
+                  ),
+                  _buildActionSheetTile(
+                    icon: Icons.edit_outlined,
+                    label: "Edit Group",
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showEditConfirmationDialog(context, groupResp);
+                    },
+                  ),
+
+                  const SizedBox(height: 4),
+
+
+                  // --- delete action in a soft red pill ---
+                  _buildActionSheetTile(
+                    icon: Icons.delete_outline,
+                    label: "Delete Group",
+                    isDestructive: true,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showDeleteConfirmationDialog(context, groupResp.id);
+                    },
+                  ),
+                ],
               ),
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text("Edit Group"),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showEditConfirmationDialog(context, groupResp);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text(
-                  "Delete Group",
-                  style: TextStyle(color: Colors.red),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showDeleteConfirmationDialog(context, groupResp.id);
-                },
-              ),
-              const SizedBox(height: 10),
-            ],
+            ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
+
+Widget _buildActionSheetTile({
+  required IconData icon,
+  required String label,
+  required VoidCallback onTap,
+  bool isDestructive = false,
+}) {
+  final Color accentColor =
+      isDestructive ? Colors.red.shade700 : const Color(0xFF3A3024);
+  final Color iconBg =
+      isDestructive ? const Color(0xFFFFECEB) : const Color(0xFFFFF1DE);
+
+  return ListTile(
+    contentPadding: const EdgeInsets.symmetric(vertical: 2),
+    leading: CircleAvatar(
+      radius: 18,
+      backgroundColor: iconBg,
+      child: Icon(
+        icon,
+        size: 20,
+        color: accentColor,
+      ),
+    ),
+    title: Text(
+      label,
+      style: TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: accentColor,
+      ),
+    ),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    onTap: onTap,
+    tileColor: isDestructive ? const Color(0xFFFFF3F0) : null,
+  );
+}
 
   Widget buildRolePill(String role) {
     Color bg;
@@ -684,40 +848,96 @@ class _GroupPanelsState extends State<GroupPanels> {
   // ---------------------------------------------------------------------------
 
   Future<void> _showDeleteConfirmationDialog(
-      BuildContext context, String groupID) async {
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title:
-              const Text('Are you sure you want to delete this Study Group?'),
-          content: const Text(
-              'This Study Group will be permanently deleted and all members will be disbanded.'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton(
-              onPressed: _isDeleting ? null : () => _handleDelete(groupID),
-              child: _isDeleting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+    BuildContext context, String groupID) async {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: const Color(0xFFFFF8E8), // soft cream
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Are you sure you want to delete this Study Group?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF3A3024),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'This Study Group will be permanently deleted and all members will be disbanded.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF8C7A5A),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // Buttons row (Cancel + gradient Delete)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed:
+                          _isDeleting ? null : () => Navigator.of(ctx).pop(),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF8C7A5A),
+                        ),
                       ),
-                    )
-                  : const Text("Delete"),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 40,
+                      child: GradientButton(
+                        borderRadius: BorderRadius.circular(20),
+                        onPressed: _isDeleting
+                            ? null
+                            : () {
+                                _handleDelete(groupID);
+                              },
+                        child: _isDeleting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Delete',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        );
-      },
-    );
-  }
+          ),
+        ),
+      );
+    },
+  );
+}
+
 
   Future<void> _handleDelete(String groupID) async {
     setState(() => _isDeleting = true);
@@ -836,66 +1056,147 @@ class _GroupPanelsState extends State<GroupPanels> {
   }
 
   Future<void> _showEditConfirmationDialog(
-      BuildContext context, StudyGroupResponse groupResp) async {
-    _groupNameController.text = groupResp.name;
-    return showDialog<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text("Editing Study Group: \n${groupResp.name}"),
-          contentPadding: const EdgeInsets.fromLTRB(22, 44.0, 22, 20.0),
-          content: Form(
-            key: _formKey,
-            child: TextFormField(
-              maxLength: 60,
-              controller: _groupNameController,
-              decoration: InputDecoration(
-                labelText: 'Study Group name..',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
+    BuildContext context, StudyGroupResponse groupResp) async {
+  _groupNameController.text = groupResp.name;
+  final theme = Theme.of(context);
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (BuildContext context) {
+      return Dialog(
+        backgroundColor: const Color(0xFFFFF8E8), // soft cream
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title + subtitle
+                const Text(
+                  "Edit Study Group",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF3A3024),
+                  ),
                 ),
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter some text';
-                }
-                return null;
-              },
+                const SizedBox(height: 4),
+                Text(
+                  groupResp.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF8C7A5A),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // Form field (same validation + controller)
+                Form(
+                  key: _formKey,
+                  child: TextFormField(
+                    maxLength: 60,
+              controller: _groupNameController,
+                    decoration: InputDecoration(
+                      labelText: 'Study Group name',
+                      filled: true,
+                      fillColor: const Color(0xFFFFFCF8),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFE5D3B2),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFF4A259),
+                          width: 1.6,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter some text';
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Buttons row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF8C7A5A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 40,
+                      child: GradientButton(
+                        width: 110,
+                        borderRadius: BorderRadius.circular(20),
+                        onPressed: _isEditing
+                            ? null
+                            : () {
+                                if (_formKey.currentState!.validate()) {
+                                  final groupUpdated = groupResp.copyWith(
+                                    name:
+                                        _groupNameController.text.trim(),
+                                  );
+                                  _handleUpdate(groupUpdated);
+                                }
+                              },
+                        child: _isEditing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Submit',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ElevatedButton(
-              onPressed: _isEditing
-                  ? null
-                  : () {
-                      if (_formKey.currentState!.validate()) {
-                        final groupUpdated = groupResp.copyWith(
-                            name: _groupNameController.text.trim());
-                        _handleUpdate(groupUpdated);
-                      }
-                    },
-              child: _isEditing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text("Submit"),
-            ),
-          ],
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
+
+
 
   Future<void> _handleUpdate(StudyGroupResponse groupUpdated) async {
     setState(() => _isEditing = true);
@@ -981,32 +1282,29 @@ class _GroupPanelsState extends State<GroupPanels> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Top row: name 
-                 Row(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    Expanded(
-      child: Text(
-        group.name,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: theme.colorScheme.onSurface,
-        ),
-      ),
-    ),
-    const SizedBox(width: 8),
-    Text(
-      formatDate(group.date),
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  ],
-),
-
-
-
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          group.name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        formatDate(group.date),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
 
                   const SizedBox(height: 10),
 
@@ -1039,266 +1337,288 @@ class _GroupPanelsState extends State<GroupPanels> {
                           ),
                         );
                       }
-final groupResponse = snap.data!;
-final bool isOwner = groupResponse.access == "owner";
-final bool isMember = groupResponse.access == "member";
-final int memberCount = (groupResponse.members?.length ?? 0);
+                      final groupResponse = snap.data!;
+                      final bool isOwner = groupResponse.access == "owner";
+                      final bool isMember = groupResponse.access == "member";
+                      final int memberCount =
+                          (groupResponse.members?.length ?? 0);
 
-return Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-    // 1) OWNER INFO directly under the group name
-    Text(
-      'Owned by: ${groupResponse.ownerDisplayName}',
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-    const SizedBox(height: 2),
-    Text(
-       '@${groupResponse.ownerHandle}',
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: Colors.black54,
-      ),
-    ),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // 1) OWNER INFO directly under the group name
+                          Text(
+                            'Owned by: ${groupResponse.ownerDisplayName}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${groupResponse.ownerHandle}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black54,
+                            ),
+                          ),
 
-    const SizedBox(height: 8),
+                          const SizedBox(height: 8),
 
-    // 2) Location + building info + time + members
-    FutureBuilder<String?>(
-      future: _service.getBuildingName(groupResponse.buildingCode),
-      builder: (context, buildingSnap) {
-        final buildingName =
-            buildingSnap.data ?? groupResponse.buildingCode;
+                          // 2) Location + building info + time + members
+                          FutureBuilder<String?>(
+                            future: _service
+                                .getBuildingName(groupResponse.buildingCode),
+                            builder: (context, buildingSnap) {
+                              final buildingName =
+                                  buildingSnap.data ?? groupResponse.buildingCode;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(
-                  Icons.location_on_outlined,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    "${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(
-                  Icons.apartment_rounded,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    buildingName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(
-                  Icons.access_time,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${formatTo12Hour(group.startTime)} - ${formatTo12Hour(group.endTime)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(
-                  Icons.group_outlined,
-                  size: 18,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Members: $memberCount',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-      },
-    ),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.location_on_outlined,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          "${groupResponse.buildingCode} - ${groupResponse.roomNumber}",
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.apartment_rounded,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          buildingName,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${formatTo12Hour(group.startTime)} - ${formatTo12Hour(group.endTime)}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.group_outlined,
+                                        size: 18,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Members: $memberCount',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
 
-    // 3) OWNER / MEMBER ACTIONS (unchanged)
-    if (isOwner) ...[
-      const SizedBox(height: 12),
-      const Divider(
-        color: Color(0x22000000),
-        thickness: 1,
-        height: 20,
-      ),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          SizedBox(
-            height: 36,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.group_outlined, size: 18),
-              label: const Text(
-                "View Members",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFB58A3A)),
-                backgroundColor: const Color(0xFFFFF7E0),
-                foregroundColor: const Color(0xFF8B6D41),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () async {
-                final membersRaw = groupResponse.members ?? [];
-                final memberNames =
-                    membersRaw.map((m) => m.toString()).toList();
+                          // 3) OWNER / MEMBER ACTIONS (unchanged)
+                          if (isOwner) ...[
+                            const SizedBox(height: 12),
+                            const Divider(
+                              color: Color(0x22000000),
+                              thickness: 1,
+                              height: 20,
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                SizedBox(
+                                  height: 36,
+                                  child: OutlinedButton.icon(
+                                    icon: const Icon(Icons.group_outlined,
+                                        size: 18),
+                                    label: const Text(
+                                      "View Members",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(
+                                          color: Color(0xFFB58A3A)),
+                                      backgroundColor:
+                                          const Color(0xFFFFF7E0),
+                                      foregroundColor:
+                                          const Color(0xFF8B6D41),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      final membersRaw =
+                                          groupResponse.members ?? [];
+                                      final memberNames = membersRaw
+                                          .map((m) => m.toString())
+                                          .toList();
 
-                await _showMembershipPopup(
-                  isOwner: true,
-                  ownerName: groupResponse.ownerDisplayName,
-                  members: memberNames,
-                );
-              },
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded, size: 22),
-            color: Colors.brown,
-            padding: EdgeInsets.zero,
-            onPressed: () => _showOwnerActionsSheet(groupResponse),
-            tooltip: "More actions",
-          ),
-        ],
-      ),
-    ],
+                                      await _showMembershipPopup(
+                                        isOwner: true,
+                                        ownerName:
+                                            groupResponse.ownerDisplayName,
+                                        members: memberNames,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.more_vert_rounded,
+                                      size: 22),
+                                  color: Colors.brown,
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () =>
+                                      _showOwnerActionsSheet(groupResponse),
+                                  tooltip: "More actions",
+                                ),
+                              ],
+                            ),
+                          ],
 
-    if (isMember) ...[
-      const SizedBox(height: 12),
-      const Divider(
-        color: Color(0x22000000),
-        thickness: 1,
-        height: 20,
-      ),
-      const SizedBox(height: 8),
-      Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFFAF0),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            SizedBox(
-              height: 36,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.group_outlined, size: 18),
-                label: const Text(
-                  "View Members",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFB58A3A)),
-                  backgroundColor: const Color(0xFFFFF7E0),
-                  foregroundColor: const Color(0xFF8B6D41),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () async {
-                  final membersRaw = groupResponse.members ?? [];
-                  final memberNames =
-                      membersRaw.map((m) => m.toString()).toList();
+                          if (isMember) ...[
+                            const SizedBox(height: 12),
+                            const Divider(
+                              color: Color(0x22000000),
+                              thickness: 1,
+                              height: 20,
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFFAF0),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 8),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  SizedBox(
+                                    height: 36,
+                                    child: OutlinedButton.icon(
+                                      icon: const Icon(Icons.group_outlined,
+                                          size: 18),
+                                      label: const Text(
+                                        "View Members",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(
+                                            color: Color(0xFFB58A3A)),
+                                        backgroundColor:
+                                            const Color(0xFFFFF7E0),
+                                        foregroundColor:
+                                            const Color(0xFF8B6D41),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      onPressed: () async {
+                                        final membersRaw =
+                                            groupResponse.members ?? [];
+                                        final memberNames = membersRaw
+                                            .map((m) => m.toString())
+                                            .toList();
 
-                  await _showMembershipPopup(
-                    isOwner: false,
-                    ownerName: groupResponse.ownerDisplayName,
-                    members: memberNames,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              height: 36,
-              child: ElevatedButton(
-                onPressed: () => _showLeaveConfirmationDialog(
-                  context,
-                  groupResponse.id,
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      const Color.fromARGB(255, 223, 75, 12),
-                  foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 2,
-                ),
-                child: const Text(
-                  "LEAVE",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  ],
-);
-
-
-
+                                        await _showMembershipPopup(
+                                          isOwner: false,
+                                          ownerName:
+                                              groupResponse.ownerDisplayName,
+                                          members: memberNames,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    height: 36,
+                                    child: ElevatedButton(
+                                      onPressed: () =>
+                                          _showLeaveConfirmationDialog(
+                                        context,
+                                        groupResponse.id,
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color.fromARGB(
+                                                255, 223, 75, 12),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 20),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        elevation: 2,
+                                      ),
+                                      child: const Text(
+                                        "LEAVE",
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
                     },
                   ),
                 ],
