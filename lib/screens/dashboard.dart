@@ -136,37 +136,51 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _checkOutRoom() async {
-    if (_checkingOut) return; // prevents double-taps
+ Future<void> _checkOutRoom() async {
+  if (_checkingOut) return; // prevents double-taps
 
-    setState(() => _checkingOut = true);
+  setState(() => _checkingOut = true);
 
-    try {
-      // 1) Update Firestore user document
-      await UserService.instance.checkOutFromRoom();
+  try {
+    // 1) Update Firestore user document
+    await UserService.instance.checkOutFromRoom();
 
-      // 2) Update local in-memory service + stop timer
-      CheckInService.instance.checkOut();
+    // 2) Update local in-memory service + stop timer
+    CheckInService.instance.checkOut();
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("You have checked out of your current room."),
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          "You have checked out of your current room.",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Failed to check out: $e"),
+        backgroundColor: const Color(0xFF81C784),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
         ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _checkingOut = false);
-      }
+        elevation: 8,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Failed to check out: $e"),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _checkingOut = false);
     }
   }
+}
 
   String _formatTime(int totalSeconds) {
     if (totalSeconds < 0) totalSeconds = 0;
