@@ -14,7 +14,10 @@
           "projectId": "studybuddy-e8dba",
           "configurations": {
             "android": "1:157338247439:android:6e54ab2d749eb1db089e7a",
-            "ios": "1:157338247439:ios:6d81784cf7ef2c97089e7a"
+            "ios": "1:157338247439:ios:6d81784cf7ef2c97089e7a",
+            "macos": "1:157338247439:ios:6d81784cf7ef2c97089e7a",
+            "web": "1:157338247439:web:a1e1b0fe95cbaa26089e7a",
+            "windows": "1:157338247439:web:cf0a388afe31843c089e7a"
           }
         }
       },
@@ -24,15 +27,29 @@
           "appId": "1:157338247439:android:6e54ab2d749eb1db089e7a",
           "fileOutput": "android/app/google-services.json"
         }
+      },
+      "macos": {
+        "default": {
+          "projectId": "studybuddy-e8dba",
+          "appId": "1:157338247439:ios:6d81784cf7ef2c97089e7a",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
       }
     }
   },
   "hosting": {
-    "public": "public",
+    "public": "build/web",
     "ignore": [
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   }
 }

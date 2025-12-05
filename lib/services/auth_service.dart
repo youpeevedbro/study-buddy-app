@@ -1,5 +1,6 @@
 // lib/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../config/app_config.dart';
@@ -25,10 +26,19 @@ class AuthService {
         'max_age': '0',             // require fresh auth
       });
 
-    // Step 1 — Perform sign-in via Firebase
-    final cred = await _auth.signInWithProvider(provider);
+    // --- Platform-specific sign-in ---
+    UserCredential cred;
+    if (kIsWeb) {
+      // Web: use popup/redirect flow from Firebase Auth Web SDK
+      // Popup is usually nicer; switch to signInWithRedirect if popups are blocked.
+      cred = await _auth.signInWithPopup(provider);
+      // cred = await _auth.signInWithRedirect(provider);
+    } else {
+      // iOS / Android / desktop: use the normal provider API
+      cred = await _auth.signInWithProvider(provider);
+    }
 
-    // Step 2 — Enforce required domain from .env (ALLOWED_EMAIL_DOMAIN)
+    // ---- Enforce required domain from .env (ALLOWED_EMAIL_DOMAIN)
     final email = cred.user?.email ?? '';
     final lower = email.toLowerCase();
 

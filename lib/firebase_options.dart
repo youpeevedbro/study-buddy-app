@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,15 +25,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -63,6 +54,33 @@ class DefaultFirebaseOptions {
     appId: '1:157338247439:android:6e54ab2d749eb1db089e7a',
     messagingSenderId: '157338247439',
     projectId: 'studybuddy-e8dba',
+    storageBucket: 'studybuddy-e8dba.firebasestorage.app',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAjYQbgTUhhBj2hIdB7afZJMjmMEbSxfaI',
+    appId: '1:157338247439:web:a1e1b0fe95cbaa26089e7a',
+    messagingSenderId: '157338247439',
+    projectId: 'studybuddy-e8dba',
+    authDomain: 'studybuddy-e8dba.firebaseapp.com',
+    storageBucket: 'studybuddy-e8dba.firebasestorage.app',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyBeKkAPruFxurNazCyDixK6d07sNnWwFnU',
+    appId: '1:157338247439:ios:6d81784cf7ef2c97089e7a',
+    messagingSenderId: '157338247439',
+    projectId: 'studybuddy-e8dba',
+    storageBucket: 'studybuddy-e8dba.firebasestorage.app',
+    iosBundleId: 'com.example.studyBuddy',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyAjYQbgTUhhBj2hIdB7afZJMjmMEbSxfaI',
+    appId: '1:157338247439:web:cf0a388afe31843c089e7a',
+    messagingSenderId: '157338247439',
+    projectId: 'studybuddy-e8dba',
+    authDomain: 'studybuddy-e8dba.firebaseapp.com',
     storageBucket: 'studybuddy-e8dba.firebasestorage.app',
   );
 

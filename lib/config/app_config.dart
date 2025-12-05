@@ -1,5 +1,5 @@
 import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AppConfig {
@@ -51,30 +51,45 @@ class AppConfig {
     microsoftTenantId = _read('MICROSOFT_TENANT_ID', def: '');
 
     // ---- App ----
-    // Reads ALLOWED_EMAIL_DOMAIN from .env; fallback is mostly irrelevant now
     allowedEmailDomain = _read('ALLOWED_EMAIL_DOMAIN', def: '@student.csulb.edu');
 
     // Prefer explicit .env overrides; otherwise pick per platform.
     final envBaseIOS     = dotenv.maybeGet('API_BASE_IOS')?.trim();
     final envBaseAndroid = dotenv.maybeGet('API_BASE_ANDROID')?.trim();
+    final envBaseWeb     = dotenv.maybeGet('API_BASE_WEB')?.trim();
     final envBaseGlobal  = dotenv.maybeGet('API_BASE')?.trim(); // optional fallback
 
-    if (Platform.isAndroid && envBaseAndroid != null && envBaseAndroid.isNotEmpty) {
+    // IMPORTANT: kIsWeb check must come BEFORE any Platform.* usage.
+    if (kIsWeb) {
+      // For web, either define API_BASE_WEB in .env,
+      // or just reuse API_BASE (point both at your Cloud Run URL).
+      apiBase = envBaseWeb ??
+          envBaseGlobal ??
+          'https://studybuddy-backend-157338247439.us-central1.run.app'; // <- put your prod backend here as last resort
+    } else if (Platform.isAndroid && envBaseAndroid != null && envBaseAndroid.isNotEmpty) {
       apiBase = envBaseAndroid;
     } else if ((Platform.isIOS || Platform.isMacOS) && envBaseIOS != null && envBaseIOS.isNotEmpty) {
       apiBase = envBaseIOS;
     } else if (envBaseGlobal != null && envBaseGlobal.isNotEmpty) {
       apiBase = envBaseGlobal;
-    } else if (kIsWeb) {
-      apiBase = 'http://localhost:8000';
     } else if (Platform.isAndroid) {
+      // Android emulator
       apiBase = 'http://10.0.2.2:8000';
     } else {
-      apiBase = 'http://127.0.0.1:8000'; // iOS simulator / macOS
+      // iOS simulator / macOS / other
+      apiBase = 'http://127.0.0.1:8000';
     }
 
-    debugPrint('✅ AppConfig: project=$firebaseProjectId apiBase=$apiBase '
-        'tenant=$microsoftTenantId postLogout=$aadPostLogoutUrl');
+    if (apiBase.isEmpty) {
+      throw StateError(
+        'No API base URL configured. Set API_BASE (and optionally API_BASE_WEB / API_BASE_ANDROID / API_BASE_IOS) in .env.',
+      );
+    }
+
+    debugPrint(
+      '✅ AppConfig: project=$firebaseProjectId apiBase=$apiBase '
+      'tenant=$microsoftTenantId postLogout=$aadPostLogoutUrl',
+    );
   }
 
   // Safe reader w/ default
