@@ -300,7 +300,7 @@ class _FilterPageState extends State<FilterPage> {
                     Expanded(
                       child: GradientButton(
                         width: double.infinity,
-                        height: 43,
+                        height: 45,
                         borderRadius: BorderRadius.circular(12.0),
                         onPressed: _applyFilters,
                         child: const Text(

@@ -96,112 +96,153 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        //title: const Text("Create Your Profile"),
-        toolbarHeight: 100,
-        title: const Text("Study Buddy"),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        titleTextStyle: const TextStyle(
-          fontFamily: 'BrittanySignature',
-          fontSize: 40,
-          fontWeight: FontWeight.w500,
-          color: Colors.black,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFFCF8), Color(0xFFFFF0C9)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 30),
-              const Text(
-                "Welcome to Study Buddy 👋",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          toolbarHeight: 100,
+          title: const Text("Study Buddy"),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          titleTextStyle: const TextStyle(
+            fontFamily: 'BrittanySignature',
+            fontSize: 40,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20.0),
+            physics: const BouncingScrollPhysics(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBF3),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.black.withOpacity(0.05),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                "Before you begin, create your public profile. "
-                "Your handle and display name will be visible to other students.",
-                style: TextStyle(fontSize: 15),
-              ),
-              const SizedBox(height: 25),
-
-              // DISPLAY NAME
-              TextFormField(
-                controller: _displayNameController,
-                decoration: const InputDecoration(
-                  labelText: "Display Name",
-                  border: OutlineInputBorder(),
-                ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return "Display name required";
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // HANDLE
-              TextFormField(
-                controller: _handleController,
-                decoration: InputDecoration(
-                  labelText: "Handle (unique username)",
-                  border: const OutlineInputBorder(),
-                  prefixText: '@ ',
-                  suffixIcon: _checkingHandle
-                      ? const Padding(
-                          padding: EdgeInsets.all(10.0),
-                          child: SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : null,
-                  errorText: _handleError,
-                ),
-                onChanged: (_) {
-                  // Clear error when typing again
-                  setState(() => _handleError = null);
-                },
-                onEditingComplete: _checkHandleUniqueness,
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) {
-                    return "Handle required";
-                  }
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 30),
-
-              // BUTTON
-              SizedBox(
-                width: double.infinity,
-                child: GradientButton(
-                  height: 50,
-                  borderRadius:
-                  BorderRadius.circular(12.0),
-                  onPressed: () => _submit(),
-                  child: const Text(
-                    'Create Profile',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18.0,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    const Text(
+                      "Welcome to Study Buddy 👋",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Before you begin, create your public profile. Your handle and display name will be visible to other students.",
+                      style: TextStyle(fontSize: 15),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // DISPLAY NAME
+                    TextFormField(
+                      controller: _displayNameController,
+                      decoration: InputDecoration(
+                        labelText: "Display Name",
+                        filled: true,
+                        fillColor: Colors.white,
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.grey.withOpacity(0.5),
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Display name required";
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // HANDLE
+                    TextFormField(
+                      controller: _handleController,
+                      decoration: InputDecoration(
+                        labelText: "Handle (unique username)",
+                        prefixText: '@ ',
+                        filled: true,
+                        fillColor: Colors.white,
+                        disabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: Colors.grey.withOpacity(0.5),
+                          ),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        suffixIcon: _checkingHandle
+                            ? const Padding(
+                                padding: EdgeInsets.all(10.0),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                        errorText: _handleError,
+                      ),
+                      onChanged: (_) {
+                        setState(() => _handleError = null);
+                      },
+                      onEditingComplete: _checkHandleUniqueness,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return "Handle required";
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // BUTTON
+                    SizedBox(
+                      width: double.infinity,
+                      child: GradientButton(
+                        height: 50,
+                        borderRadius: BorderRadius.circular(12.0),
+                        onPressed: () => _submit(),
+                        child: const Text(
+                          'Create Profile',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

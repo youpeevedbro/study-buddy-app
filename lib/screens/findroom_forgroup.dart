@@ -1,14 +1,14 @@
-// lib/pages/findroom.dart
-import 'dart:collection';
+// lib/pages/findroom_forgroup.dart
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'filter_forgroup.dart';
-import '../components/grad_button.dart';
+import '../components/room_card.dart';
 import '../services/api.dart';
 import '../models/room.dart';
 import '../models/group.dart';
+import '../services/building_service.dart';
 
 class FindRoomForGroupPage extends StatefulWidget {
   final SelectedGroupFields initialFilters;
@@ -26,23 +26,61 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
 
   // --- Filters from FilterPageForGroup ---
   FilterCriteriaForGroup? _currentFilter;
-
+  
   // --- Future for the current page ---
   Future<RoomsPage>? _futurePage;
+
+  // --- Building code -> name map ---
+  final Map<String, String> _buildingNameByCode = {};
 
   @override
   void initState() {
     super.initState();
 
-    // Default: FREE AT NOW on the chosen date
-    final now = TimeOfDay.now();
+    // Initialize filters from incoming group flow
+    final DateTime initialDate = widget.initialFilters.date ?? DateTime.now();
     _currentFilter = FilterCriteriaForGroup(
-      date: widget.initialFilters.date!,
-      startTime: now,
-      endTime: null,
+      buildingCode: widget.initialFilters.building,
+      date: initialDate,
+      startTime: widget.initialFilters.startTime,
+      endTime: widget.initialFilters.endTime,
     );
 
+    // Start first page fetch
     _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
+
+    // Load buildings and build mapping
+    _loadBuildings();
+  }
+
+  Future<void> _loadBuildings() async {
+    try {
+      final list = await BuildingService.fetchBuildings();
+      final map = <String, String>{};
+      for (final b in list) {
+        map[b.code] = b.name;
+      }
+      if (!mounted) return;
+      setState(() {
+        _buildingNameByCode
+          ..clear()
+          ..addAll(map);
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('>>> Failed to load buildings: $e');
+    }
+  }
+
+  // Reload from first page (after setting/changing filters or on retry)
+  void _reload() {
+    _nextToken = null;
+    _prevTokens
+      ..clear()
+      ..add(null);
+    setState(() {
+      _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
+    });
   }
 
   // -------- Helpers to read values from FilterCriteriaForGroup safely --------
@@ -74,71 +112,49 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
     return null;
   }
 
-  // Unique key for a specific time slot (room + date + time)
-  String _slotKey(Room r) =>
-      '${r.buildingCode}-${r.roomNumber}|${r.date}|${r.start}-${r.end}';
-
   // Pretty formatter "HH:mm" -> localized time (e.g. "3:00 PM")
   String _fmt(BuildContext context, String hhmm) {
     final parts = hhmm.split(':');
     if (parts.length != 2) return hhmm;
-
     final hour = int.tryParse(parts[0]) ?? 0;
     final minute = int.tryParse(parts[1]) ?? 0;
-
     final dt = DateTime(2025, 1, 1, hour, minute);
     return TimeOfDay.fromDateTime(dt).format(context);
   }
 
-  TimeOfDay _hhmmToTimeOfDay(String t) {
-    final parts = t.split(':');
-    if (parts.length != 2) {
-      return const TimeOfDay(hour: 0, minute: 0);
-    }
-
-    final hour = int.tryParse(parts[0]) ?? 0;
-    final minute = int.tryParse(parts[1]) ?? 0;
-
-    return TimeOfDay(hour: hour, minute: minute);
-  }
-
+  // Date formatter for labels
   String _formatDate(DateTime d) {
-    DateFormat formatted_date = DateFormat('yyyy-MM-dd');
-    return formatted_date.format(d);
+    return DateFormat('EEEE, MMM d, yyyy').format(d);
   }
 
-  // ---------- helpers to determine if a slot is already closed ----------
-
-  /// Convert this room slot's date + end time into a DateTime.
-  DateTime? _slotEndDateTime(Room r) {
-    try {
-      if (r.date.isEmpty || r.end.isEmpty) return null;
-
-      // r.date is "yyyy-MM-dd"
-      final dateParts = r.date.split('-');
-      if (dateParts.length != 3) return null;
-      final year = int.parse(dateParts[0]);
-      final month = int.parse(dateParts[1]);
-      final day = int.parse(dateParts[2]);
-
-      // r.end is "HH:mm"
-      final timeParts = r.end.split(':');
-      if (timeParts.length != 2) return null;
-      final hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-
-      return DateTime(year, month, day, hour, minute);
-    } catch (_) {
-      return null;
-    }
+  // Convert "HH:mm" -> TimeOfDay
+  TimeOfDay _hhmmToTimeOfDay(String hhmm) {
+    final parts = hhmm.split(':');
+    final h = int.tryParse(parts.elementAt(0)) ?? 0;
+    final m = int.tryParse(parts.elementAt(1)) ?? 0;
+    return TimeOfDay(hour: h, minute: m);
   }
 
-  /// Returns true if this slot has fully ended (end < now).
+  // For group selection, allow adding any slot; if you want to disable past slots,
+  // treat a slot as closed when end time is earlier than now on the selected date.
   bool _isSlotClosed(Room r) {
-    final end = _slotEndDateTime(r);
-    if (end == null) return false; // if data is weird, keep it selectable
-    final now = DateTime.now();
-    return end.isBefore(now);
+    try {
+      final dateStr = _dateFrom(_currentFilter);
+      if (dateStr == null || dateStr.isEmpty) return false;
+      final parts = dateStr.split('-');
+      if (parts.length != 3) return false;
+      final year = int.parse(parts[0]);
+      final month = int.parse(parts[1]);
+      final day = int.parse(parts[2]);
+      final endParts = r.end.split(':');
+      if (endParts.length != 2) return false;
+      final eh = int.parse(endParts[0]);
+      final em = int.parse(endParts[1]);
+      final endDt = DateTime(year, month, day, eh, em);
+      return DateTime.now().isAfter(endDt);
+    } catch (_) {
+      return false;
+    }
   }
 
   // Core fetch with current filters
@@ -167,17 +183,6 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
       print(">>> API ERROR (listRoomsPage): $e");
       rethrow;
     }
-  }
-
-  // Reload from first page (after setting/changing filters or on retry)
-  void _reload() {
-    _nextToken = null;
-    _prevTokens
-      ..clear()
-      ..add(null);
-    setState(() {
-      _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
-    });
   }
 
   // UI: open filter bottom sheet
@@ -264,10 +269,21 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    // final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFF7F8EB),
+            Color(0xFFF1F3E0),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         leading: IconButton(
           icon: Transform.translate(
@@ -279,8 +295,9 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
         toolbarHeight: 100,
         title: const Text("Study Buddy"),
         centerTitle: true,
-        backgroundColor: theme.scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.black,
+        elevation: 0,
         titleTextStyle: const TextStyle(
           fontFamily: 'BrittanySignature',
           fontSize: 40,
@@ -305,9 +322,10 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                     const Text(
                       "Find a time slot",
                       style: TextStyle(
-                        fontSize: 25,
+                        fontFamily: 'SuperLobster',
+                        fontSize: 30,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        color: Color(0xFF3A3024),
                       ),
                     ),
                     IconButton(
@@ -331,17 +349,9 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                 ),
                 const SizedBox(height: 8),
 
-                // GOLD BACKGROUND CONTAINER
-                Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFADA7A),
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(25),
-                      bottom: Radius.circular(25),
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(16),
+                // Flatten: render directly on gradient like FindRoom
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
                   child: FutureBuilder<RoomsPage>(
                     future: _futurePage,
                     builder: (context, snap) {
@@ -378,166 +388,59 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
                         );
                       }
 
-                      // Group by "{buildingCode}-{roomNumber} | date"
-                      final Map<String, List<Room>> grouped = SplayTreeMap();
-                      for (final r in rooms) {
-                        final key =
-                            '${r.buildingCode}-${r.roomNumber} | ${r.date}';
-                        grouped.putIfAbsent(key, () => []).add(r);
-                      }
-
+                      // Flatten list: render each slot as a standalone RoomSlotCard
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: grouped.length,
+                            itemCount: rooms.length,
                             itemBuilder: (context, i) {
-                              final entry = grouped.entries.elementAt(i);
-                              final header = entry.key;
-                              final slots = entry.value;
+                              final r = rooms[i];
+                              final isClosed = _isSlotClosed(r);
 
-                              final parts = header.split('|');
-                              final left = parts[0].trim();
-                              final right =
-                                  (parts.length > 1) ? parts[1].trim() : '';
-
-                              return Container(
-                                margin: const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFCF6DB),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.08),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: ExpansionTile(
-                                  tilePadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  childrenPadding: const EdgeInsets.only(
-                                    left: 16,
-                                    right: 16,
-                                    bottom: 16,
-                                    top: 8,
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          left,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontStyle: FontStyle.italic,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        right,
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  children: [
-                                    ...slots.map((r) {
-                                      final isClosed = _isSlotClosed(r);
-
-                                      Widget innerRow = Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w600,
-                                              color: isClosed
-                                                  ? Colors.grey
-                                                  : Colors.black,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          GradientButton(
-                                            width: 100,
-                                            height: 35,
-                                            borderRadius:
-                                                BorderRadius.circular(12.0),
-                                            onPressed: isClosed
-                                                ? null
-                                                : () {
-                                                    final fields =
-                                                        SelectedGroupFields(
-                                                      date:
-                                                          _currentFilter!.date,
-                                                      building: r.buildingCode,
-                                                      roomNumber: r.roomNumber,
-                                                      startTime:
-                                                          _hhmmToTimeOfDay(
-                                                              r.start),
-                                                      endTime:
-                                                          _hhmmToTimeOfDay(
-                                                              r.end),
-                                                      availabilitySlotDoc:
-                                                          r.id,
-                                                    );
-                                                    Navigator.pop(
-                                                        context, fields);
-                                                  },
-                                            child: const Text(
-                                              '+Add',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 16.0,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-
-                                      if (isClosed) {
-                                        innerRow = IgnorePointer(
-                                          child: Opacity(
-                                            opacity: 0.45,
-                                            child: innerRow,
-                                          ),
+                              Widget card = RoomSlotCard(
+                                roomLabel: '${r.buildingCode}-${r.roomNumber}',
+                                buildingName: _buildingNameByCode[r.buildingCode],
+                                timeRangeLabel: '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
+                                isActiveNow: !isClosed,
+                                checkinsCount: r.currentCheckins,
+                                reportCount: r.lockedReports,
+                                canReportLocked: false,
+                                canCheckInOut: false,
+                                showCheckOut: false,
+                                onReportLocked: () {},
+                                onCheckIn: () {},
+                                onCheckOut: () {},
+                                groupMode: true,
+                                onAdd: isClosed
+                                    ? null
+                                    : () {
+                                        final fields = SelectedGroupFields(
+                                          date: _currentFilter!.date,
+                                          building: r.buildingCode,
+                                          roomNumber: r.roomNumber,
+                                          startTime: _hhmmToTimeOfDay(r.start),
+                                          endTime: _hhmmToTimeOfDay(r.end),
+                                          availabilitySlotDoc: r.id,
                                         );
-                                      }
+                                        Navigator.pop(context, fields);
+                                      },
+                              );
 
-                                      return Container(
-                                        margin:
-                                            const EdgeInsets.only(bottom: 10),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withOpacity(0.05),
-                                              blurRadius: 3,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: innerRow,
-                                      );
-                                    }).toList(),
-                                  ],
-                                ),
+                              if (isClosed) {
+                                card = IgnorePointer(
+                                  child: Opacity(
+                                    opacity: 0.45,
+                                    child: card,
+                                  ),
+                                );
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                child: card,
                               );
                             },
                           ),
@@ -574,6 +477,7 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

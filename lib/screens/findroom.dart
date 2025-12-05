@@ -13,6 +13,7 @@ import '../services/user_service.dart';
 import '../services/timer_service.dart';
 import '../config/dev_config.dart';
 import '../components/room_card.dart';
+import '../services/building_service.dart';
 
 class FindRoomPage extends StatefulWidget {
   const FindRoomPage({super.key});
@@ -123,6 +124,9 @@ class _FindRoomPageState extends State<FindRoomPage> {
   final Set<String> _reportedSlots = <String>{};
   final Map<String, int> _slotReportCounts = <String, int>{};
 
+  // --- Building code -> name map ---
+  final Map<String, String> _buildingNameByCode = {};
+
   @override
   void initState() {
     super.initState();
@@ -136,11 +140,33 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
     _futurePage = _fetchPage(limit: _pageSize, pageToken: null);
     CheckInService.instance.addListener(_onCheckinChange);
+
+    // Load building names for display
+    _loadBuildings();
   }
 
   void _onCheckinChange() {
     if (!mounted) return;
     setState(() {});
+  }
+
+  Future<void> _loadBuildings() async {
+    try {
+      final list = await BuildingService.fetchBuildings();
+      final map = <String, String>{};
+      for (final b in list) {
+        map[b.code] = b.name;
+      }
+      if (!mounted) return;
+      setState(() {
+        _buildingNameByCode
+          ..clear()
+          ..addAll(map);
+      });
+    } catch (e) {
+      // ignore: avoid_print
+      print('>>> Failed to load buildings: $e');
+    }
   }
 
   @override
@@ -566,6 +592,7 @@ class _FindRoomPageState extends State<FindRoomPage> {
 
                               return RoomSlotCard(
                                 roomLabel: '${r.buildingCode}-${r.roomNumber}',
+                                buildingName: _buildingNameByCode[r.buildingCode],
                                 timeRangeLabel: '${_fmt(context, r.start)} - ${_fmt(context, r.end)}',
                                 isActiveNow: isActiveNow,
                                 checkinsCount: r.currentCheckins,
