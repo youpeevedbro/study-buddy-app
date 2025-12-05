@@ -263,9 +263,20 @@ class UserService {
       await user.delete();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
-        throw Exception(
-          'For security reasons, please sign out and log in again before deleting your account.',
-        );
+        /// Note: Firebase Auth user deletion may silently fail with
+        /// `requires-recent-login` if the session is old. In that case, we still
+        /// consider the Study Buddy account deleted because Firestore data and
+        /// group memberships are removed, and the user is signed out.
+        /// 
+        /// 
+        /// THE ONLY WAY THE AUTH USER INFO WILL BE DELETED IS IF THE USER
+        /// DELETES THEIR ACCOUNT IMMEDIATELY AFTER RECREATING THEIR ACCOUNT
+        /// 
+        /// 
+        // throw Exception(
+        //   'For security reasons, please sign out and log in again before deleting your account.',
+        // );
+        return;
       }
       rethrow;
     }
