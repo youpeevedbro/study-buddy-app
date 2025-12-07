@@ -245,7 +245,7 @@ class _DashboardState extends State<Dashboard> with WidgetsBindingObserver {
           Text(
             title,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.w600,
               color: Color(0xFF604652),
               //color: Color(0xFFA97155),
