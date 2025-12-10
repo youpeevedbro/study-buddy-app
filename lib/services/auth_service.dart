@@ -17,6 +17,33 @@ class AuthService {
   /// Returns true if a Firebase user is currently signed in.
   Future<bool> isLoggedIn() async => _auth.currentUser != null;
 
+  /// Helper: check if an email is in one of the allowed domains.
+  bool _isAllowedEmail(String email) {
+    final lower = email.trim().toLowerCase();
+    if (lower.isEmpty) return false;
+
+    final domains = AppConfig.allowedEmailDomains;
+    if (domains.isNotEmpty) {
+      return domains.any((suffix) => lower.endsWith(suffix.toLowerCase()));
+    }
+
+    // Fallback: legacy single domain
+    final single = AppConfig.allowedDomain.trim().toLowerCase();
+    if (single.isEmpty) return true; // no restriction configured
+    return lower.endsWith(single);
+  }
+
+  String _allowedDomainDescription() {
+    final domains = AppConfig.allowedEmailDomains;
+    if (domains.isNotEmpty) {
+      // domains already include '@'
+      if (domains.length == 1) return domains.first;
+      if (domains.length == 2) return '${domains[0]} or ${domains[1]}';
+      return domains.join(', ');
+    }
+    return AppConfig.allowedDomain;
+  }
+
   /// Sign in with CSULB SSO (OIDC via Firebase) with a forced fresh prompt.
   /// Provider ID must match Firebase Auth → OpenID Connect config.
   Future<UserCredential> signInWithCsulb() async {
@@ -38,17 +65,14 @@ class AuthService {
       cred = await _auth.signInWithProvider(provider);
     }
 
-    // ---- Enforce required domain from .env (ALLOWED_EMAIL_DOMAIN)
+    // ---- Enforce allowed domains from AppConfig (multi-domain aware)
     final email = cred.user?.email ?? '';
-    final lower = email.toLowerCase();
-
-    if (AppConfig.allowedDomain.isNotEmpty &&
-        !lower.endsWith(AppConfig.allowedDomain.trim().toLowerCase())) {
+    if (!_isAllowedEmail(email)) {
       await _auth.signOut();
 
       throw FirebaseAuthException(
         code: 'invalid-email-domain',
-        message: 'Use your ${AppConfig.allowedDomain} email address.',
+        message: 'Use your ${_allowedDomainDescription()} email address.',
       );
     }
 
@@ -65,8 +89,16 @@ class AuthService {
     required String email,
     required String password,
   }) {
+    final e = email.trim().toLowerCase();
+    if (!_isAllowedEmail(e)) {
+      throw FirebaseAuthException(
+        code: 'invalid-email-domain',
+        message: 'Use your ${_allowedDomainDescription()} email address.',
+      );
+    }
+
     return _auth.signInWithEmailAndPassword(
-      email: email.trim().toLowerCase(),
+      email: e,
       password: password,
     );
   }
@@ -88,11 +120,10 @@ class AuthService {
   /// Forgot-password helper (only for Email/Password accounts).
   Future<void> sendPasswordResetEmail(String email) async {
     final e = email.trim().toLowerCase();
-    if (AppConfig.allowedDomain.isNotEmpty &&
-        !e.endsWith(AppConfig.allowedDomain.trim().toLowerCase())) {
+    if (!_isAllowedEmail(e)) {
       throw FirebaseAuthException(
         code: 'invalid-email-domain',
-        message: 'Use your ${AppConfig.allowedDomain} email address.',
+        message: 'Use your ${_allowedDomainDescription()} email address.',
       );
     }
     await _auth.sendPasswordResetEmail(email: e);

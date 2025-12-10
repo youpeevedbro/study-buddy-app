@@ -23,8 +23,11 @@ class AppConfig {
   static late final String microsoftTenantId;
 
   // === App settings ===
-  /// Client-side hint only; your backend enforces allowed domains.
+  /// Legacy single-domain hint (kept for back-compat).
   static late final String allowedEmailDomain;
+
+  /// New: list of allowed email domain suffixes, e.g. ['@student.csulb.edu', '@csulb.edu'].
+  static late final List<String> allowedEmailDomains;
 
   /// FastAPI backend base URL (per-platform overrides supported).
   static late final String apiBase;
@@ -43,17 +46,39 @@ class AppConfig {
     );
 
     // ---- AAD ----
-    // aadPostLogoutUrl  = _read(
-    //   'AAD_POST_LOGOUT_URL',
-    //   def: 'https://$firebaseProjectId.web.app/signed-out/',
-    // );
     aadPostLogoutUrl  = _read('AAD_POST_LOGOUT_URL', def: '');
     microsoftTenantId = _read('MICROSOFT_TENANT_ID', def: '');
 
-    // ---- App ----
-    allowedEmailDomain = _read('ALLOWED_EMAIL_DOMAIN', def: '@student.csulb.edu');
+    // ---- App: allowed email domains ----
+    // Legacy single-domain value with '@' included.
+    allowedEmailDomain = _read('ALLOWED_EMAIL_DOMAIN', def: '@student.csulb.edu').toLowerCase();
 
-    // Prefer explicit .env overrides; otherwise pick per platform.
+    // New multi-domain env: ALLOWED_EMAIL_DOMAINS=student.csulb.edu,csulb.edu
+    final multiRaw = dotenv.maybeGet('ALLOWED_EMAIL_DOMAINS')?.trim() ?? '';
+
+    if (multiRaw.isNotEmpty) {
+      final parsed = multiRaw
+          .split(',')
+          .map((d) => d.trim().toLowerCase())
+          .where((d) => d.isNotEmpty)
+          .map((d) => d.startsWith('@') ? d : '@$d')
+          .toList();
+
+      if (parsed.isNotEmpty) {
+        allowedEmailDomains = parsed;
+      } else if (allowedEmailDomain.isNotEmpty) {
+        allowedEmailDomains = [allowedEmailDomain];
+      } else {
+        allowedEmailDomains = const [];
+      }
+    } else if (allowedEmailDomain.isNotEmpty) {
+      // Fallback: only the legacy single domain.
+      allowedEmailDomains = [allowedEmailDomain];
+    } else {
+      allowedEmailDomains = const [];
+    }
+
+    // ---- API Base URL selection ----
     final envBaseIOS     = dotenv.maybeGet('API_BASE_IOS')?.trim();
     final envBaseAndroid = dotenv.maybeGet('API_BASE_ANDROID')?.trim();
     final envBaseWeb     = dotenv.maybeGet('API_BASE_WEB')?.trim();
@@ -88,7 +113,8 @@ class AppConfig {
 
     debugPrint(
       '✅ AppConfig: project=$firebaseProjectId apiBase=$apiBase '
-      'tenant=$microsoftTenantId postLogout=$aadPostLogoutUrl',
+          'tenant=$microsoftTenantId postLogout=$aadPostLogoutUrl '
+          'allowedDomains=${allowedEmailDomains.join(", ")}',
     );
   }
 
