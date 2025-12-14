@@ -25,8 +25,13 @@ import 'services/user_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Prints whether fake time is on/off
+
+  // ---------------------------------------
+  // ENABLE FAKE TIME FOR TESTING
+  // ---------------------------------------
+  DevConfig.setFakeTime(DateTime(2025, 10, 25, 8, 0));
   DevConfig.printDebugInfo();
+  // ---------------------------------------
 
   // --- ENV + CONFIG ---
   await dotenv.load(fileName: ".env");
@@ -37,23 +42,19 @@ Future<void> main() async {
   await Hive.initFlutter();
   await Hive.openBox('roomsCache');
 
+  // DEBUG ONLY: clear cached "no rooms" results
+  if (DevConfig.debug) {
+    await Hive.box('roomsCache').clear();
+  }
+
   // --- Initialize Firebase ---
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // // ---------------------------------------
-  // // ENABLE FAKE TIME FOR TESTING
-  // // ---------------------------------------
-  // DevConfig.setFakeTime(
-  //   DateTime(2025, 11, 26, 18, 45),  // <-- pick any time you need
-  // );
-  // // DevConfig.useRealTime(); // turn off later
-  // DevConfig.printDebugInfo();
-  // // ---------------------------------------
-
   runApp(const StudyBuddyApp());
 }
+
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});

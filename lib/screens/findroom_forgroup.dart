@@ -9,6 +9,7 @@ import '../services/api.dart';
 import '../models/room.dart';
 import '../models/group.dart';
 import '../services/building_service.dart';
+import '../config/dev_config.dart';
 
 class FindRoomForGroupPage extends StatefulWidget {
   final SelectedGroupFields initialFilters;
@@ -38,7 +39,7 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
     super.initState();
 
     // Initialize filters from incoming group flow
-    final DateTime initialDate = widget.initialFilters.date ?? DateTime.now();
+    final DateTime initialDate = widget.initialFilters.date ?? DevConfig.now();
     _currentFilter = FilterCriteriaForGroup(
       buildingCode: widget.initialFilters.building,
       date: initialDate,
@@ -151,7 +152,7 @@ class _FindRoomForGroupPageState extends State<FindRoomForGroupPage> {
       final eh = int.parse(endParts[0]);
       final em = int.parse(endParts[1]);
       final endDt = DateTime(year, month, day, eh, em);
-      return DateTime.now().isAfter(endDt);
+      return DevConfig.now().isAfter(endDt);
     } catch (_) {
       return false;
     }

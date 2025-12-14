@@ -1,6 +1,7 @@
 // lib/services/rooms_cache.dart
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../config/dev_config.dart';
 
 class CachedResponse {
   final DateTime timestamp;
@@ -56,7 +57,7 @@ class RoomsCache {
       final ts = DateTime.parse(decoded["timestamp"]);
       final expiry = ttl ?? defaultTtl;
 
-      if (DateTime.now().difference(ts) > expiry) {
+      if (DevConfig.now().difference(ts) > expiry) {
         await box.delete(key);
         return null;
       }
@@ -89,7 +90,7 @@ class RoomsCache {
     );
 
     final payload = jsonEncode({
-      "timestamp": DateTime.now().toIso8601String(),
+      "timestamp": DevConfig.now().toIso8601String(),
       "body": body,
     });
 

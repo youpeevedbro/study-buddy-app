@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../components/grad_button.dart';
 import '../services/building_service.dart';
+import '../config/dev_config.dart';
 
 // ---------------------- Backend Zone Helper ---------------------
 class FilterCriteriaForGroup {
@@ -104,7 +105,7 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
     }
 
     // Define allowed window: today -> 7 days from today (inclusive)
-    final nowDT = DateTime.now();
+    final nowDT = DevConfig.now();
     final today = DateTime(nowDT.year, nowDT.month, nowDT.day);
     final weekOut = today.add(const Duration(days: 7));
     final nowTime = TimeOfDay.now();
@@ -232,7 +233,7 @@ class _FilterPageForGroupState extends State<FilterPageForGroup> {
 
   Future<void> _selectDate(BuildContext context) async {
     // Allowed window: today -> 7 days from today
-    final now = DateTime.now();
+    final now = DevConfig.now();
     final today = DateTime(now.year, now.month, now.day);
     final weekOut = today.add(const Duration(days: 7));
 

@@ -28,7 +28,7 @@
 // ------------------------------------------------------------
 
 class DevConfig {
-  static bool debug = false; // set true to enable fake time
+  static bool debug = true; // set true to enable fake time
   static DateTime? _fakeTime;
 
   /// Optional static setters:

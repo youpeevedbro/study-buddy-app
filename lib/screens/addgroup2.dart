@@ -7,6 +7,7 @@ import '../components/grad_button.dart';
 import '../models/group.dart';
 import '../services/group_service.dart';
 import 'package:intl/intl.dart';
+import '../config/dev_config.dart';
 
 class AddGroupPage extends StatefulWidget {
   const AddGroupPage({super.key});
@@ -132,7 +133,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
   }
 
   DateTime _timeOfDayToToday(TimeOfDay tod) {
-    final now = DateTime.now();
+    final now = DevConfig.now();
     return DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
   }
 
@@ -203,7 +204,7 @@ class _AddGroupPageState extends State<AddGroupPage> {
     if (!_canEdit) return;
 
     // Define allowed window: today -> 7 days from today (inclusive)
-    final now = DateTime.now();
+    final now = DevConfig.now();
     final today = DateTime(now.year, now.month, now.day);
     final weekOut = today.add(const Duration(days: 7));
 

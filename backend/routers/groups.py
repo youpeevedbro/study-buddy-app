@@ -311,12 +311,15 @@ def add_group_member(group_id: str, user_id: str,
 
 
 @router.get("/myStudyGroups")
-def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedStudyGroupResponse:
+def get_joined_groups(
+    includePast: bool = Query(False),
+    claims: dict = Depends(verify_firebase_token),
+) -> JoinedStudyGroupResponse:
     """
-    Returns data from 'joinedStudyGroups' field in User document
+    Returns data from 'joinedStudyGroups' field in User document.
+    By default, excludes past groups. Set includePast=true to include them.
     """
     try:
-
         uid = claims.get("uid") or claims.get("sub")
 
         db = get_db()
@@ -327,25 +330,34 @@ def get_joined_groups(claims: dict = Depends(verify_firebase_token)) -> JoinedSt
         if doc.exists:
             user_dict = doc.to_dict()
             joinedGroups = user_dict.get("joinedStudyGroups", {})
+
+            now_utc = datetime.now(timezone.utc)
+
             for key, value in joinedGroups.items():
                 groupEndTime = convert_to_utc_datetime(value["date"], value["endTime"])
-                if groupEndTime < datetime.now(timezone.utc):
-                    continue   # do not send past study groups
+
+                # Only filter past groups if includePast is false
+                if (not includePast) and (groupEndTime < now_utc):
+                    continue
+
                 items.append(
                     JoinedStudyGroup(
-                        id = key,
-                        name = value.get("name", ""),
-                        startTime = value.get("startTime", ""),
-                        endTime = value.get("endTime", ""),
-                        date = value.get("date", "")
-                ))
+                        id=key,
+                        name=value.get("name", ""),
+                        startTime=value.get("startTime", ""),
+                        endTime=value.get("endTime", ""),
+                        date=value.get("date", ""),
+                    )
+                )
+
             items.sort(key=lambda item: convert_to_utc_datetime(item.date, item.startTime))
             return JoinedStudyGroupResponse(items=items)
-        else:
-            raise HTTPException(status_code=404, detail="User doc not found")
+
+        raise HTTPException(status_code=404, detail="User doc not found")
+
     except Exception as e:
-        # Surface exact failure in response while we debug
         raise HTTPException(status_code=500, detail=f"/groups failed: {type(e).__name__}: {e}")
+
 
 
 @router.get("/")

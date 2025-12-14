@@ -2,22 +2,28 @@
 import 'package:flutter/material.dart';
 import '../components/grad_button.dart';
 import '../services/building_service.dart';
+import 'package:intl/intl.dart';
+import '../config/dev_config.dart';
+
 
 // ---------------------- Backend Zone Helper ---------------------
 class FilterCriteria {
   final String? buildingCode;
+  final DateTime date;
   final TimeOfDay? startTime;
   final TimeOfDay? endTime;
 
   FilterCriteria({
     this.buildingCode,
+    DateTime? date,
     this.startTime,
     this.endTime,
-  });
+  }) : date = date ?? DevConfig.now();
 
   Map<String, dynamic> toJson() {
     return {
       'building': buildingCode,
+      'date': DateFormat('yyyy-MM-dd').format(date),
       'startTime': startTime?.format24Hour(),
       'endTime': endTime?.format24Hour(),
     };
@@ -33,8 +39,15 @@ class FilterCriteria {
       return TimeOfDay(hour: h, minute: m);
     }
 
+    DateTime _parseDate(String? s) {
+      if (s == null) return DevConfig.now();
+      // expects yyyy-MM-dd
+      return DateTime.tryParse(s) ?? DevConfig.now();
+    }
+
     return FilterCriteria(
       buildingCode: json['building'] as String?,
+      date: _parseDate(json['date'] as String?),
       startTime: _parseHHMM(json['startTime'] as String?),
       endTime: _parseHHMM(json['endTime'] as String?),
     );
@@ -143,6 +156,7 @@ class _FilterPageState extends State<FilterPage> {
     // 2) Build criteria as before
     final criteria = FilterCriteria(
       buildingCode: _selectedBuildingCode,
+      date: DevConfig.now(),
       startTime: startTime,
       endTime: endTime,
     );
@@ -163,8 +177,8 @@ class _FilterPageState extends State<FilterPage> {
       _selectedBuildingCode = null;
 
       // Reset to “free AT the current time”
-      final now = TimeOfDay.now();
-      startTime = now;
+      final now = DevConfig.now();
+      startTime = TimeOfDay(hour: now.hour, minute: now.minute);
       endTime = null;
 
       _timeError = null;
@@ -389,7 +403,7 @@ class _FilterPageState extends State<FilterPage> {
         onTap: () async {
           final picked = await showTimePicker(
             context: context,
-            initialTime: time ?? TimeOfDay.now(),
+            initialTime: time ?? TimeOfDay(hour: DevConfig.now().hour, minute: DevConfig.now().minute),
             builder: (context, child) {
               return Theme(
                 data: ThemeData.light().copyWith(

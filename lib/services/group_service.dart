@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../config/app_config.dart';
 import '../models/group.dart';
+import '../config/dev_config.dart';
 
 
 class GroupService {
@@ -85,7 +86,16 @@ class GroupService {
   }
 
   Future<List<JoinedGroup>> listMyStudyGroups() async {
-    final uri = _u('/group/myStudyGroups');
+    final qp = <String, String>{};
+
+    // If we're using fake time for testing, don't let the backend filter out
+    // groups that are "past" relative to real server time.
+    if (DevConfig.debug) {
+      qp["includePast"] = "true";
+    }
+
+    final uri = _u('/group/myStudyGroups', qp.isEmpty ? null : qp);
+
     final resp =
         await http.get(uri, headers: await _headers()).timeout(_timeout);
 
@@ -99,6 +109,7 @@ class GroupService {
     final List<dynamic> joinedGroups = data["items"];
     return joinedGroups.map((m) => JoinedGroup.fromJson(m)).toList();
   }
+
 
   Future<List<StudyGroupResponse>> listAllStudyGroups({String? name}) async {  //optional named parameter
     Map<String, String> qp = {};
