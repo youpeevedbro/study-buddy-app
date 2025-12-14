@@ -312,7 +312,7 @@ def add_group_member(group_id: str, user_id: str,
 
 @router.get("/myStudyGroups")
 def get_joined_groups(
-    includePast: bool = Query(False),
+    includePast: bool = Query(True),
     claims: dict = Depends(verify_firebase_token),
 ) -> JoinedStudyGroupResponse:
     """
