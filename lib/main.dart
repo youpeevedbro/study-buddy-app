@@ -123,6 +123,16 @@ class StudyBuddyApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: brand),
         scaffoldBackgroundColor: Colors.white,
+
+        // ✅ Accessibility: scalable, consistent typography
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+          titleMedium: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          bodyLarge: TextStyle(fontSize: 16),
+          bodyMedium: TextStyle(fontSize: 14),
+          bodySmall: TextStyle(fontSize: 12),
+          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
       ),
       home: const AuthGate(),
       routes: {

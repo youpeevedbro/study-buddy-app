@@ -125,12 +125,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
                       child: Column(
                         children: [
-                          const CircleAvatar(
-                            radius: 110,
-                            backgroundColor: Colors.transparent,
-                            backgroundImage:
-                                AssetImage("assets/images/elbee.png"),
+                          Semantics(
+                            label: 'Study Buddy mascot (profile image)',
+                            image: true,
+                            child: const CircleAvatar(
+                              radius: 110,
+                              backgroundColor: Colors.transparent,
+                              backgroundImage: AssetImage("assets/images/elbee.png"),
+                            ),
                           ),
+
 
                           const SizedBox(height: 28),
 
