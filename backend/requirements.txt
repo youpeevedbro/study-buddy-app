@@ -11,3 +11,8 @@ python-dotenv==1.0.1
 
 # Pydantic v2 (FastAPI 0.115 uses v2)
 pydantic>=2.0.0,<3.0.0
+
+# Scraper dependencies
+requests==2.32.3
+beautifulsoup4==4.12.3
+lxml==5.3.0
